@@ -1,24 +1,26 @@
-import { NativeTabs } from 'expo-router/native-tabs';
-import { useColorScheme } from 'react-native';
+import { Tabs } from 'expo-router/tabs';
+import { TabBar } from '@/features/shell/TabBar';
+import { setActiveTab } from '@/features/shell/TabStack';
 import { TAB_DEFS, useTabs } from '@/features/shell/tabs';
+import { tabTransition } from '@/features/shell/tabTransition';
 
-/** Thanh tab UIKit thật; tab hiện theo quyền ở chi nhánh đang chọn. */
+/** Thanh tab tự vẽ; tab không có quyền thì ẩn (href: null). */
 export default function TabsLayout() {
   const { visible } = useTabs();
   const shown = new Set(visible.map((t) => t.key));
-  const tint = useColorScheme() === 'dark' ? '#5CC8D5' : '#1A5F6A';
   return (
-    <NativeTabs tintColor={tint}>
+    <Tabs
+      screenOptions={{ headerShown: false, ...tabTransition }}
+      screenListeners={({ route }) => ({ focus: () => setActiveTab(route.name) })}
+      tabBar={(props) => <TabBar {...props} />}>
       {TAB_DEFS.map((tab) => (
-        <NativeTabs.Trigger key={tab.key} name={tab.key} hidden={!shown.has(tab.key)}>
-          <NativeTabs.Trigger.Label>{tab.label}</NativeTabs.Trigger.Label>
-          <NativeTabs.Trigger.Icon sf={{ default: tab.icon, selected: tab.iconSelected }} />
-        </NativeTabs.Trigger>
+        <Tabs.Screen
+          key={tab.key}
+          name={tab.key}
+          options={{ title: tab.label, href: shown.has(tab.key) ? undefined : null }}
+        />
       ))}
-      <NativeTabs.Trigger name="them">
-        <NativeTabs.Trigger.Label>Thêm</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={{ default: 'ellipsis.circle', selected: 'ellipsis.circle.fill' }} />
-      </NativeTabs.Trigger>
-    </NativeTabs>
+      <Tabs.Screen name="them" options={{ title: 'Thêm' }} />
+    </Tabs>
   );
 }

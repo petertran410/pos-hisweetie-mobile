@@ -72,6 +72,16 @@ export function dayLabel(value: string | number | Date | null | undefined, now =
   return d.getFullYear() === now.getFullYear() ? `${weekday}, ${short}` : dateVN(d);
 }
 
+/** Thời điểm gọn: "19:42" (hôm nay), "Hôm qua 19:42", "28/10 19:42". */
+export function shortWhen(value: string | number | Date | null | undefined, now = new Date()): string {
+  const d = toDate(value);
+  if (!d) return '';
+  const diff = Math.round((startOfDay(now).getTime() - startOfDay(d).getTime()) / 86_400_000);
+  if (diff === 0) return timeVN(d);
+  if (diff === 1) return `Hôm qua ${timeVN(d)}`;
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${timeVN(d)}`;
+}
+
 /** Khoá nhóm theo ngày (yyyy-mm-dd theo giờ máy). */
 export function dayKey(value: string | number | Date | null | undefined): string {
   const d = toDate(value);

@@ -7,6 +7,7 @@ import {
   parseQty,
   periodRange,
   qty,
+  shortWhen,
   vnd,
 } from '../format';
 
@@ -44,6 +45,13 @@ describe('format', () => {
     expect(periodRange('today', now)).toEqual({ from: '2026-10-31', to: '2026-10-31' });
     expect(periodRange('last7', now)).toEqual({ from: '2026-10-25', to: '2026-10-31' });
     expect(periodRange('lastMonth', now)).toEqual({ from: '2026-09-01', to: '2026-09-30' });
+  });
+
+  it('shows compact times', () => {
+    const now = new Date(2026, 9, 31, 15, 0);
+    expect(shortWhen(new Date(2026, 9, 31, 9, 5), now)).toBe('09:05');
+    expect(shortWhen(new Date(2026, 9, 30, 20, 30), now)).toBe('Hôm qua 20:30');
+    expect(shortWhen(new Date(2026, 9, 28, 7, 0), now)).toBe('28/10 07:00');
   });
 
   it('takes initials from the last two words', () => {

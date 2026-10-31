@@ -1,0 +1,67 @@
+// Dữ liệu MẪU cho trang xem trước khi dev (không phải dữ liệu thật).
+import type { Branch } from '@/core/session';
+import type { DashboardData } from '../dashboard/DashboardView';
+import type { TaskRow } from '../dashboard/api';
+
+export const sampleUser = {
+  name: 'Nguyễn Thị Lan',
+  email: 'lan@example.com',
+  roles: ['Super Admin'],
+  permissions: [] as string[],
+};
+
+export const sampleBranches: Branch[] = [
+  { id: 1, name: 'Chi nhánh mẫu A', address: '12 Đường Mẫu, Quận 1' },
+  { id: 2, name: 'Chi nhánh mẫu B', address: '88 Đường Thử, Quận 7' },
+];
+
+const hours = ['08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19'];
+const revenue = [1.2, 2.4, 3.1, 1.8, 0.9, 1.5, 2.8, 3.6, 2.2, 1.4, 0.8, 0.5];
+
+export const sampleDashboard: DashboardData = {
+  stats: {
+    currentRevenue: 22_200_000,
+    lastRevenue: 19_760_000,
+    revenueChange: 12.3,
+    invoiceCount: 24,
+    invoiceChange: 8,
+    aov: 925_000,
+    aovChange: -2.1,
+    profit: 5_120_000,
+    profitChange: 15.4,
+    marginAvg: 23.1,
+    totalCustomerDebt: 48_350_000,
+    totalSupplierDebt: 120_400_000,
+    unpaidInvoices: 35,
+    unpaidAmount: 31_200_000,
+    codAmount: 4_650_000,
+    codCount: 4,
+    lowStockProducts: 9,
+    outOfStockProducts: 2,
+    negativeStock: 0,
+  },
+  trend: hours.map((label, i) => ({ label, revenue: revenue[i] * 1_000_000, profit: revenue[i] * 230_000 })),
+  counts: { orders: 12, debt: 35, cod: 4, stock: 9 },
+  products: [
+    { productId: 1, code: 'SP001', name: 'Trà đen 1kg', totalQuantity: 42, totalRevenue: 7_770_000 },
+    { productId: 2, code: 'SP002', name: 'Siro đào 2,5L', totalQuantity: 30, totalRevenue: 2_880_000 },
+    { productId: 3, code: 'SP003', name: 'Trân châu đen 3kg', totalQuantity: 28, totalRevenue: 2_184_000 },
+    { productId: 4, code: 'SP004', name: 'Bột sữa béo 1kg', totalQuantity: 25, totalRevenue: 1_625_000 },
+    { productId: 5, code: 'SP005', name: 'Thạch dừa 2,5kg', totalQuantity: 18, totalRevenue: 990_000 },
+  ],
+  buyers: [
+    { id: 1, code: 'KH001', name: 'Quán mẫu Trà Mây', totalRevenue: 6_400_000, invoiceCount: 5 },
+    { id: 2, code: 'KH002', name: 'Quán mẫu Gió Chiều', totalRevenue: 4_100_000, invoiceCount: 3 },
+    { id: 3, code: 'KH003', name: 'Tiệm mẫu Lối Nhỏ', totalRevenue: 2_950_000, invoiceCount: 2 },
+  ],
+  recent: [
+    { id: 1, code: 'DH000101', customerName: 'Quán mẫu Trà Mây', grandTotal: 3_400_000, createdAt: new Date().toISOString() },
+    { id: 2, code: 'DH000100', customerName: 'Tiệm mẫu Lối Nhỏ', grandTotal: 1_650_000, createdAt: new Date(Date.now() - 3_600_000).toISOString() },
+  ],
+};
+
+export const sampleTasks: TaskRow[] = [
+  { code: 'DH000101', partner: 'Quán mẫu Trà Mây', branchName: 'Chi nhánh mẫu A', value: 3_400_000, time: new Date().toISOString(), status: 'pending' },
+  { code: 'DH000099', partner: 'Quán mẫu Gió Chiều', branchName: 'Chi nhánh mẫu A', value: 5_120_000, time: new Date(Date.now() - 86_400_000).toISOString(), status: 'confirmed' },
+  { code: 'DH000097', partner: 'Tiệm mẫu Lối Nhỏ', branchName: 'Chi nhánh mẫu B', value: 7_800_000, time: new Date(Date.now() - 2 * 86_400_000).toISOString(), status: 'partially_invoiced' },
+];

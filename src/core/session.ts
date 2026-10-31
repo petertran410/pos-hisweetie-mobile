@@ -98,7 +98,13 @@ async function applyAuth(body: AuthBody) {
 
 /** Mở app: còn refresh token thì vào thẳng, không thì về màn đăng nhập. */
 export async function bootstrap() {
-  requestContext.deviceId = await getDeviceId();
+  try {
+    requestContext.deviceId = await getDeviceId();
+  } catch {
+    // Keychain không dùng được (vd. bản xem trước trên trình duyệt) → coi như chưa đăng nhập.
+    useSession.setState({ status: 'signedOut' });
+    return;
+  }
   if (!(await getRefreshToken())) {
     useSession.setState({ status: 'signedOut' });
     return;

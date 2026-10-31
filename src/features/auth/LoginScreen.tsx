@@ -1,28 +1,25 @@
 import { router } from 'expo-router';
 import { useRef, useState, type ComponentRef } from 'react';
-import {
-  KeyboardAvoidingView,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import Animated, { LinearTransition, ZoomIn } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorMessage } from '@/core/http';
 import { signInWithLark, signInWithPassword, useSession } from '@/core/session';
-import { Banner, Button, C, Txt } from '@/ui';
+import { Banner, Button, C, Card, gentleEntering, Icon, PageBackground, TextField, Txt } from '@/ui';
+import { easeOut } from '@/ui/motion';
 import { Logo } from './Logo';
 
 type Mode = 'lark' | 'password';
 
 export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
   const notice = useSession((s) => s.notice);
   const [mode, setMode] = useState<Mode>('lark');
   const [busy, setBusy] = useState<'lark' | 'password' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   const loginLark = async () => {
@@ -56,123 +53,129 @@ export default function LoginScreen() {
     }
   };
 
+  const switchMode = (next: Mode) => {
+    setError(null);
+    setMode(next);
+  };
+
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <PageBackground />
       <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 }]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive">
           <View style={styles.brand}>
-            <Logo />
-            <Txt variant="title1" align="center">
-              HiSweetie POS
+            <Animated.View entering={ZoomIn.duration(380).easing(easeOut)}>
+              <Logo size={76} />
+            </Animated.View>
+            <Txt variant="label" weight="bold" color={C.brand} style={styles.brandName}>
+              HISWEETIE POS
             </Txt>
-            <Txt variant="body" color={C.secondary} align="center">
+            <Txt variant="title" align="center">
+              Đăng nhập vào tài khoản
+            </Txt>
+            <Txt variant="body" color={C.muted} align="center">
               Lên đơn, xem công nợ và báo đơn ngay trên iPhone
             </Txt>
           </View>
 
-          <View style={styles.bottom}>
-            {notice && !error ? <Banner tone="info" icon="info.circle.fill" title={notice} /> : null}
+          {/* Mở màn: khung hiện dần; đổi giữa Lark và email: khung co giãn mượt. */}
+          <Animated.View entering={gentleEntering(2)} layout={LinearTransition.duration(250)}>
+          <Card style={styles.panel}>
+            {notice && !error ? <Banner tone="info" title={notice} /> : null}
             {error ? <Banner tone="danger" title={error} /> : null}
 
             {mode === 'lark' ? (
-              <>
+              <View key="lark" style={styles.modeBody}>
                 <Button
                   title="Đăng nhập bằng Lark"
-                  icon="person.badge.key.fill"
+                  icon="key-round"
                   onPress={loginLark}
                   loading={busy === 'lark'}
                   disabled={busy !== null}
                 />
                 <Button
-                  title="Đăng nhập bằng email và mật khẩu"
-                  variant="plain"
-                  size="medium"
-                  onPress={() => {
-                    setError(null);
-                    setMode('password');
-                  }}
+                  title="Email và mật khẩu"
+                  icon="mail"
+                  variant="outline"
+                  onPress={() => switchMode('password')}
                   disabled={busy !== null}
                 />
-                <Txt variant="footnote" color={C.secondary} align="center" style={styles.hint}>
-                  Dùng tài khoản Lark của công ty. Đăng nhập ngay trên trang Lark vừa mở, không chọn mở
-                  ứng dụng Lark.
-                </Txt>
-              </>
-            ) : (
-              <>
-                <View style={styles.form}>
-                  <View style={styles.field}>
-                    <Txt style={styles.fieldLabel}>Email</Txt>
-                    <TextInput
-                      value={email}
-                      onChangeText={setEmail}
-                      placeholder="ten@hisweetie.vn"
-                      placeholderTextColor={C.tertiary}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="email-address"
-                      textContentType="username"
-                      autoComplete="email"
-                      returnKeyType="next"
-                      onSubmitEditing={() => passwordRef.current?.focus()}
-                      style={styles.input}
-                    />
-                  </View>
-                  <View style={styles.separator} />
-                  <View style={styles.field}>
-                    <Txt style={styles.fieldLabel}>Mật khẩu</Txt>
-                    <TextInput
-                      ref={passwordRef}
-                      value={password}
-                      onChangeText={setPassword}
-                      placeholder="Bắt buộc"
-                      placeholderTextColor={C.tertiary}
-                      secureTextEntry
-                      textContentType="password"
-                      autoComplete="current-password"
-                      returnKeyType="go"
-                      onSubmitEditing={loginPassword}
-                      style={styles.input}
-                    />
-                  </View>
+                <View style={styles.hint}>
+                  <Icon name="info" size={16} color={C.muted} />
+                  <Txt variant="caption" color={C.muted} style={{ flex: 1 }}>
+                    Dùng tài khoản Lark của công ty. Đăng nhập ngay trên trang Lark vừa mở, không chọn mở
+                    ứng dụng Lark.
+                  </Txt>
                 </View>
+              </View>
+            ) : (
+              <View key="password" style={styles.modeBody}>
+                <TextField
+                  label="Email"
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="ten@congty.vn"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  textContentType="username"
+                  autoComplete="email"
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                />
+                <TextField
+                  ref={passwordRef}
+                  label="Mật khẩu"
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Nhập mật khẩu"
+                  secureTextEntry={!showPassword}
+                  textContentType="password"
+                  autoComplete="current-password"
+                  returnKeyType="go"
+                  onSubmitEditing={loginPassword}
+                  right={
+                    <Pressable
+                      onPress={() => setShowPassword((v) => !v)}
+                      hitSlop={10}
+                      accessibilityRole="button"
+                      accessibilityLabel={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
+                      <Icon name={showPassword ? 'eye-off' : 'eye'} size={20} color={C.muted} />
+                    </Pressable>
+                  }
+                />
                 <Button
                   title="Đăng nhập"
                   onPress={loginPassword}
                   loading={busy === 'password'}
                   disabled={busy !== null}
+                  style={{ marginTop: 4 }}
                 />
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => {
-                    setError(null);
-                    setMode('lark');
-                  }}
-                  style={styles.back}>
-                  <Txt color={C.tint}>Đăng nhập bằng Lark</Txt>
-                </Pressable>
-              </>
+                <Button
+                  title="Quay lại đăng nhập bằng Lark"
+                  variant="ghost"
+                  size="medium"
+                  onPress={() => switchMode('lark')}
+                  disabled={busy !== null}
+                />
+              </View>
             )}
-          </View>
+          </Card>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.plainBg },
-  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 24 },
-  brand: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingVertical: 40 },
-  bottom: { gap: 12 },
-  hint: { marginTop: 4, paddingHorizontal: 8 },
-  form: { backgroundColor: C.fill, borderRadius: 12, overflow: 'hidden' },
-  field: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 16, gap: 12 },
-  fieldLabel: { width: 82 },
-  input: { flex: 1, fontSize: 17, color: C.label, paddingVertical: 12 },
-  separator: { height: StyleSheet.hairlineWidth, backgroundColor: C.separator, marginLeft: 16 },
-  back: { alignItems: 'center', justifyContent: 'center', minHeight: 44 },
+  scroll: { flexGrow: 1, paddingHorizontal: 20, justifyContent: 'center', gap: 28 },
+  brand: { alignItems: 'center', gap: 10 },
+  brandName: { letterSpacing: 2, marginTop: 6 },
+  panel: { padding: 18, gap: 14 },
+  modeBody: { gap: 14 },
+  hint: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingTop: 2 },
 });

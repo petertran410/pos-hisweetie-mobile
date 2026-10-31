@@ -1,60 +1,96 @@
-import { DynamicColorIOS, PlatformColor, Platform, type ColorValue } from 'react-native';
-
-const dyn = (light: string, dark: string): ColorValue =>
-  Platform.OS === 'ios' ? DynamicColorIOS({ light, dark }) : light;
-const sys = (name: string, fallback: string): ColorValue =>
-  Platform.OS === 'ios' ? PlatformColor(name) : fallback;
+import type { ViewStyle } from 'react-native';
 
 /**
- * Màu theo chuẩn iOS: màu hệ thống (tự đổi khi bật chế độ tối) + màu
- * thương hiệu HiSweetie làm tint.
+ * Bảng màu cố định (app chỉ dùng giao diện sáng). Màu chữ và màu nhấn
+ * đã chọn để đủ tương phản trên nền trắng.
  */
 export const C = {
-  bg: sys('systemGroupedBackground', '#F2F2F7'),
-  card: sys('secondarySystemGroupedBackground', '#FFFFFF'),
-  plainBg: sys('systemBackground', '#FFFFFF'),
-  label: sys('label', '#000000'),
-  secondary: sys('secondaryLabel', '#636366'),
-  tertiary: sys('tertiaryLabel', '#AEAEB2'),
-  separator: sys('separator', '#C6C6C8'),
-  fill: sys('tertiarySystemFill', '#E3E3E8'),
-  fillStrong: sys('secondarySystemFill', '#D1D1D6'),
-  /** Nút, liên kết, phần đang chọn. */
-  tint: dyn('#1A5F6A', '#5CC8D5'),
-  tintSoft: dyn('#E0F2F4', '#12363B'),
-  onTint: dyn('#FFFFFF', '#06262A'),
-  accent: '#00B7CC' as ColorValue,
-  warning: dyn('#975A16', '#F2B860'),
-  warningSoft: dyn('#FDF3E1', '#3A2A12'),
-  danger: dyn('#C53030', '#FF6961'),
-  dangerSoft: dyn('#FBE9E9', '#3B1616'),
-  success: dyn('#2F7A4F', '#5DD38C'),
-  successSoft: dyn('#E6F4EC', '#123222'),
-  info: dyn('#1F5AA6', '#7FB2FF'),
-  infoSoft: dyn('#E8F0FB', '#16263D'),
-  neutralSoft: dyn('#EFEFF4', '#2C2C2E'),
+  /** Nền trang: gradient từ trên xuống. */
+  bgTop: '#DDF1F4',
+  bgMid: '#EEF7F8',
+  bg: '#F4F7FA',
+  card: '#FFFFFF',
+  border: '#E6ECF1',
+  divider: '#EEF2F6',
+  text: '#1D2433',
+  muted: '#5F6B7A',
+  faint: '#9AA4B2',
+  /** Màu thương hiệu dùng cho chữ/viền (đủ tương phản trên nền trắng). */
+  brand: '#0B7A87',
+  brandDark: '#164E58',
+  brandSoft: '#E1F4F6',
+  white: '#FFFFFF',
+  overlay: 'rgba(16, 33, 40, 0.35)',
+} as const;
+
+/** Gradient nút chính / thẻ nổi bật (chữ trắng đủ tương phản). */
+export const gradients = {
+  brand: ['#08808E', '#164E58'] as const,
+  page: [C.bgTop, C.bgMid, C.bg] as const,
 };
 
-/** Màu dạng chuỗi cho thư viện biểu đồ (không nhận PlatformColor). */
-export const chartColors = (dark: boolean) => ({
-  line: dark ? '#5CC8D5' : '#1A5F6A',
-  fillStart: dark ? 'rgba(92,200,213,0.35)' : 'rgba(26,95,106,0.22)',
-  fillEnd: dark ? 'rgba(92,200,213,0.02)' : 'rgba(26,95,106,0.02)',
-  secondLine: dark ? '#F2B860' : '#975A16',
-  axis: dark ? '#8E8E93' : '#8E8E93',
-  bar: dark ? '#5CC8D5' : '#1A5F6A',
-});
+/** Màu nhấn cho biểu tượng từng chức năng. */
+export const accents = {
+  teal: '#0B8A9A',
+  blue: '#2563EB',
+  violet: '#6D4AFF',
+  green: '#16A34A',
+  orange: '#D97706',
+  red: '#DC2626',
+  pink: '#DB2777',
+  slate: '#475569',
+} as const;
 
-export type Tone = 'info' | 'warning' | 'success' | 'danger' | 'neutral' | 'tint';
+export type AccentName = keyof typeof accents;
 
-export const toneColors: Record<Tone, { fg: ColorValue; bg: ColorValue }> = {
-  info: { fg: C.info, bg: C.infoSoft },
-  warning: { fg: C.warning, bg: C.warningSoft },
-  success: { fg: C.success, bg: C.successSoft },
-  danger: { fg: C.danger, bg: C.dangerSoft },
-  neutral: { fg: C.secondary, bg: C.neutralSoft },
-  tint: { fg: C.tint, bg: C.tintSoft },
+/** Nền nhạt tương ứng cho ô biểu tượng. */
+export const accentSoft: Record<AccentName, string> = {
+  teal: '#E0F4F6',
+  blue: '#E5EDFE',
+  violet: '#EEEAFF',
+  green: '#E3F6EA',
+  orange: '#FDF1E1',
+  red: '#FDE8E8',
+  pink: '#FCE7F1',
+  slate: '#EEF1F5',
 };
 
-export const radius = { card: 14, sheet: 20, control: 10, pill: 999 };
-export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };
+export type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'brand';
+
+export const toneColors: Record<Tone, { fg: string; bg: string }> = {
+  success: { fg: '#15803D', bg: '#DCFCE7' },
+  warning: { fg: '#B45309', bg: '#FEF3C7' },
+  danger: { fg: '#B91C1C', bg: '#FEE2E2' },
+  info: { fg: '#1D4ED8', bg: '#DBEAFE' },
+  neutral: { fg: '#4B5563', bg: '#F1F3F6' },
+  brand: { fg: C.brand, bg: C.brandSoft },
+};
+
+export const radius = { card: 16, control: 12, pill: 999 } as const;
+export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 } as const;
+
+/** Bóng rất nhẹ cho thẻ. */
+export const shadow: ViewStyle = {
+  shadowColor: '#0F3A42',
+  shadowOpacity: 0.06,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 2,
+};
+
+/** Font Be Vietnam Pro theo độ đậm (không dùng fontWeight để iOS khỏi tự làm đậm). */
+export const fonts = {
+  regular: 'BeVietnamPro_400Regular',
+  medium: 'BeVietnamPro_500Medium',
+  semibold: 'BeVietnamPro_600SemiBold',
+  bold: 'BeVietnamPro_700Bold',
+} as const;
+
+export type FontWeight = keyof typeof fonts;
+
+/** Màu cho thư viện biểu đồ. */
+export const chartColors = {
+  bar: '#0B8A9A',
+  barActive: '#164E58',
+  axis: '#9AA4B2',
+};

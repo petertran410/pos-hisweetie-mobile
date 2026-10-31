@@ -1,58 +1,113 @@
 import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Alert, StyleSheet, View } from 'react-native';
 import { API_ORIGIN, APP_VERSION } from '@/core/config';
-import { canDo } from '@/core/permissions';
+import type { PermissionHolder } from '@/core/can';
 import { currentBranch, signOut, useSession } from '@/core/session';
-import { Avatar, C, Card, Row, Screen, Section, Txt, type IconName } from '@/ui';
+import { ActionCard, Appear, Avatar, Button, C, Card, gradients, InfoRow, Page, Section, TitleHeader, toast, Txt } from '@/ui';
+import { allowedShortcuts } from '../dashboard/shortcuts';
 import { useTabs } from './tabs';
 
-interface MenuItem {
-  key: string;
-  title: string;
-  icon: IconName;
-  color: string;
-  allowed: boolean;
-  /** Chưa có thì hiện "Sắp có" và không bấm được. */
-  href?: string;
+/** Chức năng xem ở tab Thêm (những gì không có trên thanh tab). */
+const MORE_KEYS = ['hang-hoa', 'so-quy', 'bien-dong', 'bao-cao', 'quan-tri', 'bao-don'] as const;
+
+const DESCRIPTIONS: Record<string, string> = {
+  'hang-hoa': 'Giá, tồn kho theo chi nhánh',
+  'so-quy': 'Phiếu thu, phiếu chi, tồn quỹ',
+  'bien-dong': 'Tiền vào tài khoản ngân hàng',
+  'bao-cao': 'Bán hàng, hàng hóa, khách hàng, tài chính',
+  'quan-tri': 'Người dùng, vai trò, chi nhánh',
+  'bao-don': 'Giao hàng, đóng hàng, loading',
+};
+
+export interface MoreViewProps {
+  user: (PermissionHolder & { name?: string | null; email?: string | null }) | null;
+  branchName?: string;
+  canSwitchBranch: boolean;
+  hiddenTabKeys: string[];
+  onOpenBranch: () => void;
+  onOpen: (key: string, href?: string) => void;
+  onSignOut: () => void;
+}
+
+export function MoreView({ user, branchName, canSwitchBranch, hiddenTabKeys, onOpenBranch, onOpen, onSignOut }: MoreViewProps) {
+  const items = allowedShortcuts(user).filter(
+    (s) => (MORE_KEYS as readonly string[]).includes(s.key) && (s.key !== 'bao-don' || hiddenTabKeys.includes('bao-don')),
+  );
+
+  return (
+    <Page header={<TitleHeader title="Thêm" />}>
+      <Appear index={0}>
+      <LinearGradient colors={[...gradients.brand]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.profile}>
+        <View style={styles.avatarRing}>
+          <Avatar name={user?.name} size={56} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Txt variant="heading" color={C.white} numberOfLines={1}>
+            {user?.name}
+          </Txt>
+          <Txt variant="label" weight="regular" color="rgba(255,255,255,0.88)" numberOfLines={1}>
+            {user?.email}
+          </Txt>
+          {user?.roles?.length ? (
+            <Txt variant="caption" color="rgba(255,255,255,0.88)" numberOfLines={1}>
+              {user.roles.join(', ')}
+            </Txt>
+          ) : null}
+        </View>
+      </LinearGradient>
+      </Appear>
+
+      <Section index={1} title="Chi nhánh">
+        <ActionCard
+          icon="store"
+          color="teal"
+          title={branchName ?? 'Chưa chọn chi nhánh'}
+          subtitle="Số liệu, quyền và đơn hàng theo chi nhánh này"
+          onPress={canSwitchBranch ? onOpenBranch : undefined}
+        />
+      </Section>
+
+      {items.length > 0 ? (
+        <Section index={2} title="Quản lý">
+          <View style={{ gap: 10 }}>
+            {items.map((item) => (
+              <ActionCard
+                key={item.key}
+                icon={item.icon}
+                color={item.color}
+                title={item.label.replace('\n', ' ')}
+                subtitle={DESCRIPTIONS[item.key]}
+                badge={item.href ? undefined : 'Sắp có'}
+                onPress={() => onOpen(item.key, item.href)}
+              />
+            ))}
+          </View>
+        </Section>
+      ) : null}
+
+      <Section index={3} title="Ứng dụng">
+        <Card>
+          <InfoRow icon="smartphone" color="slate" label="Phiên bản" value={APP_VERSION} />
+          {__DEV__ ? (
+            <InfoRow icon="info" color="slate" label="Máy chủ (chỉ hiện khi dev)" value={API_ORIGIN.replace(/^https?:\/\//, '')} />
+          ) : null}
+        </Card>
+      </Section>
+
+      <View style={{ marginTop: 24 }}>
+        <Button title="Đăng xuất" icon="log-out" variant="danger" onPress={onSignOut} />
+      </View>
+    </Page>
+  );
 }
 
 export default function MoreScreen() {
   const user = useSession((s) => s.user);
   useSession((s) => s.branchId);
   const branches = useSession((s) => s.branches);
-  const branch = currentBranch();
-  const { overflow } = useTabs();
-  const can = (p: string) => canDo(user, p);
-  const hasReport = !!user && (user.roles.includes('Super Admin') || user.permissions.some((p) => p.startsWith('reports:')));
-
-  const candidates: MenuItem[] = [
-    ...overflow.map<MenuItem>((t) => ({
-      key: t.key,
-      title: t.label,
-      icon: t.iconSelected,
-      color: '#1A5F6A',
-      allowed: true,
-      href: t.key === 'tong-quan' ? '/tong-quan' : undefined,
-    })),
-    { key: 'hang-hoa', title: 'Hàng hóa', icon: 'cube.box.fill', color: '#2F7A4F', allowed: can('products:view') },
-    { key: 'so-quy', title: 'Sổ quỹ', icon: 'book.closed.fill', color: '#975A16', allowed: can('cash_flows:view') },
-    {
-      key: 'bien-dong',
-      title: 'Biến động số dư',
-      icon: 'building.columns.fill',
-      color: '#1F5AA6',
-      allowed: can('sepay:view'),
-    },
-    { key: 'bao-cao', title: 'Báo cáo', icon: 'chart.pie.fill', color: '#8E44AD', allowed: hasReport },
-    {
-      key: 'quan-tri',
-      title: 'Quản trị',
-      icon: 'gearshape.2.fill',
-      color: '#636366',
-      allowed: can('users:view') || can('roles:view') || can('branches:view'),
-    },
-  ];
-  const items = candidates.filter((i) => i.allowed);
+  // Tab có quyền nhưng không còn chỗ trên thanh tab → hiện ở đây.
+  const hiddenTabKeys = useTabs().overflow.map((t) => t.key);
 
   const confirmSignOut = () =>
     Alert.alert('Đăng xuất?', 'Bạn sẽ cần đăng nhập lại để dùng ứng dụng trên máy này.', [
@@ -61,64 +116,29 @@ export default function MoreScreen() {
     ]);
 
   return (
-    <Screen>
-      <Card style={styles.profile}>
-        <Avatar name={user?.name} size={56} />
-        <View style={{ flex: 1, gap: 2 }}>
-          <Txt variant="title3" numberOfLines={1}>
-            {user?.name}
-          </Txt>
-          <Txt variant="footnote" color={C.secondary} numberOfLines={1}>
-            {user?.email}
-          </Txt>
-          {user?.roles?.length ? (
-            <Txt variant="footnote" color={C.secondary} numberOfLines={1}>
-              {user.roles.join(', ')}
-            </Txt>
-          ) : null}
-        </View>
-      </Card>
-
-      <Section footer="Số liệu, quyền và đơn hàng hiển thị theo chi nhánh đang chọn." separatorInset={57}>
-        <Row
-          icon="building.2.fill"
-          iconBackground={C.tint}
-          title="Chi nhánh"
-          value={branch?.name ?? 'Chưa chọn'}
-          chevron={branches.length > 1}
-          onPress={branches.length > 1 ? () => router.push('/chi-nhanh') : undefined}
-        />
-      </Section>
-
-      {items.length > 0 ? (
-        <Section title="Quản lý" separatorInset={57}>
-          {items.map((item) => (
-            <Row
-              key={item.key}
-              icon={item.icon}
-              iconBackground={item.color}
-              title={item.title}
-              value={item.href ? undefined : 'Sắp có'}
-              chevron={!!item.href}
-              onPress={item.href ? () => router.push(item.href as never) : undefined}
-            />
-          ))}
-        </Section>
-      ) : null}
-
-      <Section title="Ứng dụng">
-        <Row title="Phiên bản" value={APP_VERSION} />
-        {/* Chỉ hiện khi dev: không đưa địa chỉ backend lên giao diện người dùng. */}
-        {__DEV__ ? <Row title="Máy chủ (dev)" value={API_ORIGIN.replace(/^https?:\/\//, '')} /> : null}
-      </Section>
-
-      <Section>
-        <Row title="Đăng xuất" destructive onPress={confirmSignOut} />
-      </Section>
-    </Screen>
+    <MoreView
+      user={user}
+      branchName={currentBranch()?.name}
+      canSwitchBranch={branches.length > 1}
+      hiddenTabKeys={hiddenTabKeys}
+      onOpenBranch={() => router.push('/chi-nhanh')}
+      onOpen={(_key, href) => {
+        if (href) router.navigate(href as never);
+        else toast.info('Chức năng này sẽ có ở bản cập nhật tới');
+      }}
+      onSignOut={confirmSignOut}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  profile: { marginTop: 12, marginHorizontal: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  profile: {
+    marginTop: 4,
+    borderRadius: 20,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  avatarRing: { padding: 3, borderRadius: 34, backgroundColor: 'rgba(255,255,255,0.35)' },
 });

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { http } from '@/core/http';
 import { useSession } from '@/core/session';
 
@@ -78,6 +78,8 @@ export function useDashboardStats(range: DashRange) {
   const branchId = useBranch();
   return useQuery({
     queryKey: ['dashboard', 'stats', range, branchId],
+    // Đổi kỳ: giữ số cũ trong lúc tải để số liệu chạy mượt sang số mới.
+    placeholderData: keepPreviousData,
     queryFn: () => http.get<DashboardStats>('/dashboard/stats', { range, branchId }),
   });
 }
@@ -86,6 +88,8 @@ export function useRevenueTrend(range: DashRange) {
   const branchId = useBranch();
   return useQuery({
     queryKey: ['dashboard', 'trend', range, branchId],
+    // Đổi kỳ: giữ số cũ trong lúc tải để số liệu chạy mượt sang số mới.
+    placeholderData: keepPreviousData,
     queryFn: () => http.get<TrendPoint[]>('/dashboard/revenue-trend', { range, branchId }),
   });
 }
@@ -112,6 +116,8 @@ export function useTopProducts(range: DashRange) {
   const branchId = useBranch();
   return useQuery({
     queryKey: ['dashboard', 'top-products', range, branchId],
+    // Đổi kỳ: giữ số cũ trong lúc tải để số liệu chạy mượt sang số mới.
+    placeholderData: keepPreviousData,
     queryFn: () =>
       http.get<TopProduct[]>('/dashboard/top-products', { range, branchId, limit: 5, metric: 'rev' }),
   });
@@ -121,6 +127,8 @@ export function useTopBuyers(range: DashRange) {
   const branchId = useBranch();
   return useQuery({
     queryKey: ['dashboard', 'top-buyers', range, branchId],
+    // Đổi kỳ: giữ số cũ trong lúc tải để số liệu chạy mượt sang số mới.
+    placeholderData: keepPreviousData,
     queryFn: () => http.get<TopBuyer[]>('/dashboard/top-buyers', { range, branchId, limit: 5 }),
   });
 }

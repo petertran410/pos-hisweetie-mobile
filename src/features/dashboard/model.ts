@@ -1,3 +1,4 @@
+import type { AccentName, IconName, Tone } from '@/ui';
 import type { TaskType } from './api';
 
 export const RANGE_OPTIONS = [
@@ -19,12 +20,36 @@ export function formatDelta(pct: number | null | undefined): string | null {
 
 export const TASKS: Record<
   TaskType,
-  { title: string; icon: 'shippingbox' | 'creditcard' | 'banknote' | 'exclamationmark.triangle'; empty: string }
+  { title: string; short: string; icon: IconName; color: AccentName; empty: string }
 > = {
-  orders: { title: 'Đơn đặt chờ xử lý', icon: 'shippingbox', empty: 'Không có đơn đặt nào đang chờ.' },
-  debt: { title: 'Hóa đơn còn nợ', icon: 'creditcard', empty: 'Không có hóa đơn nào còn nợ.' },
-  cod: { title: 'Tiền thu hộ (COD)', icon: 'banknote', empty: 'Không có đơn COD nào chưa thu.' },
-  stock: { title: 'Hàng sắp hết', icon: 'exclamationmark.triangle', empty: 'Không có mặt hàng nào sắp hết.' },
+  orders: {
+    title: 'Đơn đặt chờ xử lý',
+    short: 'Đơn chờ xử lý',
+    icon: 'clipboard-list',
+    color: 'violet',
+    empty: 'Không có đơn đặt nào đang chờ.',
+  },
+  debt: {
+    title: 'Hóa đơn còn nợ',
+    short: 'Hóa đơn còn nợ',
+    icon: 'credit-card',
+    color: 'red',
+    empty: 'Không có hóa đơn nào còn nợ.',
+  },
+  cod: {
+    title: 'Tiền thu hộ (COD)',
+    short: 'COD chưa thu',
+    icon: 'banknote',
+    color: 'orange',
+    empty: 'Không có đơn COD nào chưa thu.',
+  },
+  stock: {
+    title: 'Hàng sắp hết',
+    short: 'Hàng sắp hết',
+    icon: 'triangle-alert',
+    color: 'pink',
+    empty: 'Không có mặt hàng nào sắp hết.',
+  },
 };
 
 export const TASK_ORDER: TaskType[] = ['orders', 'debt', 'cod', 'stock'];
@@ -58,4 +83,32 @@ export function taskStatusLabel(type: TaskType, status: string): string {
 
 export function isValidTaskType(value: unknown): value is TaskType {
   return value === 'orders' || value === 'debt' || value === 'cod' || value === 'stock';
+}
+
+/** Màu nhãn thay đổi: tăng xanh, giảm đỏ, không đổi xám. */
+export function deltaTone(pct: number | null | undefined): Tone {
+  if (!pct || !Number.isFinite(pct)) return 'neutral';
+  return pct > 0 ? 'success' : 'danger';
+}
+
+/** Lời chào theo giờ trong ngày. */
+export function greetingFor(date: Date): string {
+  const h = date.getHours();
+  if (h < 11) return 'Chào buổi sáng!';
+  if (h < 14) return 'Chào buổi trưa!';
+  if (h < 18) return 'Chào buổi chiều!';
+  return 'Chào buổi tối!';
+}
+
+/** Tên gọi ngắn: lấy chữ cuối của họ tên ("Nguyễn Thị Lan" → "Lan"). */
+export function shortName(name?: string | null): string {
+  const words = (name ?? '').trim().split(/\s+/).filter(Boolean);
+  return words[words.length - 1] ?? '';
+}
+
+/** Chỉ hiện nhãn trục cách quãng để không chồng chữ. */
+export function sparseLabels(labels: string[], max = 7): string[] {
+  if (labels.length <= max) return labels;
+  const step = Math.ceil(labels.length / max);
+  return labels.map((l, i) => (i % step === 0 ? l : ''));
 }

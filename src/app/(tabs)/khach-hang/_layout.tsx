@@ -1,9 +1,5 @@
-import { Stack } from 'expo-router';
+import { TabStack } from '@/features/shell/TabStack';
 
 export default function Layout() {
-  return (
-    <Stack screenOptions={{ headerShadowVisible: false, headerBackButtonDisplayMode: 'minimal' }}>
-      <Stack.Screen name="index" options={{ title: 'Khách hàng', headerLargeTitleEnabled: true }} />
-    </Stack>
-  );
+  return <TabStack name="khach-hang" />;
 }

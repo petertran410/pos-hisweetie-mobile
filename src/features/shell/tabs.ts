@@ -1,14 +1,13 @@
-import type { SFSymbol } from 'expo-symbols';
 import { canDo, type PermissionHolder } from '@/core/can';
 import { useSession } from '@/core/session';
+import type { IconName } from '@/ui/icons';
 
 export type TabKey = 'tong-quan' | 'ban-hang' | 'don-hang' | 'khach-hang' | 'bao-don';
 
 export interface TabDef {
   key: TabKey;
   label: string;
-  icon: SFSymbol;
-  iconSelected: SFSymbol;
+  icon: IconName;
   /** Chỉ cần 1 trong các quyền (giống `ROUTE_PERMISSIONS` của web). */
   permissions: string[];
 }
@@ -18,36 +17,31 @@ export const TAB_DEFS: TabDef[] = [
   {
     key: 'tong-quan',
     label: 'Tổng quan',
-    icon: 'chart.bar',
-    iconSelected: 'chart.bar.fill',
+    icon: 'layout-dashboard',
     permissions: ['dashboard:view'],
   },
   {
     key: 'ban-hang',
     label: 'Bán hàng',
-    icon: 'bag',
-    iconSelected: 'bag.fill',
+    icon: 'shopping-cart',
     permissions: ['orders:create', 'invoices:create'],
   },
   {
     key: 'don-hang',
     label: 'Đơn hàng',
-    icon: 'doc.text',
-    iconSelected: 'doc.text.fill',
+    icon: 'receipt-text',
     permissions: ['invoices:view', 'orders:view'],
   },
   {
     key: 'khach-hang',
     label: 'Khách hàng',
-    icon: 'person.2',
-    iconSelected: 'person.2.fill',
+    icon: 'users',
     permissions: ['customers:view'],
   },
   {
     key: 'bao-don',
     label: 'Báo đơn',
-    icon: 'shippingbox',
-    iconSelected: 'shippingbox.fill',
+    icon: 'truck',
     permissions: [
       'packing_slips:view',
       'packing_slips:create',

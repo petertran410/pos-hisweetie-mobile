@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
-import { Icon } from './Icon';
+import { Icon } from './icons';
 import { Txt } from './Text';
-import { C } from './theme';
+import { C, shadow, toneColors } from './theme';
 
 type Kind = 'success' | 'error' | 'info';
 const useToastStore = create<{ message: string | null; kind: Kind; seq: number }>(() => ({
@@ -46,8 +46,8 @@ export function ToastHost() {
   }, [seq, message, anim]);
 
   if (!message) return null;
-  const icon = kind === 'success' ? 'checkmark.circle.fill' : kind === 'error' ? 'xmark.octagon.fill' : 'info.circle.fill';
-  const color = kind === 'success' ? C.success : kind === 'error' ? C.danger : C.tint;
+  const icon = kind === 'success' ? 'circle-check' : kind === 'error' ? 'circle-x' : 'info';
+  const color = kind === 'success' ? toneColors.success.fg : kind === 'error' ? toneColors.danger.fg : C.brand;
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center' }]}>
       <Animated.View
@@ -61,7 +61,7 @@ export function ToastHost() {
           },
         ]}>
         <Icon name={icon} size={20} color={color} />
-        <Txt variant="subhead" weight="600" style={{ flexShrink: 1 }}>
+        <Txt variant="label" weight="semibold" style={{ flexShrink: 1 }}>
           {message}
         </Txt>
       </Animated.View>
@@ -79,9 +79,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 24,
     backgroundColor: C.card,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: C.border,
+    ...shadow,
+    shadowOpacity: 0.12,
   },
 });

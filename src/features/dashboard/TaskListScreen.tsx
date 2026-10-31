@@ -1,15 +1,28 @@
 import { FlashList } from '@shopify/flash-list';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { dateVN, money, qty } from '@/core/format';
-import { C, EmptyState, ErrorState, LoadingState, Pill, Txt, listStyles } from '@/ui';
-import { useTasks, type TaskRow, type TaskType } from './api';
-import { isValidTaskType, TASKS, taskStatusLabel } from './model';
+import {
+  C,
+  Card,
+  ChipGroup,
+  EmptyState,
+  ErrorState,
+  IconBadge,
+  PageBackground,
+  Pill,
+  Skeleton,
+  SubHeader,
+  TabPanel,
+  Txt,
+} from '@/ui';
+import { useTaskCounts, useTasks, type TaskRow, type TaskType } from './api';
+import { isValidTaskType, TASK_ORDER, TASKS, taskStatusLabel } from './model';
 
-function TaskItem({ row, type }: { row: TaskRow; type: TaskType }) {
+function TaskCard({ row, type }: { row: TaskRow; type: TaskType }) {
   const status = taskStatusLabel(type, row.status);
   const isStock = type === 'stock';
-  const overdue = type === 'debt' && row.status === 'overdue';
+  const bad = (type === 'debt' && row.status === 'overdue') || row.status === 'negative' || row.status === 'out';
   const meta = [
     row.code,
     row.branchName,
@@ -20,17 +33,95 @@ function TaskItem({ row, type }: { row: TaskRow; type: TaskType }) {
     .filter(Boolean)
     .join(', ');
   return (
-    <View style={styles.item}>
-      <View style={{ flex: 1, gap: 3 }}>
-        <Txt numberOfLines={2}>{row.partner}</Txt>
-        <Txt variant="footnote" color={C.secondary} numberOfLines={2}>
+    <Card style={styles.card}>
+      <IconBadge name={TASKS[type].icon} color={TASKS[type].color} size={40} />
+      <View style={{ flex: 1, gap: 4 }}>
+        <Txt variant="body" weight="semibold" numberOfLines={2}>
+          {row.partner}
+        </Txt>
+        <Txt variant="caption" color={C.muted} numberOfLines={2}>
           {meta}
         </Txt>
-        {status ? <Pill label={status} tone={overdue || row.status === 'negative' || row.status === 'out' ? 'danger' : 'neutral'} /> : null}
+        {status ? <Pill label={status} tone={bad ? 'danger' : 'neutral'} /> : null}
       </View>
-      <Txt variant="headline" numeric color={overdue ? C.danger : C.label}>
+      <Txt variant="body" weight="bold" numeric color={bad ? '#B91C1C' : C.text}>
         {isStock ? `${qty(row.value)} ${row.unit ?? ''}`.trim() : money(row.value)}
       </Txt>
+    </Card>
+  );
+}
+
+/** Khung xám thay cho danh sách đang tải. */
+function TaskSkeleton() {
+  return (
+    <View style={styles.skeleton}>
+      {[0, 1, 2, 3].map((i) => (
+        <Card key={i} style={styles.card}>
+          <Skeleton width={40} height={40} radius={12} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <Skeleton width="70%" height={16} />
+            <Skeleton width="50%" height={12} />
+          </View>
+          <Skeleton width={72} height={16} />
+        </Card>
+      ))}
+    </View>
+  );
+}
+
+type Phase = 'loading' | 'error' | 'ready';
+
+/** Danh sách việc cần xử lý; chip phía trên để chuyển nhanh giữa 4 loại. */
+export function TaskListView({
+  type,
+  onTypeChange,
+  rows,
+  counts,
+  loading,
+  error,
+  refreshing,
+  onRefresh,
+}: {
+  type: TaskType;
+  onTypeChange: (type: TaskType) => void;
+  rows?: TaskRow[];
+  counts?: Partial<Record<TaskType, number>>;
+  loading?: boolean;
+  error?: unknown;
+  refreshing?: boolean;
+  onRefresh?: () => void;
+}) {
+  const phase: Phase = loading ? 'loading' : error ? 'error' : 'ready';
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <PageBackground />
+      <SubHeader title="Việc cần xử lý">
+        <ChipGroup
+          options={TASK_ORDER.map((t) => ({ value: t, label: TASKS[t].short, count: counts?.[t] }))}
+          value={type}
+          onChange={onTypeChange}
+        />
+      </SubHeader>
+      <TabPanel value={type} order={TASK_ORDER} phase={phase} style={{ flex: 1 }}>
+        {loading ? (
+          <TaskSkeleton />
+        ) : error ? (
+          <ErrorState error={error} onRetry={onRefresh} />
+        ) : (
+          <FlashList
+            data={rows ?? []}
+            keyExtractor={(row, i) => `${row.code}-${i}`}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 32 }}
+            onRefresh={onRefresh}
+            refreshing={!!refreshing}
+            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+            ListEmptyComponent={
+              <EmptyState icon="circle-check" color="green" title="Đã xử lý hết" message={TASKS[type].empty} />
+            }
+            renderItem={({ item }) => <TaskCard row={item} type={type} />}
+          />
+        )}
+      </TabPanel>
     </View>
   );
 }
@@ -39,49 +130,22 @@ export default function TaskListScreen() {
   const { type: raw } = useLocalSearchParams<{ type: string }>();
   const type: TaskType = isValidTaskType(raw) ? raw : 'orders';
   const tasks = useTasks(type);
-
+  const counts = useTaskCounts();
   return (
-    <>
-      <Stack.Screen options={{ title: TASKS[type].title }} />
-      {tasks.isLoading ? (
-        <LoadingState />
-      ) : tasks.isError ? (
-        <ErrorState error={tasks.error} onRetry={() => void tasks.refetch()} />
-      ) : (
-        <FlashList
-          data={tasks.data ?? []}
-          keyExtractor={(row, i) => `${row.code}-${i}`}
-          contentInsetAdjustmentBehavior="automatic"
-          style={{ backgroundColor: C.bg }}
-          contentContainerStyle={{ paddingVertical: 16 }}
-          onRefresh={() => void tasks.refetch()}
-          refreshing={tasks.isRefetching}
-          ItemSeparatorComponent={() => (
-            <View style={styles.sep}>
-              <View style={[listStyles.separator, { marginLeft: 16 }]} />
-            </View>
-          )}
-          ListEmptyComponent={<EmptyState icon="checkmark.circle" title="Đã xử lý hết" message={TASKS[type].empty} />}
-          renderItem={({ item, index }) => (
-            <View
-              style={[
-                styles.card,
-                index === 0 ? styles.first : null,
-                index === (tasks.data?.length ?? 0) - 1 ? styles.last : null,
-              ]}>
-              <TaskItem row={item} type={type} />
-            </View>
-          )}
-        />
-      )}
-    </>
+    <TaskListView
+      type={type}
+      onTypeChange={(next) => router.setParams({ type: next })}
+      rows={tasks.data}
+      counts={counts.data}
+      loading={tasks.isLoading}
+      error={tasks.isError ? tasks.error : undefined}
+      refreshing={tasks.isRefetching}
+      onRefresh={() => void tasks.refetch()}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  card: { marginHorizontal: 16, backgroundColor: C.card },
-  first: { borderTopLeftRadius: 14, borderTopRightRadius: 14 },
-  last: { borderBottomLeftRadius: 14, borderBottomRightRadius: 14 },
-  sep: { marginHorizontal: 16, backgroundColor: C.card },
-  item: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'flex-start' },
+  skeleton: { paddingHorizontal: 16, paddingTop: 4, gap: 10 },
+  card: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
 });
