@@ -1,11 +1,7 @@
-import { useSession, type Profile } from './session';
+import { canDo } from './can';
+import { useSession } from './session';
 
-/** Quyền dạng "resource:action", Super Admin có mọi quyền (giống web). */
-export function canDo(user: Profile | null | undefined, permission: string): boolean {
-  if (!user) return false;
-  if (user.roles?.includes('Super Admin')) return true;
-  return user.permissions?.includes(permission) ?? false;
-}
+export { canDo } from './can';
 
 export function useCan(resource: string, action: string): boolean {
   const user = useSession((s) => s.user);

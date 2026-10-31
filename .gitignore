@@ -3,6 +3,11 @@
 # dependencies
 node_modules/
 
+# Biến môi trường thật (chỉ commit .env.example)
+.env
+.env.*
+!.env.example
+
 # Expo
 .expo/
 dist/
@@ -30,8 +35,17 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# Chứng chỉ, khoá ký app, thông tin đăng nhập dịch vụ — không bao giờ commit
+*.cer
+*.certSigningRequest
+*.mobileprovision
+*.provisionprofile
+credentials.json
+credentials/
+GoogleService-Info.plist
+google-services.json
+*.keystore
+service-account*.json
 
 # typescript
 *.tsbuildinfo
