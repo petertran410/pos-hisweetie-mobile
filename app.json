@@ -42,7 +42,15 @@
       ],
       "expo-secure-store",
       "expo-sharing",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "HiSweetie POS dùng camera để quét mã vạch sản phẩm khi bán hàng.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false,

@@ -5,12 +5,14 @@ import Banknote from 'lucide-react-native/icons/banknote';
 import BookOpen from 'lucide-react-native/icons/book-open';
 import Boxes from 'lucide-react-native/icons/boxes';
 import Building from 'lucide-react-native/icons/building';
+import Camera from 'lucide-react-native/icons/camera';
 import ChartColumn from 'lucide-react-native/icons/chart-column';
 import ChartPie from 'lucide-react-native/icons/chart-pie';
 import Check from 'lucide-react-native/icons/check';
 import ChevronDown from 'lucide-react-native/icons/chevron-down';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import CircleCheck from 'lucide-react-native/icons/circle-check';
+import CirclePlus from 'lucide-react-native/icons/circle-plus';
 import CircleX from 'lucide-react-native/icons/circle-x';
 import ClipboardList from 'lucide-react-native/icons/clipboard-list';
 import Clock from 'lucide-react-native/icons/clock';
@@ -18,6 +20,7 @@ import Coins from 'lucide-react-native/icons/coins';
 import CreditCard from 'lucide-react-native/icons/credit-card';
 import Eye from 'lucide-react-native/icons/eye';
 import EyeOff from 'lucide-react-native/icons/eye-off';
+import Flashlight from 'lucide-react-native/icons/flashlight';
 import Hammer from 'lucide-react-native/icons/hammer';
 import HandCoins from 'lucide-react-native/icons/hand-coins';
 import Inbox from 'lucide-react-native/icons/inbox';
@@ -29,18 +32,32 @@ import LayoutGrid from 'lucide-react-native/icons/layout-grid';
 import Lock from 'lucide-react-native/icons/lock';
 import LogOut from 'lucide-react-native/icons/log-out';
 import Mail from 'lucide-react-native/icons/mail';
+import Minus from 'lucide-react-native/icons/minus';
 import Package from 'lucide-react-native/icons/package';
+import PackageSearch from 'lucide-react-native/icons/package-search';
+import Pencil from 'lucide-react-native/icons/pencil';
 import Percent from 'lucide-react-native/icons/percent';
+import Plus from 'lucide-react-native/icons/plus';
+import Printer from 'lucide-react-native/icons/printer';
 import Receipt from 'lucide-react-native/icons/receipt';
 import ReceiptText from 'lucide-react-native/icons/receipt-text';
+import ScanBarcode from 'lucide-react-native/icons/scan-barcode';
+import Search from 'lucide-react-native/icons/search';
+import Share2 from 'lucide-react-native/icons/share-2';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
+import ShoppingBag from 'lucide-react-native/icons/shopping-bag';
 import ShoppingCart from 'lucide-react-native/icons/shopping-cart';
 import Smartphone from 'lucide-react-native/icons/smartphone';
+import StickyNote from 'lucide-react-native/icons/sticky-note';
 import Store from 'lucide-react-native/icons/store';
+import Tag from 'lucide-react-native/icons/tag';
+import Trash from 'lucide-react-native/icons/trash';
 import TrendingDown from 'lucide-react-native/icons/trending-down';
 import TrendingUp from 'lucide-react-native/icons/trending-up';
 import TriangleAlert from 'lucide-react-native/icons/triangle-alert';
 import Truck from 'lucide-react-native/icons/truck';
+import User from 'lucide-react-native/icons/user';
+import UserPlus from 'lucide-react-native/icons/user-plus';
 import Users from 'lucide-react-native/icons/users';
 import Wallet from 'lucide-react-native/icons/wallet';
 import WifiOff from 'lucide-react-native/icons/wifi-off';
@@ -55,12 +72,14 @@ const ICONS = {
   'book-open': BookOpen,
   boxes: Boxes,
   building: Building,
+  camera: Camera,
   'chart-column': ChartColumn,
   'chart-pie': ChartPie,
   check: Check,
   'chevron-down': ChevronDown,
   'chevron-right': ChevronRight,
   'circle-check': CircleCheck,
+  'circle-plus': CirclePlus,
   'circle-x': CircleX,
   'clipboard-list': ClipboardList,
   clock: Clock,
@@ -68,6 +87,7 @@ const ICONS = {
   'credit-card': CreditCard,
   eye: Eye,
   'eye-off': EyeOff,
+  flashlight: Flashlight,
   hammer: Hammer,
   'hand-coins': HandCoins,
   inbox: Inbox,
@@ -79,18 +99,32 @@ const ICONS = {
   lock: Lock,
   'log-out': LogOut,
   mail: Mail,
+  minus: Minus,
   package: Package,
+  'package-search': PackageSearch,
+  pencil: Pencil,
   percent: Percent,
+  plus: Plus,
+  printer: Printer,
   receipt: Receipt,
   'receipt-text': ReceiptText,
+  'scan-barcode': ScanBarcode,
+  search: Search,
+  'share-2': Share2,
   'shield-check': ShieldCheck,
+  'shopping-bag': ShoppingBag,
   'shopping-cart': ShoppingCart,
   smartphone: Smartphone,
+  'sticky-note': StickyNote,
   store: Store,
+  tag: Tag,
+  trash: Trash,
   'trending-down': TrendingDown,
   'trending-up': TrendingUp,
   'triangle-alert': TriangleAlert,
   truck: Truck,
+  user: User,
+  'user-plus': UserPlus,
   users: Users,
   wallet: Wallet,
   'wifi-off': WifiOff,

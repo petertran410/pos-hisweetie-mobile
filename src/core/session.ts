@@ -57,6 +57,9 @@ export const useSession = create<SessionState>(() => ({
 
 const branchKey = (userId: number) => `hs_branch_${userId}`;
 
+/** Tiền tố khóa lưu dữ liệu nháp (giỏ hàng) trên máy. */
+export const DRAFT_PREFIX = 'hs_draft_';
+
 interface AuthBody extends TokenBody {
   refreshToken: string;
   user: Profile;
@@ -184,11 +187,19 @@ async function resetLocal(notice: string | null) {
   useSession.setState({ status: 'signedOut', user: null, branches: [], notice });
 }
 
+/** Giỏ hàng nháp có tên, số điện thoại, địa chỉ khách: xóa khi đăng xuất. */
+async function clearDrafts() {
+  const keys = await AsyncStorage.getAllKeys().catch(() => [] as readonly string[]);
+  const drafts = keys.filter((k) => k.startsWith(DRAFT_PREFIX));
+  if (drafts.length) await AsyncStorage.multiRemove(drafts).catch(() => {});
+}
+
 export async function signOut() {
   const refreshToken = await getRefreshToken();
   if (refreshToken) {
     rawRequest('/auth/mobile/logout', { method: 'POST', body: { refreshToken } }).catch(() => {});
   }
+  await clearDrafts();
   await resetLocal(null);
 }
 

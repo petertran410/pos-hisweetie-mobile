@@ -186,7 +186,8 @@ export function ChipGroup<T extends string>({
   fill,
 }: {
   options: { value: T; label: string; count?: number }[];
-  value: T;
+  /** null = chưa chọn chip nào. */
+  value: T | null;
   onChange: (value: T) => void;
   scroll?: boolean;
   /** Chia đều bề ngang (ít lựa chọn, không cuộn). */
@@ -194,7 +195,7 @@ export function ChipGroup<T extends string>({
 }) {
   const reduced = useReducedMotion();
   const [boxes, setBoxes] = useState<Partial<Record<string, Box>>>({});
-  const target = boxes[value];
+  const target = value === null ? undefined : boxes[value];
   const tx = target?.x;
   const tw = target?.width;
 

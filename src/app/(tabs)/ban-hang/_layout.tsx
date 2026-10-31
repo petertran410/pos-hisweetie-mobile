@@ -1,5 +1,5 @@
-import { TabStack } from '@/features/shell/TabStack';
+import { SalesStack } from '@/features/sales/SalesStack';
 
 export default function Layout() {
-  return <TabStack name="ban-hang" />;
+  return <SalesStack />;
 }

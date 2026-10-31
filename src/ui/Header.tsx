@@ -94,6 +94,59 @@ export function SubHeader({
   );
 }
 
+/**
+ * Đầu sheet (màn trượt từ dưới lên): "Hủy" bên trái, tiêu đề giữa, nút xác
+ * nhận bên phải — theo cách của iOS.
+ */
+export function SheetHeader({
+  title,
+  onCancel,
+  cancelLabel = 'Hủy',
+  actionLabel,
+  onAction,
+  actionDisabled,
+}: {
+  title: string;
+  onCancel?: () => void;
+  cancelLabel?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  actionDisabled?: boolean;
+}) {
+  return (
+    <View style={styles.sheet}>
+      <View style={styles.sheetSide}>
+        <PressableScale
+          onPress={onCancel ?? (() => router.back())}
+          accessibilityLabel={cancelLabel}
+          hitSlop={10}
+          scaleTo={0.92}>
+          <Txt variant="body" color={C.brand}>
+            {cancelLabel}
+          </Txt>
+        </PressableScale>
+      </View>
+      <Txt variant="heading" align="center" numberOfLines={1} style={{ flex: 1 }}>
+        {title}
+      </Txt>
+      <View style={[styles.sheetSide, { alignItems: 'flex-end' }]}>
+        {actionLabel && onAction ? (
+          <PressableScale
+            onPress={onAction}
+            disabled={actionDisabled}
+            accessibilityLabel={actionLabel}
+            hitSlop={10}
+            scaleTo={0.92}>
+            <Txt variant="body" weight="semibold" color={actionDisabled ? C.faint : C.brand}>
+              {actionLabel}
+            </Txt>
+          </PressableScale>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 export { IconButton };
 
 const styles = StyleSheet.create({
@@ -101,4 +154,16 @@ const styles = StyleSheet.create({
   sub: { paddingHorizontal: 12, paddingBottom: 10, gap: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
   back: { width: 40, height: 44, alignItems: 'center', justifyContent: 'center' },
+  sheet: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 52,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    gap: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: C.border,
+    backgroundColor: C.card,
+  },
+  sheetSide: { width: 72 },
 });

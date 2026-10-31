@@ -2,6 +2,9 @@
 import type { Branch } from '@/core/session';
 import type { DashboardData } from '../dashboard/DashboardView';
 import type { TaskRow } from '../dashboard/api';
+import type { BankAccount } from '../sales/api';
+import type { SaleCustomer, SaleProduct } from '../sales/cart';
+import type { SalePerms } from '../sales/perms';
 
 export const sampleUser = {
   name: 'Nguyễn Thị Lan',
@@ -64,4 +67,51 @@ export const sampleTasks: TaskRow[] = [
   { code: 'DH000101', partner: 'Quán mẫu Trà Mây', branchName: 'Chi nhánh mẫu A', value: 3_400_000, time: new Date().toISOString(), status: 'pending' },
   { code: 'DH000099', partner: 'Quán mẫu Gió Chiều', branchName: 'Chi nhánh mẫu A', value: 5_120_000, time: new Date(Date.now() - 86_400_000).toISOString(), status: 'confirmed' },
   { code: 'DH000097', partner: 'Tiệm mẫu Lối Nhỏ', branchName: 'Chi nhánh mẫu B', value: 7_800_000, time: new Date(Date.now() - 2 * 86_400_000).toISOString(), status: 'partially_invoiced' },
+];
+
+// ---------- Bán hàng (mẫu) ----------
+
+export const sampleSalePerms: SalePerms = {
+  order: true,
+  invoice: true,
+  products: true,
+  customers: true,
+  priceBooks: true,
+  editPrice: true,
+  editDiscount: true,
+  viewStock: true,
+  viewPayment: true,
+  editPayment: true,
+  viewDebt: true,
+  print: true,
+};
+
+export const sampleProducts: SaleProduct[] = [
+  { id: 1, code: 'SP001', name: 'Trà đen mẫu 1kg', unit: 'gói', basePrice: 185_000, onHand: 42, weightGrams: 1000 },
+  { id: 2, code: 'SP002', name: 'Siro đào mẫu 2,5L', unit: 'chai', basePrice: 96_000, onHand: 18, conversionValue: 6 },
+  { id: 3, code: 'SP003', name: 'Trân châu đen mẫu 3kg', unit: 'gói', basePrice: 78_000, onHand: 0 },
+  { id: 4, code: 'SP004', name: 'Bột sữa béo mẫu 1kg', unit: 'gói', basePrice: 65_000, onHand: 125 },
+  { id: 5, code: 'SP005', name: 'Thạch dừa mẫu 2,2kg', unit: 'hũ', basePrice: 54_000, onHand: 9 },
+  { id: 6, code: 'SP006', name: 'Ly nhựa mẫu 500ml (50 cái)', unit: 'cây', basePrice: 38_000, onHand: 300 },
+];
+
+export const sampleCustomers: SaleCustomer[] = [
+  {
+    id: 11,
+    code: 'KH0011',
+    name: 'Quán mẫu Trà Mây',
+    contactNumber: '0900 000 111',
+    totalDebt: 1_250_000,
+    addresses: [
+      { id: 1, label: 'Quán', receiver: 'Chị Mây', contactNumber: '0900 000 111', address: '25 Đường Mẫu', wardName: 'Phường Mẫu', locationName: 'TP. Mẫu', isDefault: true },
+      { id: 2, label: 'Kho', receiver: 'Anh Nam', contactNumber: '0900 000 222', address: '9 Đường Thử', wardName: 'Phường Thử', locationName: 'TP. Mẫu' },
+    ],
+  },
+  { id: 12, code: 'KH0012', name: 'Tiệm mẫu Gió Chiều', contactNumber: '0900 000 333', totalDebt: -300_000, requireFullPayment: true, addresses: [] },
+  { id: 13, code: 'KH0013', name: 'Quán mẫu Lối Nhỏ', phone: '0900 000 444', totalDebt: 0, parentName: 'Chuỗi mẫu Lối', addresses: [] },
+];
+
+export const sampleBanks: BankAccount[] = [
+  { id: 1, bankCode: 'VCB', accountNumber: '0000001234' },
+  { id: 2, bankCode: 'TCB', accountNumber: '0000005678' },
 ];
