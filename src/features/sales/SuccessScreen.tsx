@@ -1,41 +1,74 @@
-import * as Print from 'expo-print';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { money } from '@/core/format';
-import { errorMessage } from '@/core/http';
-import { Appear, Banner, Button, C, Card, EmptyState, Icon, PageBackground, toast, Txt } from '@/ui';
+import { Appear, Banner, Button, C, Card, Divider, EmptyState, Icon, PageBackground, PressableScale, Txt } from '@/ui';
 import { easeOut } from '@/ui/motion';
-import { renderPrint } from './api';
 import { useLastSale, type LastSale } from './CheckoutScreen';
 import { useSalePerms } from './perms';
+import { parseStockWarning } from './warnings';
 
-/** Bọc nội dung mẫu in thành trang HTML đầy đủ (giống web). */
-export function printDocument(content: string): string {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-<style>
-@page { margin: 8mm; }
-html, body { margin: 0; padding: 0; width: 100%; }
-body { font-family: Arial, sans-serif; font-size: 13px; color: #000; overflow-wrap: anywhere; }
-table { width: 100% !important; max-width: 100% !important; border-collapse: collapse; }
-td, th { padding: 4px 8px; }
-img, svg { max-width: 100% !important; height: auto; }
-* { box-sizing: border-box; }
-</style></head><body><div class="print-content">${content}</div></body></html>`;
+/** Hàng chưa đủ tồn: gọn 1 dòng, bấm để xem từng món. */
+function StockWarnings({ warnings }: { warnings: string[] }) {
+  const [open, setOpen] = useState(false);
+  const items = warnings.map(parseStockWarning);
+  return (
+    <Card style={styles.stock}>
+      <PressableScale
+        onPress={() => setOpen((v) => !v)}
+        accessibilityLabel={`${items.length} món chưa đủ tồn kho. ${open ? 'Bấm để ẩn' : 'Bấm để xem'}`}
+        accessibilityState={{ expanded: open }}
+        scaleTo={0.98}
+        style={styles.stockHead}>
+        <View style={styles.stockIcon}>
+          <Icon name="triangle-alert" size={20} color="#B45309" />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Txt variant="body" weight="semibold">
+            {items.length} món chưa đủ tồn kho
+          </Txt>
+          <Txt variant="caption" color={C.muted}>
+            Đơn vẫn được tạo. Kiểm tra hàng trước khi giao.
+          </Txt>
+        </View>
+        <Txt variant="label" weight="semibold" color={C.brand}>
+          {open ? 'Ẩn' : 'Xem'}
+        </Txt>
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={16} color={C.brand} />
+      </PressableScale>
+      {open ? (
+        <Appear>
+          {items.map((it, i) => (
+            <View key={i}>
+              <Divider inset={14} />
+              <View style={styles.stockRow}>
+                <Txt variant="label" numberOfLines={2} style={{ flex: 1 }}>
+                  {it.name}
+                </Txt>
+                {it.need !== undefined ? (
+                  <Txt variant="caption" weight="semibold" color="#B91C1C" numeric>
+                    Có {it.have} · Cần {it.need}
+                  </Txt>
+                ) : null}
+              </View>
+            </View>
+          ))}
+        </Appear>
+      ) : null}
+    </Card>
+  );
 }
 
 export function SuccessView({
   sale,
   canPrint,
-  printing,
   onPrint,
   onNew,
 }: {
   sale: LastSale;
   canPrint: boolean;
-  printing?: boolean;
   onPrint: () => void;
   onNew: () => void;
 }) {
@@ -44,7 +77,7 @@ export function SuccessView({
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <PageBackground />
-      <View style={[styles.body, { paddingTop: insets.top + 48 }]}>
+      <ScrollView contentContainerStyle={[styles.body, { paddingTop: insets.top + 40 }]}>
         <Animated.View entering={ZoomIn.duration(360).easing(easeOut)} style={styles.check}>
           <Icon name="check" size={44} color={C.white} strokeWidth={2.8} />
         </Animated.View>
@@ -59,10 +92,10 @@ export function SuccessView({
         <Appear index={2} style={{ alignSelf: 'stretch' }}>
           <Card style={styles.card}>
             <View style={styles.row}>
-              <Txt variant="label" color={C.muted} style={{ flex: 1 }}>
+              <Txt variant="label" color={C.muted}>
                 Khách hàng
               </Txt>
-              <Txt variant="body" weight="semibold" numberOfLines={1} style={{ flexShrink: 1 }}>
+              <Txt variant="body" weight="semibold" numberOfLines={1} align="right" style={{ flex: 1 }}>
                 {sale.customerName}
               </Txt>
             </View>
@@ -78,13 +111,18 @@ export function SuccessView({
         </Appear>
         {sale.notes.length ? (
           <Appear index={3} style={{ alignSelf: 'stretch' }}>
-            <Banner tone="warning" icon="triangle-alert" title="Lưu ý" message={sale.notes.join('\n')} />
+            <Banner tone="warning" icon="triangle-alert" title="Cần làm thêm" message={sale.notes.join('\n')} />
           </Appear>
         ) : null}
-      </View>
-      <View style={[styles.actions, { paddingBottom: 16 }]}>
+        {sale.stockWarnings.length ? (
+          <Appear index={4} style={{ alignSelf: 'stretch' }}>
+            <StockWarnings warnings={sale.stockWarnings} />
+          </Appear>
+        ) : null}
+      </ScrollView>
+      <View style={styles.actions}>
         {canPrint ? (
-          <Button title={`In ${what}`} icon="printer" variant="outline" onPress={onPrint} loading={printing} />
+          <Button title={`Xem và in ${what}`} icon="printer" variant="outline" onPress={onPrint} />
         ) : null}
         <Button title="Tạo đơn mới" icon="plus" onPress={onNew} />
       </View>
@@ -95,7 +133,6 @@ export function SuccessView({
 export default function SuccessScreen() {
   const sale = useLastSale((s) => s.sale);
   const perms = useSalePerms();
-  const [printing, setPrinting] = useState(false);
 
   if (!sale) {
     return (
@@ -114,18 +151,9 @@ export default function SuccessScreen() {
     <SuccessView
       sale={sale}
       canPrint={perms.print}
-      printing={printing}
-      onPrint={async () => {
-        setPrinting(true);
-        try {
-          const content = await renderPrint(sale.kind, sale.id);
-          await Print.printAsync({ html: printDocument(content) });
-        } catch (e) {
-          toast.error(errorMessage(e));
-        } finally {
-          setPrinting(false);
-        }
-      }}
+      onPrint={() =>
+        router.push({ pathname: '/ban-hang/phieu-in', params: { kind: sale.kind, id: String(sale.id), code: sale.code } })
+      }
       onNew={() => {
         useLastSale.setState({ sale: null });
         router.back();
@@ -135,7 +163,7 @@ export default function SuccessScreen() {
 }
 
 const styles = StyleSheet.create({
-  body: { flex: 1, alignItems: 'center', paddingHorizontal: 20, gap: 18 },
+  body: { alignItems: 'center', paddingHorizontal: 20, paddingBottom: 24, gap: 18 },
   check: {
     width: 88,
     height: 88,
@@ -146,5 +174,24 @@ const styles = StyleSheet.create({
   },
   card: { padding: 16, gap: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  actions: { paddingHorizontal: 16, gap: 10 },
+  stock: { overflow: 'hidden' },
+  stockHead: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+  stockIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stockRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
+  actions: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    gap: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: C.border,
+    backgroundColor: C.bg,
+  },
 });

@@ -46,6 +46,7 @@ export function PressableScale({
   haptic,
   accessibilityRole = 'button',
   accessibilityLabel,
+  accessibilityHint,
   accessibilityState,
   hitSlop,
   onLayout,
@@ -59,6 +60,7 @@ export function PressableScale({
   haptic?: 'light' | 'selection';
   accessibilityRole?: AccessibilityRole;
   accessibilityLabel?: string;
+  accessibilityHint?: string;
   accessibilityState?: AccessibilityState;
   hitSlop?: number;
   onLayout?: (e: LayoutChangeEvent) => void;
@@ -84,6 +86,7 @@ export function PressableScale({
       }}
       accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
       accessibilityState={accessibilityState}
       style={[style, animated]}>
       {children}

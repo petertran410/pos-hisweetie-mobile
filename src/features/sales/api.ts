@@ -287,21 +287,3 @@ export const addOrderPayment = (body: { orderId: number; amount: number; payment
   http.post<unknown>('/order-payments', body);
 export const addPaymentNote = (kind: 'invoices' | 'orders', id: number, body: { paymentType: string; amount?: number }) =>
   http.post<unknown>(`/${kind}/${id}/payment-note`, body);
-
-// ---------- In ----------
-
-/** Lấy nội dung in (HTML) theo mẫu in mặc định của loại phiếu. */
-export async function renderPrint(templateFor: 'invoice' | 'order', entityId: number): Promise<string> {
-  const templates = await http.get<{ id: number; isDefault?: boolean }[]>('/print-templates', {
-    templateFor,
-    isActive: true,
-  });
-  if (!templates?.length) throw new Error('Chưa có mẫu in cho loại phiếu này');
-  const template = templates.find((t) => t.isDefault) ?? templates[0];
-  const preview = await http.post<{ content?: string }>('/print-templates/preview', {
-    templateId: template.id,
-    entityId,
-  });
-  if (!preview?.content) throw new Error('Không tạo được nội dung in');
-  return preview.content;
-}

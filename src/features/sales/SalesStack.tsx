@@ -23,6 +23,7 @@ export function SalesStack() {
       <Stack.Screen name="dong/[rowId]" options={sheet} />
       <Stack.Screen name="giao-hang" options={sheet} />
       <Stack.Screen name="giam-gia" options={sheet} />
+      <Stack.Screen name="phieu-in" options={sheet} />
       <Stack.Screen
         name="bang-gia"
         options={{

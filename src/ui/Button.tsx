@@ -21,9 +21,14 @@ export function Button({
   size = 'large',
   style,
   haptic,
+  onLongPress,
+  accessibilityHint,
 }: {
   title: string;
   onPress?: () => void;
+  /** Giữ lâu (vd đổi máy in). */
+  onLongPress?: () => void;
+  accessibilityHint?: string;
   variant?: Variant;
   icon?: IconName;
   loading?: boolean;
@@ -55,6 +60,8 @@ export function Button({
       disabled={inactive}
       haptic={haptic ? 'light' : undefined}
       onPress={onPress}
+      onLongPress={onLongPress}
+      accessibilityHint={accessibilityHint}
       style={[
         styles.base,
         { height, borderRadius: size === 'small' ? radius.pill : radius.control },

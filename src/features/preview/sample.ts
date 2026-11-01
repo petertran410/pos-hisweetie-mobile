@@ -115,3 +115,17 @@ export const sampleBanks: BankAccount[] = [
   { id: 1, bankCode: 'VCB', accountNumber: '0000001234' },
   { id: 2, bankCode: 'TCB', accountNumber: '0000005678' },
 ];
+
+/** Nội dung mẫu in giả (giống cấu trúc phiếu đặt hàng của hệ thống). */
+export const samplePrintContent = `
+<p style="text-align:center;font-size:11px;margin:0">Chi nhánh mẫu A</p>
+<h2 style="text-align:center;margin:4px 0">PHIẾU ĐẶT HÀNG</h2>
+<p style="text-align:center;margin:0">Ngày 01/11/2026 · Mã đơn: DH000123</p>
+<p><b>Khách hàng:</b> Quán mẫu Trà Mây · 0900 000 111<br/><b>Địa chỉ:</b> 25 Đường Mẫu, Phường Mẫu, TP. Mẫu<br/><b>Nhân viên:</b> Nguyễn Thị Lan</p>
+<table border="1">
+<tr><th>Sản phẩm</th><th>Đơn giá</th><th>SL</th><th>Đơn vị</th><th>Thành tiền</th></tr>
+<tr><td>Trà đen mẫu 1kg</td><td>170.000</td><td>2</td><td>Gói</td><td>340.000</td></tr>
+<tr><td>Siro đào mẫu 2,5L</td><td>96.000</td><td>6</td><td>Chai</td><td>576.000</td></tr>
+<tr><td>Bột sữa béo mẫu 1kg</td><td>65.000</td><td>1</td><td>Gói</td><td>65.000</td></tr>
+</table>
+<p style="text-align:right"><b>Tổng tiền hàng:</b> 981.000<br/><b>Cần thanh toán:</b> 981.000</p>`;

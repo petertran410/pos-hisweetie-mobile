@@ -10,11 +10,14 @@ import {
   sampleBranches,
   sampleCustomers,
   sampleDashboard,
+  samplePrintContent,
   sampleProducts,
   sampleSalePerms,
   sampleTasks,
   sampleUser,
 } from '@/features/preview/sample';
+import { printDocument } from '@/features/print/print';
+import { PrintPreviewView } from '@/features/print/PrintPreviewScreen';
 import { addressToDelivery, cartTotals, useCart } from '@/features/sales/cart';
 import { CheckoutView } from '@/features/sales/CheckoutScreen';
 import { CustomerPickerView } from '@/features/sales/CustomerPickerScreen';
@@ -44,6 +47,7 @@ const SCREENS = [
   { key: 'giam-gia', title: 'Giảm giá và phí ship' },
   { key: 'bang-gia', title: 'Bảng giá' },
   { key: 'xong', title: 'Tạo đơn xong' },
+  { key: 'phieu-in', title: 'Xem và in phiếu' },
 ] as const;
 
 /** Giỏ mẫu cho các màn bán hàng. */
@@ -230,16 +234,36 @@ export default function PreviewScreen() {
     return (
       <SuccessView
         sale={{
-          kind: 'invoice',
+          kind: 'order',
           id: 1,
-          code: 'HD000123',
+          code: 'DH000123',
           total: 1_041_000,
           customerName: sampleCustomers[0].name,
           notes: [],
+          stockWarnings: [
+            'Sản phẩm Trà đen mẫu 1kg không đủ tồn kho (Có: 0, Cần: 2)',
+            'Sản phẩm Siro đào mẫu 2,5L không đủ tồn kho (Có: 3, Cần: 6)',
+            'Sản phẩm Thạch dừa mẫu 2,2kg (12 hũ/thùng) không đủ tồn kho (Có: 0, Cần: 1)',
+            'Sản phẩm Bột sữa béo mẫu 1kg không đủ tồn kho (Có: 0, Cần: 1)',
+            'Sản phẩm Ly nhựa mẫu 500ml (50 cái) không đủ tồn kho (Có: 0, Cần: 4)',
+            'Sản phẩm Trân châu đen mẫu 3kg không đủ tồn kho (Có: 0, Cần: 1)',
+          ],
         }}
         canPrint
-        onPrint={noop}
+        onPrint={toView('phieu-in')}
         onNew={toView('ban-hang')}
+      />
+    );
+  if (man === 'phieu-in')
+    return (
+      <PrintPreviewView
+        title="Phiếu đặt hàng"
+        html={printDocument({ content: samplePrintContent, paperSize: 'A5', landscape: false }, { screen: true })}
+        pageWidth={559}
+        onPrint={noop}
+        onChangePrinter={noop}
+        onSendPdf={noop}
+        onSendImage={noop}
       />
     );
   if (man === 'chi-nhanh')

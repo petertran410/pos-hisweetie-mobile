@@ -55,7 +55,10 @@ export interface LastSale {
   code: string;
   total: number;
   customerName: string;
+  /** Việc cần làm thêm (vd chưa ghi được tiền cọc). */
   notes: string[];
+  /** Hàng chưa đủ tồn kho (đơn đặt hàng vẫn được tạo). */
+  stockWarnings: string[];
 }
 
 export const useLastSale = create<{ sale: LastSale | null }>(() => ({ sale: null }));
@@ -402,10 +405,18 @@ export default function CheckoutScreen() {
     try {
       if (mode === 'invoice') {
         const res = await createPosInvoice(buildInvoicePayload(state, ctx));
-        sale = { kind: 'invoice', id: res.id, code: res.code, total: 0, customerName: '', notes: [] };
+        sale = { kind: 'invoice', id: res.id, code: res.code, total: 0, customerName: '', notes: [], stockWarnings: [] };
       } else {
         const res = await createOrder(buildOrderPayload(state, ctx));
-        sale = { kind: 'order', id: res.order.id, code: res.order.code, total: 0, customerName: '', notes: res.warnings ?? [] };
+        sale = {
+          kind: 'order',
+          id: res.order.id,
+          code: res.order.code,
+          total: 0,
+          customerName: '',
+          notes: [],
+          stockWarnings: res.warnings ?? [],
+        };
       }
     } catch (e) {
       busyRef.current = false;
