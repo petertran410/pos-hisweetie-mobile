@@ -69,7 +69,7 @@
     },
     "owner": "petertran410",
     "runtimeVersion": {
-      "policy": "sdkVersion"
+      "policy": "fingerprint"
     },
     "updates": {
       "url": "https://u.expo.dev/f74e1fdc-e813-42e3-94f9-809f7fac3b8d"
