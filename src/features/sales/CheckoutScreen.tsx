@@ -43,6 +43,7 @@ import { cartTotals, useCart, type PayKind, type SaleMode } from './cart';
 import { LineRow, SumRow } from './components';
 import { buildInvoicePayload, buildOrderPayload, paymentNoteOf, validateCheckout } from './payload';
 import { useSalePerms, type SalePerms } from './perms';
+import { useScopedCart } from './scope';
 import { lineTotal } from './totals';
 
 const MODE_ORDER: SaleMode[] = ['order', 'invoice'];
@@ -83,8 +84,9 @@ export interface CheckoutViewProps {
   onClear: () => void;
 }
 
-function CustomerCard({ perms, onPress }: { perms: SalePerms; onPress: () => void }) {
-  const customer = useCart((s) => s.customer);
+/** Khách của giỏ đang mở; không truyền `onPress` thì không cho đổi khách. */
+export function CustomerCard({ perms, onPress }: { perms: SalePerms; onPress?: () => void }) {
+  const customer = useScopedCart((s) => s.customer);
   if (!customer) {
     return (
       <PressableScale onPress={onPress} accessibilityLabel="Chọn khách hàng" scaleTo={0.98} style={styles.pickCustomer}>
@@ -105,7 +107,10 @@ function CustomerCard({ perms, onPress }: { perms: SalePerms; onPress: () => voi
   }
   const debt = customer.totalDebt ?? 0;
   return (
-    <Card onPress={onPress} accessibilityLabel={`Khách hàng ${customer.name}. Bấm để đổi`} style={styles.customer}>
+    <Card
+      onPress={onPress}
+      accessibilityLabel={onPress ? `Khách hàng ${customer.name}. Bấm để đổi` : `Khách hàng ${customer.name}`}
+      style={styles.customer}>
       <Avatar name={customer.name} size={44} />
       <View style={{ flex: 1, gap: 2 }}>
         <Txt variant="body" weight="semibold" numberOfLines={1}>
@@ -120,15 +125,17 @@ function CustomerCard({ perms, onPress }: { perms: SalePerms; onPress: () => voi
           </View>
         ) : null}
       </View>
-      <Txt variant="label" weight="semibold" color={C.brand}>
-        Đổi
-      </Txt>
+      {onPress ? (
+        <Txt variant="label" weight="semibold" color={C.brand}>
+          Đổi
+        </Txt>
+      ) : null}
     </Card>
   );
 }
 
-function DeliveryCard({ onPress }: { onPress: () => void }) {
-  const d = useCart((s) => s.delivery);
+export function DeliveryCard({ onPress }: { onPress: () => void }) {
+  const d = useScopedCart((s) => s.delivery);
   const place = [d.address, d.wardName, d.locationName].filter(Boolean).join(', ');
   return (
     <Card onPress={onPress} accessibilityLabel="Sửa thông tin giao hàng" style={styles.delivery}>

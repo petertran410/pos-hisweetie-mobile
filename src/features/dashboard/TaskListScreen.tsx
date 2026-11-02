@@ -2,6 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { dateVN, money, qty } from '@/core/format';
+import { usePullRefresh } from '@/core/usePullRefresh';
 import {
   C,
   Card,
@@ -130,6 +131,7 @@ export default function TaskListScreen() {
   const { type: raw } = useLocalSearchParams<{ type: string }>();
   const type: TaskType = isValidTaskType(raw) ? raw : 'orders';
   const tasks = useTasks(type);
+  const pull = usePullRefresh(tasks.refetch);
   const counts = useTaskCounts();
   return (
     <TaskListView
@@ -139,8 +141,8 @@ export default function TaskListScreen() {
       counts={counts.data}
       loading={tasks.isLoading}
       error={tasks.isError ? tasks.error : undefined}
-      refreshing={tasks.isRefetching}
-      onRefresh={() => void tasks.refetch()}
+      refreshing={pull.refreshing}
+      onRefresh={pull.onRefresh}
     />
   );
 }

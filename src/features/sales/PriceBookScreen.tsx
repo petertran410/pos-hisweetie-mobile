@@ -6,9 +6,9 @@ import { errorMessage } from '@/core/http';
 import { useSession } from '@/core/session';
 import { C, ErrorState, Icon, LoadingState, PressableScale, SheetHeader, toast, Txt } from '@/ui';
 import { fetchPriceBook, useApplicablePriceBooks, type PriceBookSummary } from './api';
-import { useCart } from './cart';
 import { useSalePerms } from './perms';
 import { rememberPriceBook } from './persist';
+import { useSaleScope, useScopedCart } from './scope';
 
 const GENERAL: PriceBookSummary = { id: 0, name: 'Bảng giá chung' };
 
@@ -74,14 +74,15 @@ export default function PriceBookScreen() {
   const perms = useSalePerms();
   const qc = useQueryClient();
   const userId = useSession((s) => s.user?.id);
-  const customerId = useCart((s) => s.customer?.id);
-  const selectedId = useCart((s) => s.priceBookId ?? 0);
+  const { store, editing } = useSaleScope();
+  const customerId = useScopedCart((s) => s.customer?.id);
+  const selectedId = useScopedCart((s) => s.priceBookId ?? 0);
   const books = useApplicablePriceBooks(customerId, perms.priceBooks);
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const pick = async (b: PriceBookSummary) => {
     if (b.id === selectedId) return router.back();
-    const { lines, setPriceBook } = useCart.getState();
+    const { lines, setPriceBook } = store.getState();
     let prices: Map<number, number> | undefined;
     if (lines.length) {
       setBusyId(b.id);
@@ -104,7 +105,8 @@ export default function PriceBookScreen() {
       }
     }
     setPriceBook(b.id || null, b.id ? b.name : null, prices);
-    if (userId) rememberPriceBook(userId, b.id || null, b.id ? b.name : null);
+    // Đơn đang sửa dùng bảng giá của đơn, không đổi bảng giá mặc định của giỏ bán hàng.
+    if (userId && !editing) rememberPriceBook(userId, b.id || null, b.id ? b.name : null);
     setBusyId(null);
     router.back();
   };

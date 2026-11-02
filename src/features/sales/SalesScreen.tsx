@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useDebounced } from '@/core/useDebounced';
+import { usePullRefresh } from '@/core/usePullRefresh';
 import {
   Appear,
   C,
@@ -14,14 +15,16 @@ import {
   PressableScale,
   SearchField,
   Skeleton,
+  SubHeader,
   TitleHeader,
   toast,
   Txt,
 } from '@/ui';
 import { priceFor, usePriceBook, useSaleProducts, type PriceBookDetail } from './api';
-import { cartTotals, useCart, type SaleProduct } from './cart';
+import { cartTotals, useCart, type CartStore, type SaleProduct } from './cart';
 import { CartBar, ProductRow } from './components';
 import { useSalePerms } from './perms';
+import { useSaleScope, useScopedCart } from './scope';
 
 export interface SalesViewProps {
   search: string;
@@ -45,6 +48,8 @@ export interface SalesViewProps {
   cartCount: number;
   cartTotal: number;
   onOpenCart: () => void;
+  /** Mở từ đơn đang sửa: đầu trang có nút quay lại, thanh dưới để quay về đơn. */
+  editing?: boolean;
 }
 
 function ListSkeleton() {
@@ -67,11 +72,12 @@ function ListSkeleton() {
 /** Màn chọn hàng: tìm/quét → bấm để thêm vào giỏ → thanh giỏ ở dưới. */
 export function SalesView(p: SalesViewProps) {
   const hasCart = p.cartCount > 0;
+  const Header = p.editing ? SubHeader : TitleHeader;
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <PageBackground />
-      <TitleHeader
-        title="Bán hàng"
+      <Header
+        title={p.editing ? 'Thêm hàng vào đơn' : 'Bán hàng'}
         right={p.onScan ? <IconButton icon="scan-barcode" label="Quét mã vạch" onPress={p.onScan} /> : undefined}>
         <SearchField value={p.search} onChangeText={p.onSearch} placeholder="Tìm tên hoặc mã hàng" />
         {p.onOpenPriceBook ? (
@@ -87,7 +93,7 @@ export function SalesView(p: SalesViewProps) {
             <Icon name="chevron-down" size={15} color={C.brand} />
           </PressableScale>
         ) : null}
-      </TitleHeader>
+      </Header>
 
       {p.loading ? (
         <ListSkeleton />
@@ -129,7 +135,7 @@ export function SalesView(p: SalesViewProps) {
 
       {hasCart ? (
         <Appear style={styles.cartBar}>
-          <CartBar count={p.cartCount} total={p.cartTotal} onPress={p.onOpenCart} />
+          <CartBar count={p.cartCount} total={p.cartTotal} onPress={p.onOpenCart} action={p.editing ? 'Xem đơn' : undefined} />
         </Appear>
       ) : null}
     </View>
@@ -137,7 +143,12 @@ export function SalesView(p: SalesViewProps) {
 }
 
 /** Thêm hàng vào giỏ theo bảng giá đang chọn (chặn hàng ngoài bảng giá "chỉ bán hàng trong bảng giá"). */
-export function addToCart(product: SaleProduct, book: PriceBookDetail | null | undefined, quantity = 1): boolean {
+export function addToCart(
+  product: SaleProduct,
+  book: PriceBookDetail | null | undefined,
+  quantity = 1,
+  store: CartStore = useCart,
+): boolean {
   const listed = !book || book.prices.has(product.id);
   if (book && !listed && !book.allowNonListedProducts) {
     toast.error(`“${product.name}” không có trong bảng giá ${book.name}`);
@@ -146,13 +157,13 @@ export function addToCart(product: SaleProduct, book: PriceBookDetail | null | u
   if (book && !listed && book.warnNonListedProducts) {
     toast.info(`“${product.name}” không có trong bảng giá, dùng giá gốc`);
   }
-  useCart.getState().add(product, priceFor(product, book), quantity);
+  store.getState().add(product, priceFor(product, book), quantity);
   return true;
 }
 
 /** Đổi tổng SL của 1 sản phẩm trong giỏ (tăng/giảm ở dòng mới nhất của sản phẩm đó). */
-export function setProductQty(productId: number, next: number) {
-  const { lines, setQuantity } = useCart.getState();
+export function setProductQty(productId: number, next: number, store: CartStore = useCart) {
+  const { lines, setQuantity } = store.getState();
   const mine = lines.filter((l) => l.product.id === productId);
   const current = mine.reduce((s, l) => s + l.quantity, 0);
   const target = mine[0];
@@ -164,15 +175,17 @@ export default function SalesScreen() {
   const perms = useSalePerms();
   const [search, setSearch] = useState('');
   const term = useDebounced(search.trim(), 300);
-  const lines = useCart((s) => s.lines);
-  const orderDiscount = useCart((s) => s.orderDiscount);
-  const shippingFee = useCart((s) => s.shippingFee);
-  const priceBookId = useCart((s) => s.priceBookId);
-  const priceBookName = useCart((s) => s.priceBookName);
+  const { store, editing, paths } = useSaleScope();
+  const lines = useScopedCart((s) => s.lines);
+  const orderDiscount = useScopedCart((s) => s.orderDiscount);
+  const shippingFee = useScopedCart((s) => s.shippingFee);
+  const priceBookId = useScopedCart((s) => s.priceBookId);
+  const priceBookName = useScopedCart((s) => s.priceBookName);
 
   const book = usePriceBook(priceBookId, perms.priceBooks);
   const strict = !!book.data && !book.data.allowNonListedProducts;
   const products = useSaleProducts(term, { priceBookId, onlyInPriceBook: strict });
+  const pull = usePullRefresh(products.refetch);
 
   if (!perms.products) {
     return (
@@ -206,26 +219,27 @@ export default function SalesScreen() {
         if (products.hasNextPage && !products.isFetchingNextPage) void products.fetchNextPage();
       }}
       loadingMore={products.isFetchingNextPage}
-      refreshing={products.isRefetching && !products.isFetchingNextPage}
-      onRefresh={() => void products.refetch()}
+      refreshing={pull.refreshing}
+      onRefresh={pull.onRefresh}
       priceOf={(p) => priceFor(p, book.data)}
       qtyInCart={(id) => qtyByProduct.get(id) ?? 0}
       showStock={perms.viewStock}
       priceBookName={priceBookName}
-      onOpenPriceBook={perms.priceBooks ? () => router.push('/ban-hang/bang-gia') : undefined}
-      onScan={() => router.push('/ban-hang/quet-ma')}
+      onOpenPriceBook={perms.priceBooks ? () => router.push(paths.priceBook as never) : undefined}
+      onScan={() => router.push(paths.scan as never)}
       onAdd={(p) => {
         if (book.isLoading && priceBookId) return toast.info('Đang tải bảng giá, thử lại sau giây lát');
-        addToCart(p, book.data);
+        addToCart(p, book.data, 1, store);
       }}
-      onSetQty={(p, n) => setProductQty(p.id, n)}
+      onSetQty={(p, n) => setProductQty(p.id, n, store)}
       cartCount={totals.itemCount}
       cartTotal={totals.total}
-      onOpenCart={() => router.push('/ban-hang/gio-hang')}
+      // Đơn đang sửa: màn chọn hàng mở từ đơn nên quay lại là về đơn.
+      onOpenCart={() => (editing ? router.back() : router.push(paths.cart as never))}
+      editing={editing}
     />
   );
 }
-
 
 const styles = StyleSheet.create({
   book: {

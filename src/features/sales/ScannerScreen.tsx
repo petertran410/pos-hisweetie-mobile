@@ -9,9 +9,10 @@ import { errorMessage } from '@/core/http';
 import { useSession } from '@/core/session';
 import { Button, C, EmptyState, Icon, LoadingState, PressableScale, toast, Txt } from '@/ui';
 import { findProductByCode, usePriceBook } from './api';
-import { cartTotals, useCart } from './cart';
+import { cartTotals } from './cart';
 import { useSalePerms } from './perms';
 import { addToCart } from './SalesScreen';
+import { useSaleScope, useScopedCart } from './scope';
 
 const BARCODE_TYPES = ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39', 'code93', 'itf14', 'qr'] as const;
 
@@ -47,9 +48,10 @@ export default function ScannerScreen() {
   const insets = useSafeAreaInsets();
   const perms = useSalePerms();
   const branchId = useSession((s) => s.branchId);
-  const priceBookId = useCart((s) => s.priceBookId);
-  const count = useCart((s) => cartTotals(s).itemCount);
-  const total = useCart((s) => cartTotals(s).total);
+  const { store } = useSaleScope();
+  const priceBookId = useScopedCart((s) => s.priceBookId);
+  const count = useScopedCart((s) => cartTotals(s).itemCount);
+  const total = useScopedCart((s) => cartTotals(s).total);
   const book = usePriceBook(priceBookId, perms.priceBooks);
   const [permission, requestPermission] = useCameraPermissions();
   const [torch, setTorch] = useState(false);
@@ -75,7 +77,7 @@ export default function ScannerScreen() {
       if (!match) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         toast.error(found.length ? `Có ${found.length} hàng khớp “${code}”, hãy tìm bằng tên` : `Không tìm thấy hàng có mã “${code}”`);
-      } else if (addToCart(match, book.data)) {
+      } else if (addToCart(match, book.data, 1, store)) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setAdded(match.name);
       }

@@ -21,6 +21,7 @@ import CreditCard from 'lucide-react-native/icons/credit-card';
 import Eye from 'lucide-react-native/icons/eye';
 import EyeOff from 'lucide-react-native/icons/eye-off';
 import Flashlight from 'lucide-react-native/icons/flashlight';
+import Gift from 'lucide-react-native/icons/gift';
 import Hammer from 'lucide-react-native/icons/hammer';
 import HandCoins from 'lucide-react-native/icons/hand-coins';
 import Inbox from 'lucide-react-native/icons/inbox';
@@ -32,11 +33,13 @@ import LayoutGrid from 'lucide-react-native/icons/layout-grid';
 import Lock from 'lucide-react-native/icons/lock';
 import LogOut from 'lucide-react-native/icons/log-out';
 import Mail from 'lucide-react-native/icons/mail';
+import MapPin from 'lucide-react-native/icons/map-pin';
 import Minus from 'lucide-react-native/icons/minus';
 import Package from 'lucide-react-native/icons/package';
 import PackageSearch from 'lucide-react-native/icons/package-search';
 import Pencil from 'lucide-react-native/icons/pencil';
 import Percent from 'lucide-react-native/icons/percent';
+import Phone from 'lucide-react-native/icons/phone';
 import Plus from 'lucide-react-native/icons/plus';
 import Printer from 'lucide-react-native/icons/printer';
 import Receipt from 'lucide-react-native/icons/receipt';
@@ -88,6 +91,7 @@ const ICONS = {
   eye: Eye,
   'eye-off': EyeOff,
   flashlight: Flashlight,
+  gift: Gift,
   hammer: Hammer,
   'hand-coins': HandCoins,
   inbox: Inbox,
@@ -99,11 +103,13 @@ const ICONS = {
   lock: Lock,
   'log-out': LogOut,
   mail: Mail,
+  'map-pin': MapPin,
   minus: Minus,
   package: Package,
   'package-search': PackageSearch,
   pencil: Pencil,
   percent: Percent,
+  phone: Phone,
   plus: Plus,
   printer: Printer,
   receipt: Receipt,

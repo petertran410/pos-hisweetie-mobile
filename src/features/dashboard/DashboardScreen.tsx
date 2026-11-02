@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { useCan } from '@/core/permissions';
 import { currentBranch, useSession } from '@/core/session';
+import { usePullRefresh } from '@/core/usePullRefresh';
 import { EmptyState, Page, toast } from '@/ui';
 import {
   useDashboardStats,
@@ -25,6 +26,9 @@ export default function DashboardScreen() {
   const products = useTopProducts(range);
   const buyers = useTopBuyers(range);
   const recent = useRecentOrders();
+  const pull = usePullRefresh(() =>
+    Promise.all([stats.refetch(), trend.refetch(), counts.refetch(), products.refetch(), buyers.refetch(), recent.refetch()]),
+  );
 
   if (!allowed) {
     return (
@@ -38,15 +42,6 @@ export default function DashboardScreen() {
       </Page>
     );
   }
-
-  const refresh = () => {
-    void stats.refetch();
-    void trend.refetch();
-    void counts.refetch();
-    void products.refetch();
-    void buyers.refetch();
-    void recent.refetch();
-  };
 
   return (
     <DashboardView
@@ -64,8 +59,8 @@ export default function DashboardScreen() {
         buyers: buyers.data,
         recent: recent.data,
       }}
-      refreshing={stats.isRefetching || counts.isRefetching}
-      onRefresh={refresh}
+      refreshing={pull.refreshing}
+      onRefresh={pull.onRefresh}
       onRetry={() => void stats.refetch()}
       onOpenBranch={() => router.push('/chi-nhanh')}
       onOpenAccount={() => router.navigate('/them')}

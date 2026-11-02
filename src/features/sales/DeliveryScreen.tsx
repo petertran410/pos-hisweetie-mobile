@@ -2,7 +2,8 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { C, Icon, PressableScale, SheetHeader, TextField, Txt } from '@/ui';
-import { addressToDelivery, useCart, type CustomerAddress, type Delivery, type SaleCustomer } from './cart';
+import { addressToDelivery, type CustomerAddress, type Delivery, type SaleCustomer } from './cart';
+import { useSaleScope, useScopedCart } from './scope';
 
 const addressLine = (a: CustomerAddress) =>
   [a.address, a.newWardName || a.wardName, a.newCityName || a.locationName || a.cityName].filter(Boolean).join(', ');
@@ -92,14 +93,15 @@ export function DeliveryView({
 }
 
 export default function DeliveryScreen() {
-  const customer = useCart((s) => s.customer);
-  const delivery = useCart((s) => s.delivery);
+  const { store } = useSaleScope();
+  const customer = useScopedCart((s) => s.customer);
+  const delivery = useScopedCart((s) => s.delivery);
   return (
     <DeliveryView
       customer={customer}
       initial={delivery}
       onSave={(d) => {
-        useCart.getState().setDelivery({
+        store.getState().setDelivery({
           ...d,
           receiver: d.receiver.trim(),
           contactNumber: d.contactNumber.trim(),

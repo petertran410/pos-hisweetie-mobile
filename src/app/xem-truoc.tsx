@@ -10,12 +10,25 @@ import {
   sampleBranches,
   sampleCustomers,
   sampleDashboard,
+  sampleDocCounts,
+  sampleDocDetail,
+  sampleInvoiceDetail,
+  sampleInvoiceDraft,
+  sampleOrderEdit,
+  sampleOrderEditPromo,
+  sampleDocRows,
   samplePrintContent,
   sampleProducts,
   sampleSalePerms,
   sampleTasks,
   sampleUser,
 } from '@/features/preview/sample';
+import { InvoiceFromOrderView } from '@/features/orders/InvoiceFromOrderScreen';
+import { OrderDetailView } from '@/features/orders/OrderDetailScreen';
+import { OrderEditView } from '@/features/orders/OrderEditScreen';
+import { ORDER_EDIT_SCOPE, startOrderEdit, useOrderEditMeta } from '@/features/orders/editScope';
+import { OrdersView } from '@/features/orders/OrdersScreen';
+import type { DocKind, StatusFilter } from '@/features/orders/model';
 import { printDocument } from '@/features/print/print';
 import { PrintPreviewView } from '@/features/print/PrintPreviewScreen';
 import { addressToDelivery, cartTotals, useCart } from '@/features/sales/cart';
@@ -25,6 +38,7 @@ import { DeliveryView } from '@/features/sales/DeliveryScreen';
 import { DiscountView } from '@/features/sales/DiscountScreen';
 import { LineEditorView } from '@/features/sales/LineEditorScreen';
 import { PriceBookView } from '@/features/sales/PriceBookScreen';
+import { SaleScopeProvider } from '@/features/sales/scope';
 import { SalesView, setProductQty } from '@/features/sales/SalesScreen';
 import { SuccessView } from '@/features/sales/SuccessScreen';
 import { MoreView } from '@/features/shell/MoreScreen';
@@ -48,6 +62,12 @@ const SCREENS = [
   { key: 'bang-gia', title: 'Bảng giá' },
   { key: 'xong', title: 'Tạo đơn xong' },
   { key: 'phieu-in', title: 'Xem và in phiếu' },
+  { key: 'don-hang', title: 'Đơn hàng' },
+  { key: 'chi-tiet-don', title: 'Chi tiết đơn' },
+  { key: 'chi-tiet-hd', title: 'Chi tiết hóa đơn' },
+  { key: 'xu-ly', title: 'Xử lý đơn hàng' },
+  { key: 'xu-ly-km', title: 'Xử lý đơn có khuyến mãi' },
+  { key: 'tao-hd', title: 'Tạo hóa đơn từ đơn' },
 ] as const;
 
 /** Giỏ mẫu cho các màn bán hàng. */
@@ -95,11 +115,18 @@ export default function PreviewScreen() {
   const [range, setRange] = useState<DashRange>('today');
   const [task, setTask] = useState<TaskType>('orders');
   const [search, setSearch] = useState('');
+  const [docKind, setDocKind] = useState<DocKind>('order');
+  const [docStatus, setDocStatus] = useState<StatusFilter>('all');
+  const [docPeriod, setDocPeriod] = useState<import('@/core/format').PeriodKey | 'all'>('last7');
   const lines = useCart((st) => st.lines);
   const cart = useCart();
 
+  const editMeta = useOrderEditMeta((st) => st.meta);
+
   useEffect(() => {
     if (man && ['gio-hang', 'sua-hang', 'giao-hang', 'giam-gia'].includes(man)) seedCart();
+    if (man === 'xu-ly') startOrderEdit(sampleOrderEdit.cart, sampleOrderEdit.meta);
+    if (man === 'xu-ly-km') startOrderEdit(sampleOrderEditPromo.cart, sampleOrderEditPromo.meta);
   }, [man]);
 
   if (!__DEV__) return <Redirect href="/" />;
@@ -254,6 +281,66 @@ export default function PreviewScreen() {
         onNew={toView('ban-hang')}
       />
     );
+  if (man === 'don-hang')
+    return (
+      <View style={{ flex: 1 }}>
+        <OrdersView
+          kinds={['order', 'invoice']}
+          kind={docKind}
+          onKind={setDocKind}
+          filters={{ search, status: docStatus, period: docPeriod }}
+          onSearch={setSearch}
+          onStatus={setDocStatus}
+          onPeriod={setDocPeriod}
+          rows={docStatus === 'all' ? sampleDocRows : sampleDocRows.filter((r) => r.status === 5)}
+          total={docStatus === 'all' ? 24 : 5}
+          counts={sampleDocCounts}
+          onOpen={toView('chi-tiet-don')}
+        />
+        <FakeTabBar active="don-hang" />
+      </View>
+    );
+  if (man === 'chi-tiet-don' || man === 'chi-tiet-hd')
+    return (
+      <OrderDetailView
+        doc={man === 'chi-tiet-hd' ? sampleInvoiceDetail : sampleDocDetail}
+        canPrint
+        onPrint={toView('phieu-in')}
+        onOpenOrder={noop}
+        onOpenInvoice={noop}
+        actions={{
+          canProcess: man === 'chi-tiet-don',
+          onProcess: toView('xu-ly'),
+          canChangeStatus: true,
+          canComplete: true,
+          canCancel: true,
+          onChangeStatus: noop,
+          onComplete: noop,
+          onCancel: noop,
+        }}
+      />
+    );
+  if ((man === 'xu-ly' || man === 'xu-ly-km') && editMeta)
+    return (
+      <SaleScopeProvider value={ORDER_EDIT_SCOPE}>
+        <OrderEditView
+          meta={editMeta}
+          perms={sampleSalePerms}
+          canInvoice
+          busy={null}
+          bankAccounts={sampleBanks}
+          onSave={noop}
+          onInvoice={toView('tao-hd')}
+          onOpenCustomer={noop}
+          onOpenLine={noop}
+          onOpenDelivery={noop}
+          onOpenDiscount={noop}
+          onAddMore={noop}
+        />
+      </SaleScopeProvider>
+    );
+  if (man === 'tao-hd')
+    return <InvoiceFromOrderView draft={sampleInvoiceDraft} perms={{ viewPayment: true, editPayment: true }} onSubmit={noop} />;
   if (man === 'phieu-in')
     return (
       <PrintPreviewView

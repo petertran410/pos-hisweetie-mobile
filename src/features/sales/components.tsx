@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { money, qty } from '@/core/format';
-import { C, gradients, Icon, PressableScale, QtyStepper, radius, shadow, Txt } from '@/ui';
+import { C, gradients, Icon, Pill, PressableScale, QtyStepper, radius, shadow, Txt } from '@/ui';
 import type { CartLine, SaleProduct } from './cart';
 
 /** Ảnh sản phẩm (chỉ nhận https ở bản phát hành); không có ảnh thì hiện biểu tượng. */
@@ -79,13 +79,24 @@ export function ProductRow({
 }
 
 /** Thanh giỏ hàng nổi ở cuối màn chọn hàng. */
-export function CartBar({ count, total, onPress }: { count: number; total: number; onPress: () => void }) {
+export function CartBar({
+  count,
+  total,
+  onPress,
+  action = 'Thanh toán',
+}: {
+  count: number;
+  total: number;
+  onPress: () => void;
+  /** Chữ bên phải thanh (mặc định "Thanh toán"). */
+  action?: string;
+}) {
   return (
     <PressableScale
       onPress={onPress}
       haptic="light"
       scaleTo={0.97}
-      accessibilityLabel={`Giỏ hàng ${qty(count)} món, ${money(total)} đồng. Bấm để thanh toán`}
+      accessibilityLabel={`Giỏ hàng ${qty(count)} món, ${money(total)} đồng. ${action}`}
       style={styles.cartBarWrap}>
       <LinearGradient colors={[...gradients.brand]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cartBar}>
         <View style={styles.cartIcon}>
@@ -105,7 +116,7 @@ export function CartBar({ count, total, onPress }: { count: number; total: numbe
           </Txt>
         </View>
         <Txt variant="body" weight="semibold" color={C.white}>
-          Thanh toán
+          {action}
         </Txt>
         <Icon name="chevron-right" size={20} color={C.white} />
       </LinearGradient>
@@ -113,25 +124,52 @@ export function CartBar({ count, total, onPress }: { count: number; total: numbe
   );
 }
 
-/** Một dòng trong giỏ: tên, đơn giá × SL, thành tiền; bấm để sửa. */
+/** Nhãn của dòng lấy từ đơn: quà tặng, mua ưu đãi, bục rách, cận date. */
+function lineTags(line: CartLine): { label: string; gift: boolean }[] {
+  const o = line.origin;
+  if (!o) return [];
+  return [
+    o.lineType === 'gift' ? { label: 'Quà tặng', gift: true } : null,
+    o.lineType === 'discounted_buy' ? { label: 'Mua ưu đãi', gift: true } : null,
+    o.conditionType === 'damaged' ? { label: 'Bục rách', gift: false } : null,
+    o.conditionType === 'near_expiry' ? { label: 'Cận date', gift: false } : null,
+  ].filter((t): t is { label: string; gift: boolean } => !!t);
+}
+
+/** Một dòng trong giỏ: tên, đơn giá × SL, thành tiền; bấm để sửa. `locked`: chỉ xem. */
 export function LineRow({
   line,
   total,
   onPress,
   onChangeQty,
+  locked,
 }: {
   line: CartLine;
   total: number;
   onPress: () => void;
   onChangeQty: (n: number) => void;
+  locked?: boolean;
 }) {
   const net = line.price - line.discount;
+  const tags = lineTags(line);
   return (
     <View style={styles.line}>
-      <PressableScale onPress={onPress} accessibilityLabel={`Sửa ${line.product.name}`} scaleTo={0.985} style={{ flex: 1, gap: 3 }}>
+      <PressableScale
+        onPress={locked ? undefined : onPress}
+        disabled={locked}
+        accessibilityLabel={locked ? line.product.name : `Sửa ${line.product.name}`}
+        scaleTo={0.985}
+        style={{ flex: 1, gap: 3 }}>
         <Txt variant="body" weight="semibold" numberOfLines={2}>
           {line.product.name}
         </Txt>
+        {tags.length ? (
+          <View style={styles.tags}>
+            {tags.map((t) => (
+              <Pill key={t.label} label={t.label} tone={t.gift ? 'success' : 'warning'} />
+            ))}
+          </View>
+        ) : null}
         <Txt variant="caption" color={C.muted} numeric>
           {line.discount > 0 ? (
             <>
@@ -150,15 +188,23 @@ export function LineRow({
             Ghi chú: {line.note}
           </Txt>
         ) : null}
-        <Txt variant="caption" weight="semibold" color={C.brand}>
-          Sửa
-        </Txt>
+        {locked ? null : (
+          <Txt variant="caption" weight="semibold" color={C.brand}>
+            Sửa
+          </Txt>
+        )}
       </PressableScale>
       <View style={{ alignItems: 'flex-end', gap: 8 }}>
         <Txt variant="body" weight="bold" numeric>
           {money(total)}
         </Txt>
-        <QtyStepper value={line.quantity} onChange={onChangeQty} min={1} size="small" label={line.product.name} />
+        {locked ? (
+          <Txt variant="label" color={C.muted} numeric>
+            SL {qty(line.quantity)}
+          </Txt>
+        ) : (
+          <QtyStepper value={line.quantity} onChange={onChangeQty} min={1} size="small" label={line.product.name} />
+        )}
       </View>
     </View>
   );
@@ -212,6 +258,7 @@ export function SumRow({
 }
 
 const styles = StyleSheet.create({
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   thumb: {
     borderRadius: 12,
     backgroundColor: '#F1F5F8',

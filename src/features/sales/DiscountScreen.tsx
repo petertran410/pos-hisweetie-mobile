@@ -3,8 +3,9 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { money, parseQty } from '@/core/format';
 import { C, Card, ChipGroup, MoneyField, SheetHeader, TextField, Txt } from '@/ui';
-import { cartTotals, useCart } from './cart';
+import { cartTotals } from './cart';
 import { useSalePerms } from './perms';
+import { useScopedCart } from './scope';
 import type { Discount } from './totals';
 
 /** Giảm giá cả đơn (theo số tiền hoặc %) và phí giao hàng. */
@@ -95,7 +96,7 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
 
 export default function DiscountScreen() {
   const perms = useSalePerms();
-  const cart = useCart();
+  const cart = useScopedCart((s) => s);
   const t = cartTotals(cart);
   return (
     <DiscountView

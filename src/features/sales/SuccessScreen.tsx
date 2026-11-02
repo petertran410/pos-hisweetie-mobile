@@ -150,7 +150,7 @@ export default function SuccessScreen() {
   return (
     <SuccessView
       sale={sale}
-      canPrint={perms.print}
+      canPrint={sale.kind === 'invoice' ? perms.printInvoice : perms.printOrder}
       onPrint={() =>
         router.push({ pathname: '/ban-hang/phieu-in', params: { kind: sale.kind, id: String(sale.id), code: sale.code } })
       }

@@ -3,9 +3,10 @@ import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { money, parseQty, qty } from '@/core/format';
 import { Button, C, Card, ChipGroup, EmptyState, MoneyField, QtyField, SheetHeader, TextField, Txt } from '@/ui';
-import { useCart, type CartLine } from './cart';
+import type { CartLine } from './cart';
 import { Thumb } from './components';
 import { useSalePerms, type SalePerms } from './perms';
+import { useSaleScope, useScopedCart } from './scope';
 import { discountAmount, lineTotal } from './totals';
 
 type DiscountKind = 'amount' | 'percent';
@@ -154,7 +155,8 @@ export function LineEditorView({
 export default function LineEditorScreen() {
   const { rowId } = useLocalSearchParams<{ rowId: string }>();
   const perms = useSalePerms();
-  const line = useCart((s) => s.lines.find((l) => l.rowId === rowId));
+  const { store } = useSaleScope();
+  const line = useScopedCart((s) => s.lines.find((l) => l.rowId === rowId));
 
   if (!line) {
     return (
@@ -170,7 +172,7 @@ export default function LineEditorScreen() {
       line={line}
       perms={perms}
       onSave={(patch) => {
-        useCart.getState().updateLine(line.rowId, patch);
+        store.getState().updateLine(line.rowId, patch);
         router.back();
       }}
       onRemove={() =>
@@ -181,7 +183,7 @@ export default function LineEditorScreen() {
             style: 'destructive',
             onPress: () => {
               router.back();
-              useCart.getState().remove(line.rowId);
+              store.getState().remove(line.rowId);
             },
           },
         ])

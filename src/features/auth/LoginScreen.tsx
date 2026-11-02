@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
-import { useRef, useState, type ComponentRef } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { LinearTransition, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorMessage } from '@/core/http';
-import { signInWithLark, signInWithPassword, useSession } from '@/core/session';
+import { canUseLarkApp, signInWithLark, signInWithPassword, useSession } from '@/core/session';
 import { Banner, Button, C, Card, gentleEntering, Icon, PageBackground, TextField, Txt } from '@/ui';
 import { easeOut } from '@/ui/motion';
 import { Logo } from './Logo';
@@ -21,6 +21,18 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const passwordRef = useRef<ComponentRef<typeof TextInput>>(null);
+  // Có app Lark trên máy thì xác thực bằng app Lark, không thì trên trang Lark.
+  const [larkApp, setLarkApp] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void canUseLarkApp().then((ok) => {
+      if (alive) setLarkApp(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const loginLark = async () => {
     setError(null);
@@ -106,8 +118,9 @@ export default function LoginScreen() {
                 <View style={styles.hint}>
                   <Icon name="info" size={16} color={C.muted} />
                   <Txt variant="caption" color={C.muted} style={{ flex: 1 }}>
-                    Dùng tài khoản Lark của công ty. Đăng nhập ngay trên trang Lark vừa mở, không chọn mở
-                    ứng dụng Lark.
+                    {larkApp
+                      ? 'Dùng tài khoản Lark của công ty. App Lark sẽ mở để bạn bấm đồng ý, xong tự quay lại đây.'
+                      : 'Dùng tài khoản Lark của công ty. Đăng nhập ngay trên trang Lark vừa mở, không chọn mở ứng dụng Lark.'}
                   </Txt>
                 </View>
               </View>

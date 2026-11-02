@@ -50,7 +50,8 @@
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "./modules/lark-sso/app.plugin.js"
     ],
     "experiments": {
       "typedRoutes": false,

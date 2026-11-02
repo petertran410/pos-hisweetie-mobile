@@ -20,7 +20,9 @@ export function useSalePerms() {
     viewPayment: can('pos_payment:view'),
     editPayment: can('pos_payment:update'),
     viewDebt: can('customers:view_debt'),
-    print: can('print_templates:view'),
+    // In phiếu: cần quyền in của loại phiếu (giống web) và quyền dùng mẫu in.
+    printInvoice: can('invoices:print') && can('print_templates:view'),
+    printOrder: can('orders:print') && can('print_templates:view'),
   };
 }
 

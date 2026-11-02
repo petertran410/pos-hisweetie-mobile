@@ -110,17 +110,21 @@ export function QtyStepper({
   value,
   onChange,
   min = 0,
+  max,
   size = 'medium',
   label,
 }: {
   value: number;
   onChange: (n: number) => void;
   min?: number;
+  /** Không cho tăng quá số này. */
+  max?: number;
   size?: 'small' | 'medium';
   label: string;
 }) {
   const h = size === 'small' ? 32 : 38;
   const canMinus = value - 1 >= min;
+  const canPlus = max === undefined || value < max;
   return (
     <View style={[styles.stepper, { height: h }]} accessibilityLabel={`${label}: ${qty(value)}`}>
       <PressableScale
@@ -137,13 +141,14 @@ export function QtyStepper({
         {qty(value)}
       </Txt>
       <PressableScale
-        onPress={() => onChange(value + 1)}
+        onPress={() => onChange(max === undefined ? value + 1 : Math.min(max, value + 1))}
+        disabled={!canPlus}
         accessibilityLabel={`Tăng ${label}`}
         haptic="selection"
         hitSlop={4}
         scaleTo={0.85}
         style={[styles.stepBtn, { width: h, height: h }]}>
-        <Icon name="plus" size={17} color={C.brand} />
+        <Icon name="plus" size={17} color={canPlus ? C.brand : C.faint} />
       </PressableScale>
     </View>
   );

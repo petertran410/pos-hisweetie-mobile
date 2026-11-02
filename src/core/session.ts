@@ -2,7 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { AppState } from 'react-native';
 import { create } from 'zustand';
+import { isLarkAppId, LarkSso, type LarkSsoCode } from '../../modules/lark-sso';
 import { base64url, toBase64url } from './base64';
 import { http } from './http';
 import { queryClient } from './query';
@@ -137,11 +139,63 @@ export type LarkResult =
   | { kind: 'setup'; setupToken: string }
   | { kind: 'cancelled' };
 
+const LARK_APP_ID = (process.env.EXPO_PUBLIC_LARK_APP_ID ?? '').trim();
+
+/** Đăng nhập được bằng app Lark trên máy này (bản build có module + đã cài app Lark). */
+export async function canUseLarkApp(): Promise<boolean> {
+  if (!LarkSso || !isLarkAppId(LARK_APP_ID)) return false;
+  try {
+    return await LarkSso.isAvailable(LARK_APP_ID);
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Đăng nhập Lark: mở trang Lark trong ASWebAuthenticationSession, Lark xong
- * backend trả về app kèm mã một lần, app đổi mã (kèm PKCE) lấy phiên.
+ * Đăng nhập Lark: có app Lark thì mở app Lark để xác nhận, không thì mở trang
+ * Lark trên web. App Lark lỗi trước khi trả mã thì chuyển sang web.
  */
 export async function signInWithLark(): Promise<LarkResult> {
+  if (await canUseLarkApp()) {
+    const fromApp = await larkAppCode();
+    if (fromApp === 'cancelled') return { kind: 'cancelled' };
+    if (fromApp) return finishLarkLogin('/auth/mobile/lark/app', fromApp);
+  }
+  return signInWithLarkWeb();
+}
+
+/**
+ * Mở app Lark (LarkSSOSDK). Trả mã Lark + code_verifier; `'cancelled'` khi
+ * người dùng hủy hoặc quay lại mà không xác nhận; `null` khi SDK lỗi.
+ */
+async function larkAppCode(): Promise<LarkSsoCode | 'cancelled' | null> {
+  const sso = LarkSso;
+  if (!sso) return null;
+  let left = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // Vuốt quay lại app mà Lark không trả kết quả: kết thúc lượt đang chờ.
+  const sub = AppState.addEventListener('change', (state) => {
+    if (state === 'background') left = true;
+    if (state === 'active' && left) {
+      clearTimeout(timer);
+      timer = setTimeout(() => void sso.abandon().catch(() => {}), 1500);
+    }
+  });
+  try {
+    return await sso.authorize(LARK_APP_ID, []);
+  } catch (e) {
+    return (e as { code?: string } | null)?.code === 'ERR_LARK_CANCELLED' ? 'cancelled' : null;
+  } finally {
+    sub.remove();
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Đăng nhập Lark trên web: mở trang Lark trong ASWebAuthenticationSession, Lark
+ * xong backend trả về app kèm mã một lần, app đổi mã (kèm PKCE) lấy phiên.
+ */
+async function signInWithLarkWeb(): Promise<LarkResult> {
   const verifier = base64url(Crypto.getRandomBytes(32));
   const challenge = toBase64url(
     await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, verifier, {
@@ -161,13 +215,14 @@ export async function signInWithLark(): Promise<LarkResult> {
   const error = typeof params.error === 'string' ? params.error : undefined;
   const code = typeof params.code === 'string' ? params.code : undefined;
   if (error || !code) throw new ApiError(error ?? 'Đăng nhập Lark thất bại', 401);
+  return finishLarkLogin('/auth/mobile/lark/exchange', { code, codeVerifier: verifier });
+}
 
-  const body = await rawRequest<AuthBody | { setupToken: string }>('/auth/mobile/lark/exchange', {
-    method: 'POST',
-    body: { code, codeVerifier: verifier },
-  });
-  if ('setupToken' in body) return { kind: 'setup', setupToken: body.setupToken };
-  await applyAuth(body);
+/** Gửi mã cho backend: nhận phiên đăng nhập, hoặc setup token nếu lần đầu. */
+async function finishLarkLogin(path: string, body: LarkSsoCode): Promise<LarkResult> {
+  const res = await rawRequest<AuthBody | { setupToken: string }>(path, { method: 'POST', body });
+  if ('setupToken' in res) return { kind: 'setup', setupToken: res.setupToken };
+  await applyAuth(res);
   return { kind: 'signedIn' };
 }
 

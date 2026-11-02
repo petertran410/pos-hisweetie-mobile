@@ -1,7 +1,8 @@
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { http } from '@/core/http';
 import { useSession } from '@/core/session';
-import type { CustomerAddress, SaleCustomer, SaleProduct } from './cart';
+import type { SaleProduct } from './cart';
+import { toSaleCustomer, toSaleProduct, type RawCustomer, type RawProduct } from './mappers';
 
 /** Prisma Decimal về dạng chuỗi → số. */
 const num = (v: unknown): number => {
@@ -12,46 +13,6 @@ const num = (v: unknown): number => {
 const PAGE_SIZE = 20;
 
 // ---------- Hàng hóa ----------
-
-interface RawProduct {
-  id: number;
-  code: string;
-  name: string;
-  unit?: string | null;
-  basePrice?: string | number | null;
-  conversionValue?: string | number | null;
-  weight?: string | number | null;
-  weightUnit?: string | null;
-  shippingWeight?: string | number | null;
-  shippingWeightUnit?: string | null;
-  images?: { image?: string | null }[];
-  inventories?: { branchId: number; onHand?: string | number | null }[];
-}
-
-/** Đổi khối lượng về gram (giống web: ưu tiên khối lượng giao hàng). */
-export function toGrams(value: unknown, unit: string | null | undefined): number | null {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  const u = (unit ?? '').toLowerCase();
-  if (u === 'kg') return n * 1000;
-  return n;
-}
-
-export function toSaleProduct(p: RawProduct, branchId: number | null): SaleProduct {
-  const inv = p.inventories?.find((i) => i.branchId === branchId) ?? (branchId ? undefined : p.inventories?.[0]);
-  const conv = num(p.conversionValue);
-  return {
-    id: p.id,
-    code: p.code,
-    name: p.name,
-    unit: p.unit ?? null,
-    basePrice: num(p.basePrice),
-    conversionValue: conv > 1 ? conv : null,
-    image: p.images?.[0]?.image ?? null,
-    onHand: inv ? num(inv.onHand) : null,
-    weightGrams: toGrams(p.shippingWeight, p.shippingWeightUnit ?? 'g') ?? toGrams(p.weight, p.weightUnit ?? 'kg'),
-  };
-}
 
 interface Page<T> {
   data: T[];
@@ -170,32 +131,6 @@ export function priceFor(product: SaleProduct, book: PriceBookDetail | null | un
 }
 
 // ---------- Khách hàng ----------
-
-interface RawCustomer {
-  id: number;
-  code: string;
-  name: string;
-  contactNumber?: string | null;
-  phone?: string | null;
-  totalDebt?: string | number | null;
-  debtPolicy?: { isActive?: boolean | null; requireFullPaymentForInvoice?: boolean | null } | null;
-  parent?: { code?: string | null; name?: string | null } | null;
-  addresses?: CustomerAddress[];
-}
-
-export function toSaleCustomer(c: RawCustomer): SaleCustomer {
-  return {
-    id: c.id,
-    code: c.code,
-    name: c.name,
-    phone: c.phone ?? null,
-    contactNumber: c.contactNumber ?? null,
-    totalDebt: num(c.totalDebt),
-    parentName: c.parent?.name ?? null,
-    requireFullPayment: c.debtPolicy?.isActive !== false && c.debtPolicy?.requireFullPaymentForInvoice === true,
-    addresses: c.addresses ?? [],
-  };
-}
 
 /** Tìm khách theo tên / mã / số điện thoại (để trống: 50 khách đầu). */
 export function useCustomerSearch(search: string) {

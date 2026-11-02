@@ -246,6 +246,7 @@ export function ChipGroup<T extends string>({
         haptic={on ? undefined : 'selection'}
         scaleTo={0.94}
         accessibilityRole="tab"
+        accessibilityLabel={text(o)}
         accessibilityState={{ selected: on }}
         style={[styles.chip, fill ? styles.chipFill : null, solid ? styles.chipOn : null]}>
         <Txt variant="label" weight="medium" color={solid ? C.white : C.text} align="center" numberOfLines={1}>

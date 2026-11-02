@@ -6,8 +6,9 @@ import { money } from '@/core/format';
 import { useDebounced } from '@/core/useDebounced';
 import { Avatar, C, EmptyState, ErrorState, LoadingState, Pill, PressableScale, SearchField, SheetHeader, Txt } from '@/ui';
 import { useCustomerSearch } from './api';
-import { useCart, type SaleCustomer } from './cart';
+import type { SaleCustomer } from './cart';
 import { useSalePerms } from './perms';
+import { useSaleScope, useScopedCart } from './scope';
 
 export function CustomerPickerView({
   search,
@@ -95,7 +96,8 @@ export default function CustomerPickerScreen() {
   const [search, setSearch] = useState('');
   const term = useDebounced(search.trim(), 300);
   const result = useCustomerSearch(term);
-  const selectedId = useCart((s) => s.customer?.id);
+  const { store } = useSaleScope();
+  const selectedId = useScopedCart((s) => s.customer?.id);
 
   if (!perms.customers) {
     return (
@@ -117,7 +119,7 @@ export default function CustomerPickerScreen() {
       selectedId={selectedId}
       showDebt={perms.viewDebt}
       onPick={(c) => {
-        useCart.getState().setCustomer(c);
+        store.getState().setCustomer(c);
         router.back();
       }}
     />
