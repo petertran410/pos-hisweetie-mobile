@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { router, useLocalSearchParams, useNavigation, usePreventRemove } from 'expo-router';
+import { router, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { canDo } from '@/core/can';
@@ -320,10 +320,11 @@ function OrderEditScreen() {
   const perms = useSalePerms();
   const user = useSession((s) => s.user);
   const qc = useQueryClient();
-  const navigation = useNavigation();
   const [busy, setBusy] = useState<EditBusy>(null);
   // Sau khi lưu xong: rời màn mà không hỏi "bỏ thay đổi".
   const [exit, setExit] = useState<{ go: () => void } | null>(null);
+  // Đã chọn "Bỏ thay đổi": thôi chặn rời màn.
+  const [discarding, setDiscarding] = useState(false);
   const busyRef = useRef(false);
 
   const banks = useBankAccounts(perms.viewPayment && cart.payKind === 'transfer' && cart.paidAmount > 0);
@@ -337,10 +338,19 @@ function OrderEditScreen() {
     !!changes?.lines && !meta?.promoLocked,
   );
 
-  usePreventRemove(!!changes?.any && !exit, ({ data }) => {
+  // Phải gọi `repeat()` (tắt chặn rồi đi tiếp); tự dispatch lại hành động thì
+  // màn vẫn đang bị chặn nên hộp hỏi hiện lại mãi.
+  usePreventRemove(!!changes?.any && !exit && !discarding, ({ repeat }) => {
     Alert.alert('Bỏ thay đổi?', 'Những thay đổi chưa lưu của đơn này sẽ mất.', [
       { text: 'Ở lại', style: 'cancel' },
-      { text: 'Bỏ thay đổi', style: 'destructive', onPress: () => navigation.dispatch(data.action) },
+      {
+        text: 'Bỏ thay đổi',
+        style: 'destructive',
+        onPress: () => {
+          setDiscarding(true);
+          repeat();
+        },
+      },
     ]);
   });
 

@@ -19,7 +19,9 @@ import {
   sampleDocRows,
   samplePrintContent,
   sampleProducts,
+  sampleRawProducts,
   sampleSalePerms,
+  sampleStockMoves,
   sampleTasks,
   sampleUser,
 } from '@/features/preview/sample';
@@ -30,6 +32,21 @@ import { ORDER_EDIT_SCOPE, startOrderEdit, useOrderEditMeta } from '@/features/o
 import { OrdersView } from '@/features/orders/OrdersScreen';
 import type { DocKind, StatusFilter } from '@/features/orders/model';
 import { printDocument } from '@/features/print/print';
+import { CostScopeView } from '@/features/products/CostScopeModal';
+import { newForm, toEditForm, type ProductForm } from '@/features/products/form';
+import { ComponentPickerView, NamePickerView } from '@/features/products/PickerScreens';
+import { ProductDetailView, type DetailTab, type LogData } from '@/features/products/ProductDetailScreen';
+import { ProductFormView } from '@/features/products/ProductFormScreen';
+import { ProductFilterView } from '@/features/products/ProductFilterScreen';
+import { ProductsView } from '@/features/products/ProductsScreen';
+import {
+  DEFAULT_FILTERS,
+  productPerms,
+  toProductDetail,
+  toProductRow,
+  type ConditionBucket,
+  type ProductFilters,
+} from '@/features/products/model';
 import { PrintPreviewView } from '@/features/print/PrintPreviewScreen';
 import { addressToDelivery, cartTotals, useCart } from '@/features/sales/cart';
 import { CheckoutView } from '@/features/sales/CheckoutScreen';
@@ -68,7 +85,39 @@ const SCREENS = [
   { key: 'xu-ly', title: 'Xử lý đơn hàng' },
   { key: 'xu-ly-km', title: 'Xử lý đơn có khuyến mãi' },
   { key: 'tao-hd', title: 'Tạo hóa đơn từ đơn' },
+  { key: 'hang-hoa', title: 'Hàng hóa' },
+  { key: 'loc-hang', title: 'Bộ lọc hàng hóa' },
+  { key: 'ct-hang', title: 'Chi tiết hàng hóa' },
+  { key: 'ct-combo', title: 'Chi tiết combo' },
+  { key: 'ct-sx', title: 'Chi tiết hàng sản xuất' },
+  { key: 'them-hh', title: 'Thêm hàng hóa' },
+  { key: 'sua-hh', title: 'Sửa hàng hóa' },
+  { key: 'sua-combo', title: 'Sửa combo' },
+  { key: 'sua-sx', title: 'Sửa hàng sản xuất' },
+  { key: 'chon-nhom', title: 'Chọn nhóm hàng' },
+  { key: 'chon-tp', title: 'Chọn thành phần' },
+  { key: 'gia-von', title: 'Áp dụng giá vốn' },
 ] as const;
+
+/** Form mẫu theo màn xem trước. */
+function sampleForm(key: string): ProductForm | null {
+  if (key === 'them-hh') return newForm(2);
+  const id = { 'sua-hh': 1, 'sua-combo': 3, 'sua-sx': 4 }[key];
+  const r = sampleRawProducts.find((x) => x.id === id);
+  return r ? toEditForm(r, 1) : null;
+}
+
+const productDetailKey: Record<string, number> = { 'ct-hang': 1, 'ct-combo': 3, 'ct-sx': 4 };
+
+const sampleLogs = (rows = sampleStockMoves): LogData => ({
+  rows,
+  total: rows.length + 12,
+  loading: false,
+  hasMore: true,
+  loadingMore: false,
+  onMore: () => toast.info('Chỉ là bản xem trước'),
+  onRetry: () => {},
+});
 
 /** Giỏ mẫu cho các màn bán hàng. */
 function seedCart() {
@@ -122,6 +171,11 @@ export default function PreviewScreen() {
   const cart = useCart();
 
   const editMeta = useOrderEditMeta((st) => st.meta);
+  const [productFilters, setProductFilters] = useState<ProductFilters>(DEFAULT_FILTERS);
+  const [detailTab, setDetailTab] = useState<DetailTab>('info');
+  const [bucket, setBucket] = useState<ConditionBucket>('DAMAGED');
+  const productPermsAll = productPerms(sampleUser);
+  const [previewForm, setPreviewForm] = useState<{ key: string; form: ProductForm } | null>(null);
 
   useEffect(() => {
     if (man && ['gio-hang', 'sua-hang', 'giao-hang', 'giam-gia'].includes(man)) seedCart();
@@ -353,6 +407,118 @@ export default function PreviewScreen() {
         onSendImage={noop}
       />
     );
+  if (man === 'hang-hoa') {
+    const q = search.trim().toLowerCase();
+    const rows = sampleRawProducts
+      .map((r) => toProductRow(r, 1))
+      .filter((r) => productFilters.status === 'all' || r.isActive === (productFilters.status === 'active'))
+      .filter((r) => !q || r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q));
+    return (
+      <ProductsView
+        perms={productPermsAll}
+        search={search}
+        onSearch={setSearch}
+        filters={productFilters}
+        onStatus={(status) => setProductFilters((f) => ({ ...f, status }))}
+        onSort={(sort) => setProductFilters((f) => ({ ...f, sort }))}
+        onOpenFilters={toView('loc-hang')}
+        onCreate={noop}
+        rows={rows}
+        total={rows.length}
+        onOpen={(r) => router.setParams({ man: r.type === 1 ? 'ct-combo' : r.type === 4 ? 'ct-sx' : 'ct-hang' })}
+      />
+    );
+  }
+  if (man === 'loc-hang')
+    return (
+      <ProductFilterView
+        draft={productFilters}
+        onChange={(patch) => setProductFilters((f) => ({ ...f, ...patch }))}
+        categories={{
+          parent: { items: [{ id: 1, name: 'Nguyên liệu mẫu' }, { id: 2, name: 'Bao bì mẫu' }], loading: false },
+          middle: { items: [{ id: 3, name: 'Trong nước' }, { id: 4, name: 'Nhập khẩu' }], loading: false },
+          child: {
+            items: ['Trà', 'Siro', 'Bột', 'Thạch', 'Trân châu', 'Ly', 'Ống hút', 'Nắp', 'Sữa', 'Kem', 'Topping', 'Hương liệu', 'Thành phẩm'].map(
+              (name, i) => ({ id: 10 + i, name }),
+            ),
+            loading: false,
+          },
+        }}
+        trademarks={{ items: [{ id: 1, name: 'Thương hiệu mẫu' }], loading: false }}
+        onApply={toView('hang-hoa')}
+        onReset={() => setProductFilters((f) => ({ ...DEFAULT_FILTERS, status: f.status, sort: f.sort }))}
+        onCancel={toView('hang-hoa')}
+      />
+    );
+  if (man && productDetailKey[man]) {
+    const rawProduct = sampleRawProducts.find((r) => r.id === productDetailKey[man]) ?? sampleRawProducts[0];
+    return (
+      <ProductDetailView
+        d={toProductDetail(rawProduct, 1)}
+        perms={productPermsAll}
+        branchId={1}
+        tab={detailTab}
+        onTab={setDetailTab}
+        branches={sampleBranches}
+        logBranchId={1}
+        onLogBranch={noop}
+        card={sampleLogs()}
+        condition={{
+          summary: { onHand: 42, good: 35, damaged: 2, nearExpiry: 5, promo: 0 },
+          bucket,
+          onBucket: setBucket,
+          logs: sampleLogs([]),
+        }}
+        onOpenInvoice={noop}
+        onEdit={noop}
+        onToggleActive={noop}
+      />
+    );
+  }
+  if (man && ['them-hh', 'sua-hh', 'sua-combo', 'sua-sx'].includes(man)) {
+    const current = previewForm?.key === man ? previewForm.form : sampleForm(man);
+    if (!current) return null;
+    return (
+      <ProductFormView
+        form={current}
+        editing={man !== 'them-hh'}
+        code={current.code}
+        perms={productPermsAll}
+        onChange={(patch) =>
+          setPreviewForm({ key: man, form: { ...current, ...(typeof patch === 'function' ? patch(current) : patch) } })
+        }
+        onPickImages={noop}
+        onPick={toView('chon-nhom')}
+        onAddComponent={toView('chon-tp')}
+        onSave={toView('gia-von')}
+      />
+    );
+  }
+  if (man === 'chon-nhom')
+    return (
+      <NamePickerView
+        title="Danh mục"
+        items={['Trà', 'Siro', 'Bột', 'Thạch', 'Trân châu', 'Ly'].map((name, i) => ({ id: i + 1, name }))}
+        selected="Siro"
+        clearLabel="Bỏ chọn danh mục"
+        onPick={toView('sua-hh')}
+        onCreate={noop}
+      />
+    );
+  if (man === 'chon-tp')
+    return (
+      <ComponentPickerView
+        title="Thêm thành phần"
+        search={search}
+        onSearch={setSearch}
+        items={sampleRawProducts.filter((r) => r.type !== 1)}
+        added={[1]}
+        branchId={1}
+        showCost
+        onPick={noop}
+      />
+    );
+  if (man === 'gia-von') return <CostScopeView branches={sampleBranches} currentBranchId={1} onCancel={toView('sua-hh')} onConfirm={noop} />;
   if (man === 'chi-nhanh')
     return <BranchPickerView branches={sampleBranches} branchId={1} switching={null} onPick={noop} />;
 

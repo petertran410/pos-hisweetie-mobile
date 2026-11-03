@@ -80,6 +80,8 @@ export default function RootLayout() {
               <Stack.Protected guard={status === 'signedIn'}>
                 <Stack.Screen name="index" />
                 <Stack.Screen name="(tabs)" />
+                {/* Mục mở từ Tổng quan / tab Thêm: trượt vào như trang con. */}
+                <Stack.Screen name="hang-hoa" options={{ animation: 'default' }} />
                 <Stack.Screen
                   name="chi-nhanh"
                   options={{

@@ -1,6 +1,7 @@
 // Nhập từng biểu tượng riêng lẻ để app không kéo theo cả bộ ~1.600 icon.
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import ArrowRight from 'lucide-react-native/icons/arrow-right';
+import ArrowUpDown from 'lucide-react-native/icons/arrow-up-down';
 import Banknote from 'lucide-react-native/icons/banknote';
 import BookOpen from 'lucide-react-native/icons/book-open';
 import Boxes from 'lucide-react-native/icons/boxes';
@@ -17,17 +18,23 @@ import CircleX from 'lucide-react-native/icons/circle-x';
 import ClipboardList from 'lucide-react-native/icons/clipboard-list';
 import Clock from 'lucide-react-native/icons/clock';
 import Coins from 'lucide-react-native/icons/coins';
+import Copy from 'lucide-react-native/icons/copy';
 import CreditCard from 'lucide-react-native/icons/credit-card';
+import Ellipsis from 'lucide-react-native/icons/ellipsis';
 import Eye from 'lucide-react-native/icons/eye';
 import EyeOff from 'lucide-react-native/icons/eye-off';
+import Factory from 'lucide-react-native/icons/factory';
+import FileText from 'lucide-react-native/icons/file-text';
 import Flashlight from 'lucide-react-native/icons/flashlight';
 import Gift from 'lucide-react-native/icons/gift';
 import Hammer from 'lucide-react-native/icons/hammer';
 import HandCoins from 'lucide-react-native/icons/hand-coins';
+import ImagePlus from 'lucide-react-native/icons/image-plus';
 import Inbox from 'lucide-react-native/icons/inbox';
 import Info from 'lucide-react-native/icons/info';
 import KeyRound from 'lucide-react-native/icons/key-round';
 import Landmark from 'lucide-react-native/icons/landmark';
+import Layers from 'lucide-react-native/icons/layers';
 import LayoutDashboard from 'lucide-react-native/icons/layout-dashboard';
 import LayoutGrid from 'lucide-react-native/icons/layout-grid';
 import Lock from 'lucide-react-native/icons/lock';
@@ -41,6 +48,7 @@ import Pencil from 'lucide-react-native/icons/pencil';
 import Percent from 'lucide-react-native/icons/percent';
 import Phone from 'lucide-react-native/icons/phone';
 import Plus from 'lucide-react-native/icons/plus';
+import Power from 'lucide-react-native/icons/power';
 import Printer from 'lucide-react-native/icons/printer';
 import Receipt from 'lucide-react-native/icons/receipt';
 import ReceiptText from 'lucide-react-native/icons/receipt-text';
@@ -50,7 +58,10 @@ import Share2 from 'lucide-react-native/icons/share-2';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import ShoppingBag from 'lucide-react-native/icons/shopping-bag';
 import ShoppingCart from 'lucide-react-native/icons/shopping-cart';
+import SlidersHorizontal from 'lucide-react-native/icons/sliders-horizontal';
 import Smartphone from 'lucide-react-native/icons/smartphone';
+import Snowflake from 'lucide-react-native/icons/snowflake';
+import Star from 'lucide-react-native/icons/star';
 import StickyNote from 'lucide-react-native/icons/sticky-note';
 import Store from 'lucide-react-native/icons/store';
 import Tag from 'lucide-react-native/icons/tag';
@@ -63,6 +74,7 @@ import User from 'lucide-react-native/icons/user';
 import UserPlus from 'lucide-react-native/icons/user-plus';
 import Users from 'lucide-react-native/icons/users';
 import Wallet from 'lucide-react-native/icons/wallet';
+import Warehouse from 'lucide-react-native/icons/warehouse';
 import WifiOff from 'lucide-react-native/icons/wifi-off';
 import X from 'lucide-react-native/icons/x';
 import type { ColorValue } from 'react-native';
@@ -71,6 +83,7 @@ import { C } from './theme';
 const ICONS = {
   'arrow-left': ArrowLeft,
   'arrow-right': ArrowRight,
+  'arrow-up-down': ArrowUpDown,
   banknote: Banknote,
   'book-open': BookOpen,
   boxes: Boxes,
@@ -87,17 +100,23 @@ const ICONS = {
   'clipboard-list': ClipboardList,
   clock: Clock,
   coins: Coins,
+  copy: Copy,
   'credit-card': CreditCard,
+  ellipsis: Ellipsis,
   eye: Eye,
   'eye-off': EyeOff,
+  factory: Factory,
+  'file-text': FileText,
   flashlight: Flashlight,
   gift: Gift,
   hammer: Hammer,
   'hand-coins': HandCoins,
+  'image-plus': ImagePlus,
   inbox: Inbox,
   info: Info,
   'key-round': KeyRound,
   landmark: Landmark,
+  layers: Layers,
   'layout-dashboard': LayoutDashboard,
   'layout-grid': LayoutGrid,
   lock: Lock,
@@ -111,6 +130,7 @@ const ICONS = {
   percent: Percent,
   phone: Phone,
   plus: Plus,
+  power: Power,
   printer: Printer,
   receipt: Receipt,
   'receipt-text': ReceiptText,
@@ -120,7 +140,10 @@ const ICONS = {
   'shield-check': ShieldCheck,
   'shopping-bag': ShoppingBag,
   'shopping-cart': ShoppingCart,
+  'sliders-horizontal': SlidersHorizontal,
   smartphone: Smartphone,
+  snowflake: Snowflake,
+  star: Star,
   'sticky-note': StickyNote,
   store: Store,
   tag: Tag,
@@ -133,6 +156,7 @@ const ICONS = {
   'user-plus': UserPlus,
   users: Users,
   wallet: Wallet,
+  warehouse: Warehouse,
   'wifi-off': WifiOff,
   x: X,
 } as const;

@@ -25,7 +25,7 @@ export const SHORTCUTS: ShortcutDef[] = [
     color: 'orange',
     permissions: ['packing_slips:view', 'packing_slips:create', 'packing_hangs:create', 'packing_loadings:create'],
   },
-  { key: 'hang-hoa', label: 'Hàng hóa', icon: 'boxes', color: 'pink', permissions: ['products:view'] },
+  { key: 'hang-hoa', label: 'Hàng hóa', icon: 'boxes', color: 'pink', permissions: ['products:view'], href: '/hang-hoa' },
   { key: 'so-quy', label: 'Sổ quỹ', icon: 'book-open', color: 'teal', permissions: ['cash_flows:view'] },
   { key: 'bien-dong', label: 'Biến động\nsố dư', icon: 'landmark', color: 'blue', permissions: ['sepay:view'] },
   { key: 'bao-cao', label: 'Báo cáo', icon: 'chart-pie', color: 'violet', permissions: ['reports:*'] },

@@ -8,6 +8,7 @@ import type { SaleCustomer, SaleProduct } from '../sales/cart';
 import type { SalePerms } from '../sales/perms';
 import { toOrderEdit, type RawOrderForEdit } from '../orders/editOrder';
 import { toInvoiceDraft, type InvoiceDraft } from '../orders/fromOrder';
+import { toStockMove, type RawProduct, type StockMove } from '../products/model';
 
 export const sampleUser = {
   name: 'Nguyễn Thị Lan',
@@ -282,3 +283,120 @@ export const sampleOrderEditPromo = toOrderEdit(
   },
   1,
 );
+
+// ---------- Hàng hóa ----------
+
+const inv = (branchId: number, name: string, onHand: number, cost: number, more: object = {}) => ({
+  branchId,
+  branch: { name, isActive: true },
+  onHand: String(onHand),
+  cost: String(cost),
+  reserved: '4',
+  onOrder: '0',
+  minQuality: '10',
+  maxQuality: '200',
+  ...more,
+});
+
+/** Hàng mẫu dạng dữ liệu API (dùng cho danh sách, chi tiết, form). */
+export const sampleRawProducts: RawProduct[] = [
+  {
+    id: 1,
+    code: 'SP001',
+    name: 'Trà đen mẫu 1kg',
+    type: 2,
+    basePrice: '185000',
+    unit: 'gói',
+    conversionValue: '20',
+    weight: '1',
+    weightUnit: 'kg',
+    shippingWeight: '1050',
+    shippingWeightUnit: 'g',
+    vat: '8',
+    isActive: true,
+    isDirectSale: true,
+    parentName: 'Nguyên liệu mẫu',
+    middleName: 'Trong nước',
+    childName: 'Trà',
+    tradeMark: { id: 1, name: 'Thương hiệu mẫu' },
+    description: 'Trà đen dùng pha trà sữa (mô tả mẫu).',
+    orderTemplate: 'Giao kèm hóa đơn',
+    createdAt: '2026-03-12T08:00:00.000Z',
+    attributes: [
+      { name: 'Vị', value: 'Truyền thống' },
+      { name: 'Kích cỡ', value: '1kg' },
+    ],
+    inventories: [
+      inv(1, 'Chi nhánh mẫu A', 42, 120000, { damagedQuantity: '2', nearExpiryQuantity: '5' }),
+      inv(2, 'Chi nhánh mẫu B', 0, 118000),
+    ],
+  },
+  {
+    id: 2,
+    code: 'SP002',
+    name: 'Siro đào mẫu 2,5L',
+    type: 2,
+    basePrice: '96000',
+    unit: 'chai',
+    conversionValue: '6',
+    isActive: true,
+    childName: 'Siro',
+    cargoType: 'COLD',
+    inventories: [inv(1, 'Chi nhánh mẫu A', 18, 61000)],
+  },
+  {
+    id: 3,
+    code: 'CB001',
+    name: 'Combo khai trương mẫu',
+    type: 1,
+    basePrice: '320000',
+    unit: 'bộ',
+    isActive: true,
+    comboComponents: [
+      { componentProductId: 1, quantity: '1', componentProduct: { id: 1, code: 'SP001', name: 'Trà đen mẫu 1kg', inventories: [inv(1, 'A', 42, 120000)] } },
+      { componentProductId: 2, quantity: '2', componentProduct: { id: 2, code: 'SP002', name: 'Siro đào mẫu 2,5L', inventories: [inv(1, 'A', 18, 61000)] } },
+    ],
+    inventories: [inv(1, 'Chi nhánh mẫu A', 6, 0)],
+  },
+  {
+    id: 4,
+    code: 'SX001',
+    name: 'Trà sữa nền mẫu (thành phẩm)',
+    type: 4,
+    basePrice: '45000',
+    unit: 'lít',
+    isActive: true,
+    childName: 'Thành phẩm',
+    formulas: [
+      {
+        id: 1,
+        name: 'Công thức chuẩn',
+        isDefault: true,
+        components: [
+          { componentProductId: 1, quantity: '50', inputMode: 'gram', componentProduct: { id: 1, code: 'SP001', name: 'Trà đen mẫu 1kg' } },
+          { componentProductId: 2, quantity: '1', inputMode: 'quantity', componentProduct: { id: 2, code: 'SP002', name: 'Siro đào mẫu 2,5L' } },
+        ],
+      },
+      { id: 2, name: 'Công thức ít ngọt', components: [] },
+    ],
+    inventories: [inv(1, 'Chi nhánh mẫu A', 12, 21500)],
+  },
+  { id: 5, code: 'DV001', name: 'Phí lắp đặt quầy mẫu', type: 3, basePrice: '500000', unit: 'lần', isActive: true },
+  {
+    id: 6,
+    code: 'SP006',
+    name: 'Ly nhựa mẫu 500ml (50 cái)',
+    type: 2,
+    basePrice: '38000',
+    unit: 'cây',
+    isActive: false,
+    inventories: [inv(1, 'Chi nhánh mẫu A', 0, 25000)],
+  },
+];
+
+export const sampleStockMoves: StockMove[] = [
+  { id: 1, transactionType: 'SALE', refType: 'invoice', refId: 9, refCode: 'HD000124', partnerName: 'Quán mẫu Mây', quantity: '-3', tonCuoi: '42', costPrice: '120000', transactionPrice: '185000', transactionDate: '2026-11-02T09:15:00.000Z' },
+  { id: 2, transactionType: 'PURCHASE', refType: 'purchase_order', refId: 3, refCode: 'PN000031', partnerName: 'Nhà cung cấp mẫu', quantity: '40', tonCuoi: '45', costPrice: '118000', transactionPrice: '118000', transactionDate: '2026-10-30T14:00:00.000Z' },
+  { id: 3, transactionType: 'STOCK_AUDIT', refType: 'stock_audit', refId: 2, refCode: 'KK000012', quantity: '0', tonCuoi: '5', costPrice: '120000', transactionDate: '2026-10-28T17:30:00.000Z' },
+  { id: 4, transactionType: 'TRANSFER_OUT', refType: 'transfer', refId: 7, refCode: 'CH000007', partnerName: 'Chi nhánh mẫu B', quantity: '-10', tonCuoi: '5', costPrice: '120000', transactionDate: '2026-10-25T10:00:00.000Z' },
+].map((r) => toStockMove(r));
