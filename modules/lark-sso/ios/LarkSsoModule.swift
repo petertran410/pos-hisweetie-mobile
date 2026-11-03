@@ -50,11 +50,12 @@ public class LarkSsoModule: Module {
       request.scope = scopes
       // PKCE: mã Lark chỉ đổi được khi kèm code_verifier mà SDK trả riêng cho app.
       request.useChallengeCode = true
-      if let controller = self.appContext?.utilities?.currentViewController() {
-        LarkSSO.send(request: request, viewController: controller, delegate: receiver)
-      } else {
-        LarkSSO.send(request: request, delegate: receiver)
-      }
+      // Màn đang mở: SDK dùng để hiện trang Lark dự phòng khi không mở được app Lark.
+      LarkSSO.send(
+        request: request,
+        viewController: self.appContext?.utilities?.currentViewController(),
+        delegate: receiver
+      )
     }.runOnQueue(.main)
 
     /// Người dùng quay lại app mà Lark không trả kết quả: kết thúc lượt đang chờ.
