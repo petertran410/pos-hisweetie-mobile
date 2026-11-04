@@ -2,10 +2,12 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Alert, StyleSheet, View } from 'react-native';
 import { API_ORIGIN, APP_VERSION } from '@/core/config';
+import { dateTimeVN } from '@/core/format';
 import type { PermissionHolder } from '@/core/can';
 import { currentBranch, signOut, useSession } from '@/core/session';
 import { ActionCard, Appear, Avatar, Button, C, Card, gradients, InfoRow, Page, Section, TitleHeader, toast, Txt } from '@/ui';
 import { allowedShortcuts } from '../dashboard/shortcuts';
+import { applyAppUpdate, checkForAppUpdate, useAppUpdate } from './appUpdate';
 import { useTabs } from './tabs';
 
 /** Chức năng xem ở tab Thêm (những gì không có trên thanh tab). */
@@ -28,9 +30,18 @@ export interface MoreViewProps {
   onOpenBranch: () => void;
   onOpen: (key: string, href?: string) => void;
   onSignOut: () => void;
+  /** Cập nhật qua mạng; không có = không hiện (dev, web). */
+  update?: {
+    pending: boolean;
+    busy: boolean;
+    /** Thời điểm tạo bản đang chạy; null = bản cài đặt gốc. */
+    runningSince: Date | null;
+    onCheck: () => void;
+    onApply: () => void;
+  };
 }
 
-export function MoreView({ user, branchName, canSwitchBranch, hiddenTabKeys, onOpenBranch, onOpen, onSignOut }: MoreViewProps) {
+export function MoreView({ user, branchName, canSwitchBranch, hiddenTabKeys, onOpenBranch, onOpen, onSignOut, update }: MoreViewProps) {
   const items = allowedShortcuts(user).filter(
     (s) => (MORE_KEYS as readonly string[]).includes(s.key) && (s.key !== 'bao-don' || hiddenTabKeys.includes('bao-don')),
   );
@@ -89,10 +100,29 @@ export function MoreView({ user, branchName, canSwitchBranch, hiddenTabKeys, onO
       <Section index={3} title="Ứng dụng">
         <Card>
           <InfoRow icon="smartphone" color="slate" label="Phiên bản" value={APP_VERSION} />
+          {update ? (
+            <InfoRow
+              icon="refresh-cw"
+              color="slate"
+              label="Bản cập nhật"
+              value={update.runningSince ? dateTimeVN(update.runningSince) : 'Bản cài đặt'}
+            />
+          ) : null}
           {__DEV__ ? (
             <InfoRow icon="info" color="slate" label="Máy chủ (chỉ hiện khi dev)" value={API_ORIGIN.replace(/^https?:\/\//, '')} />
           ) : null}
         </Card>
+        {update?.pending ? (
+          <ActionCard
+            icon="download"
+            color="teal"
+            title="Có bản cập nhật mới"
+            subtitle="Đã tải xong. Bấm để cập nhật, app tự mở lại trong vài giây."
+            onPress={update.onApply}
+          />
+        ) : update ? (
+          <Button title="Kiểm tra cập nhật" icon="refresh-cw" variant="outline" size="medium" loading={update.busy} onPress={update.onCheck} />
+        ) : null}
       </Section>
 
       <View style={{ marginTop: 24 }}>
@@ -108,6 +138,7 @@ export default function MoreScreen() {
   const branches = useSession((s) => s.branches);
   // Tab có quyền nhưng không còn chỗ trên thanh tab → hiện ở đây.
   const hiddenTabKeys = useTabs().overflow.map((t) => t.key);
+  const app = useAppUpdate();
 
   const confirmSignOut = () =>
     Alert.alert('Đăng xuất?', 'Bạn sẽ cần đăng nhập lại để dùng ứng dụng trên máy này.', [
@@ -127,6 +158,22 @@ export default function MoreScreen() {
         else toast.info('Chức năng này sẽ có ở bản cập nhật tới');
       }}
       onSignOut={confirmSignOut}
+      update={
+        app.enabled
+          ? {
+              pending: app.pending,
+              busy: app.busy,
+              runningSince: app.runningSince,
+              onApply: () => void applyAppUpdate(),
+              onCheck: () =>
+                void checkForAppUpdate().then((r) => {
+                  // Tải xong thì hộp hỏi cập nhật tự hiện (UpdateWatcher).
+                  if (r === 'latest') toast.success('Bạn đang dùng bản mới nhất');
+                  if (r === 'error') toast.error('Chưa kiểm tra được, kiểm tra mạng rồi thử lại');
+                }),
+            }
+          : undefined
+      }
     />
   );
 }

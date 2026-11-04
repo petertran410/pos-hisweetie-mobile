@@ -13,6 +13,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { queryClient } from '@/core/query';
 import { bootstrap, useSession } from '@/core/session';
 import { refreshIfStale } from '@/core/tokens';
+import { UpdateWatcher } from '@/features/shell/appUpdate';
 import { PrivacyCover } from '@/features/shell/PrivacyCover';
 import { Button, C, EmptyState, Page, ToastHost } from '@/ui';
 
@@ -103,6 +104,7 @@ export default function RootLayout() {
           )}
           <ToastHost />
           <PrivacyCover />
+          <UpdateWatcher />
         </ThemeProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

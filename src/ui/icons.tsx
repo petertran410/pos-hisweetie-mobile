@@ -20,6 +20,7 @@ import Clock from 'lucide-react-native/icons/clock';
 import Coins from 'lucide-react-native/icons/coins';
 import Copy from 'lucide-react-native/icons/copy';
 import CreditCard from 'lucide-react-native/icons/credit-card';
+import Download from 'lucide-react-native/icons/download';
 import Ellipsis from 'lucide-react-native/icons/ellipsis';
 import Eye from 'lucide-react-native/icons/eye';
 import EyeOff from 'lucide-react-native/icons/eye-off';
@@ -52,6 +53,7 @@ import Power from 'lucide-react-native/icons/power';
 import Printer from 'lucide-react-native/icons/printer';
 import Receipt from 'lucide-react-native/icons/receipt';
 import ReceiptText from 'lucide-react-native/icons/receipt-text';
+import RefreshCw from 'lucide-react-native/icons/refresh-cw';
 import ScanBarcode from 'lucide-react-native/icons/scan-barcode';
 import Search from 'lucide-react-native/icons/search';
 import Share2 from 'lucide-react-native/icons/share-2';
@@ -102,6 +104,7 @@ const ICONS = {
   coins: Coins,
   copy: Copy,
   'credit-card': CreditCard,
+  download: Download,
   ellipsis: Ellipsis,
   eye: Eye,
   'eye-off': EyeOff,
@@ -134,6 +137,7 @@ const ICONS = {
   printer: Printer,
   receipt: Receipt,
   'receipt-text': ReceiptText,
+  'refresh-cw': RefreshCw,
   'scan-barcode': ScanBarcode,
   search: Search,
   'share-2': Share2,

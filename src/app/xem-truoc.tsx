@@ -228,6 +228,7 @@ export default function PreviewScreen() {
           onOpenBranch={() => router.setParams({ man: 'chi-nhanh' })}
           onOpen={noop}
           onSignOut={noop}
+          update={{ pending: true, busy: false, runningSince: new Date(), onCheck: noop, onApply: noop }}
         />
         <FakeTabBar active="them" />
       </View>
