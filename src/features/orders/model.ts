@@ -106,10 +106,18 @@ export const INVOICE_STEPS = [3, 5, 6, 7, 4, 8, 1] as const;
  * Thao tác được phép trên 1 hóa đơn (giống web).
  * `cashLocked`: hóa đơn đã có phiếu đóng hàng thu tiền mặt (admin không bị khóa).
  */
-export function invoiceActions(doc: { status: number }, perms: { update: boolean; cancel: boolean }, cashLocked: boolean) {
+export function invoiceActions(
+  doc: { status: number },
+  perms: { update: boolean; cancel: boolean; updateFinalized?: boolean },
+  cashLocked: boolean,
+) {
   // 1 = Hoàn thành, 2 = Đã hủy: không đổi trạng thái nữa.
   const final = doc.status === 1 || doc.status === 2;
+  // Giao thành công / Hoàn thành: sửa nội dung cần thêm quyền "sửa hóa đơn đã hoàn tất".
+  const finalized = doc.status === 7 || doc.status === 1;
   return {
+    /** "Xử lý hóa đơn" (giống web): sửa hàng, khách, giao hàng, giảm giá rồi lưu. */
+    process: perms.update && doc.status !== 2 && (!finalized || !!perms.updateFinalized) && !cashLocked,
     changeStatus: perms.update && !final && !cashLocked,
     complete: perms.update && !final,
     cancel: perms.cancel && doc.status !== 2 && !cashLocked,

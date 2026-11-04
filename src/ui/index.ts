@@ -3,6 +3,7 @@ export { ActionCard, ChipGroup, Grid2, ShortcutGrid, StatCard, type ShortcutItem
 export { Banner, EmptyState, ErrorState, LoadingState } from './Feedback';
 export { HomeHeader, SheetHeader, SubHeader, TitleHeader } from './Header';
 export { MoneyField, QtyField, QtyStepper, SearchField } from './Inputs';
+export { ImageViewer } from './ImageViewer';
 export { Icon, type IconName } from './icons';
 export {
   Avatar,

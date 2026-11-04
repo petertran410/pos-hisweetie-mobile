@@ -14,6 +14,7 @@ import {
   sampleDocDetail,
   sampleInvoiceDetail,
   sampleInvoiceDraft,
+  sampleInvoiceEdit,
   sampleOrderEdit,
   sampleOrderEditPromo,
   sampleDocRows,
@@ -84,6 +85,7 @@ const SCREENS = [
   { key: 'chi-tiet-hd', title: 'Chi tiết hóa đơn' },
   { key: 'xu-ly', title: 'Xử lý đơn hàng' },
   { key: 'xu-ly-km', title: 'Xử lý đơn có khuyến mãi' },
+  { key: 'xu-ly-hd', title: 'Xử lý hóa đơn' },
   { key: 'tao-hd', title: 'Tạo hóa đơn từ đơn' },
   { key: 'hang-hoa', title: 'Hàng hóa' },
   { key: 'loc-hang', title: 'Bộ lọc hàng hóa' },
@@ -181,6 +183,7 @@ export default function PreviewScreen() {
     if (man && ['gio-hang', 'sua-hang', 'giao-hang', 'giam-gia'].includes(man)) seedCart();
     if (man === 'xu-ly') startOrderEdit(sampleOrderEdit.cart, sampleOrderEdit.meta);
     if (man === 'xu-ly-km') startOrderEdit(sampleOrderEditPromo.cart, sampleOrderEditPromo.meta);
+    if (man === 'xu-ly-hd') startOrderEdit(sampleInvoiceEdit.cart, sampleInvoiceEdit.meta);
   }, [man]);
 
   if (!__DEV__) return <Redirect href="/" />;
@@ -363,8 +366,8 @@ export default function PreviewScreen() {
         onOpenOrder={noop}
         onOpenInvoice={noop}
         actions={{
-          canProcess: man === 'chi-tiet-don',
-          onProcess: toView('xu-ly'),
+          canProcess: true,
+          onProcess: toView(man === 'chi-tiet-hd' ? 'xu-ly-hd' : 'xu-ly'),
           canChangeStatus: true,
           canComplete: true,
           canCancel: true,
@@ -374,7 +377,7 @@ export default function PreviewScreen() {
         }}
       />
     );
-  if ((man === 'xu-ly' || man === 'xu-ly-km') && editMeta)
+  if ((man === 'xu-ly' || man === 'xu-ly-km' || man === 'xu-ly-hd') && editMeta)
     return (
       <SaleScopeProvider value={ORDER_EDIT_SCOPE}>
         <OrderEditView

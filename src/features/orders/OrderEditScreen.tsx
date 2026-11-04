@@ -40,10 +40,19 @@ import {
   toast,
   Txt,
 } from '@/ui';
-import { fetchOrderForEdit, updateOrder } from './api';
-import { buildOrderUpdate, editChanges, editPaymentNote, hasOrderFields, validateOrderEdit, type OrderEditMeta } from './editOrder';
+import { addInvoicePayment, fetchInvoiceForEdit, fetchOrderForEdit, updateInvoice, updateOrder } from './api';
+import {
+  buildInvoiceUpdate,
+  buildOrderUpdate,
+  editChanges,
+  editPaymentNote,
+  hasOrderFields,
+  invoiceEditProblem,
+  validateOrderEdit,
+  type OrderEditMeta,
+} from './editOrder';
 import { ORDER_EDIT_PICKER, useOrderEditMeta, withOrderEdit } from './editScope';
-import { ORDER_STATUS, statusOf } from './model';
+import { kindFromSlug, KIND_SLUG, ORDER_STATUS, statusOf } from './model';
 
 const PAY_ORDER: PayKind[] = ['transfer', 'cash'];
 
@@ -156,7 +165,9 @@ export function OrderEditView(p: OrderEditViewProps) {
   const cart = useScopedCart((s) => s);
   const t = cartTotals(cart);
   const locked = p.meta.promoLocked;
-  const status = statusOf('order', p.meta.status);
+  const invoice = p.meta.kind === 'invoice';
+  const noun = invoice ? 'hóa đơn' : 'đơn';
+  const status = statusOf(p.meta.kind, p.meta.status);
   const paidBefore = p.perms.viewPayment ? p.meta.paidBefore : 0;
   const paidNow = p.perms.viewPayment ? cart.paidAmount : 0;
   const left = t.total - paidBefore - paidNow;
@@ -164,7 +175,7 @@ export function OrderEditView(p: OrderEditViewProps) {
 
   const footer = (
     <View style={styles.footer}>
-      {p.canInvoice ? (
+      {p.canInvoice && !invoice ? (
         <Button
           title="Tạo hóa đơn"
           icon="receipt"
@@ -190,7 +201,7 @@ export function OrderEditView(p: OrderEditViewProps) {
     <Page
       stickyHeader
       header={
-        <SubHeader title="Xử lý đơn hàng">
+        <SubHeader title={invoice ? 'Xử lý hóa đơn' : 'Xử lý đơn hàng'}>
           <View style={styles.headRow}>
             <Txt variant="label" weight="semibold" color={C.muted}>
               {p.meta.code}
@@ -206,8 +217,12 @@ export function OrderEditView(p: OrderEditViewProps) {
         <Banner
           tone="info"
           icon="tag"
-          title="Đơn có khuyến mãi"
-          message="Để giữ đúng khuyến mãi, app chưa đổi được hàng và khách của đơn này. Muốn đổi hàng, hãy sửa trên web."
+          title={invoice ? 'Hóa đơn có khuyến mãi' : 'Đơn có khuyến mãi'}
+          message={
+            invoice
+              ? 'Để giữ đúng khuyến mãi, app chưa đổi được hàng, khách, giảm giá và bảng giá của hóa đơn này. Muốn đổi, hãy sửa trên web.'
+              : 'Để giữ đúng khuyến mãi, app chưa đổi được hàng và khách của đơn này. Muốn đổi hàng, hãy sửa trên web.'
+          }
         />
       ) : null}
 
@@ -239,8 +254,8 @@ export function OrderEditView(p: OrderEditViewProps) {
           <EmptyState
             icon="package"
             color="slate"
-            title="Đơn chưa có hàng"
-            message="Thêm ít nhất 1 món trước khi lưu đơn."
+            title={invoice ? 'Hóa đơn chưa có hàng' : 'Đơn chưa có hàng'}
+            message={`Thêm ít nhất 1 món trước khi lưu ${noun}.`}
             action={p.onAddMore ? <Button title="Thêm hàng" variant="outline" size="medium" onPress={p.onAddMore} /> : undefined}
           />
         )}
@@ -254,8 +269,8 @@ export function OrderEditView(p: OrderEditViewProps) {
         <Banner
           tone="warning"
           icon="tag"
-          title="Đơn này có khuyến mãi"
-          message={`${p.promotions.map((x) => x.name).join(', ')}. App chưa áp dụng khuyến mãi; muốn khách được hưởng, hãy sửa đơn trên web.`}
+          title={invoice ? 'Hóa đơn này có khuyến mãi' : 'Đơn này có khuyến mãi'}
+          message={`${p.promotions.map((x) => x.name).join(', ')}. App chưa áp dụng khuyến mãi; muốn khách được hưởng, hãy sửa ${noun} trên web.`}
         />
       ) : null}
 
@@ -285,7 +300,7 @@ export function OrderEditView(p: OrderEditViewProps) {
 
       <Section index={4} title="Ghi chú">
         <TextField
-          label="Ghi chú cho đơn"
+          label={invoice ? 'Ghi chú cho hóa đơn' : 'Ghi chú cho đơn'}
           value={cart.note}
           onChangeText={cart.setNote}
           placeholder="Không bắt buộc"
@@ -313,7 +328,8 @@ const ask = (title: string, message: string, ok: string) =>
   );
 
 function OrderEditScreen() {
-  const params = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string; kind?: string }>();
+  const kind = kindFromSlug(params.kind);
   const meta = useOrderEditMeta((s) => s.meta);
   const { store, paths } = useSaleScope();
   const cart = useScopedCart((s) => s);
@@ -341,7 +357,7 @@ function OrderEditScreen() {
   // Phải gọi `repeat()` (tắt chặn rồi đi tiếp); tự dispatch lại hành động thì
   // màn vẫn đang bị chặn nên hộp hỏi hiện lại mãi.
   usePreventRemove(!!changes?.any && !exit && !discarding, ({ repeat }) => {
-    Alert.alert('Bỏ thay đổi?', 'Những thay đổi chưa lưu của đơn này sẽ mất.', [
+    Alert.alert('Bỏ thay đổi?', `Những thay đổi chưa lưu của ${kind === 'invoice' ? 'hóa đơn' : 'đơn'} này sẽ mất.`, [
       { text: 'Ở lại', style: 'cancel' },
       {
         text: 'Bỏ thay đổi',
@@ -358,24 +374,65 @@ function OrderEditScreen() {
     if (exit) exit.go();
   }, [exit]);
 
-  if (!meta || meta.orderId !== Number(params.id)) {
+  if (!meta || meta.docId !== Number(params.id) || meta.kind !== kind) {
+    const invoice = kind === 'invoice';
     return (
-      <Page scroll={false} header={<SubHeader title="Xử lý đơn hàng" />}>
+      <Page scroll={false} header={<SubHeader title={invoice ? 'Xử lý hóa đơn' : 'Xử lý đơn hàng'} />}>
         <EmptyState
           icon="clipboard-list"
           color="slate"
-          title="Không có đơn đang xử lý"
-          message="Mở lại đơn ở danh sách Đơn hàng rồi bấm “Xử lý đơn hàng”."
+          title={invoice ? 'Không có hóa đơn đang xử lý' : 'Không có đơn đang xử lý'}
+          message={
+            invoice
+              ? 'Mở lại hóa đơn ở danh sách Đơn hàng rồi bấm “Xử lý hóa đơn”.'
+              : 'Mở lại đơn ở danh sách Đơn hàng rồi bấm “Xử lý đơn hàng”.'
+          }
         />
       </Page>
     );
   }
 
+  /** Ghi tiền khách trả thêm và ghi chú thanh toán; lỗi ở đây không làm hỏng phần đã lưu. */
+  const savePayments = async (docId: number, forceNote: boolean) => {
+    const c = store.getState();
+    const paid = perms.viewPayment ? c.paidAmount : 0;
+    if (paid > 0 && c.payKind) {
+      const account = c.payKind === 'transfer' && c.accountId ? { accountId: c.accountId } : null;
+      try {
+        if (meta.kind === 'invoice') await addInvoicePayment({ invoiceId: docId, amount: paid, paymentMethod: c.payKind, ...account });
+        else await addOrderPayment({ orderId: docId, amount: paid, paymentMethod: c.payKind, ...account });
+      } catch {
+        toast.error('Chưa ghi được tiền khách trả thêm, hãy ghi lại trên web.');
+      }
+    }
+    // Hóa đơn mới (.01) không mang theo ghi chú thanh toán: ghi lại.
+    const note =
+      forceNote && c.payKind
+        ? c.payKind === 'cash'
+          ? { paymentType: 'cash', amount: c.cashAmount }
+          : { paymentType: 'transfer' }
+        : editPaymentNote(c, meta.original);
+    if (note) {
+      try {
+        await addPaymentNote(meta.kind === 'invoice' ? 'invoices' : 'orders', docId, note);
+      } catch {
+        toast.error('Chưa ghi được hình thức thanh toán, hãy ghi lại trên web.');
+      }
+    }
+  };
+
+  const refresh = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['doc'] }),
+      qc.invalidateQueries({ queryKey: ['docs'] }),
+      qc.invalidateQueries({ queryKey: ['dashboard'] }),
+    ]);
+
   /**
-   * Lưu đơn: chỉ gửi phần đã sửa, rồi ghi tiền khách trả thêm và ghi chú
-   * thanh toán. `confirm` chuyển Phiếu tạm sang Đã xác nhận.
+   * Lưu đơn đặt hàng: chỉ gửi phần đã sửa, rồi ghi tiền khách trả thêm và
+   * ghi chú thanh toán. `confirm` chuyển Phiếu tạm sang Đã xác nhận.
    */
-  const persist = async (confirm: boolean): Promise<boolean> => {
+  const persistOrder = async (confirm: boolean): Promise<boolean> => {
     const c = store.getState();
     const changed = editChanges(c, meta.original);
     if (changed.any) {
@@ -387,7 +444,7 @@ function OrderEditScreen() {
     }
     try {
       // Giống web: đơn vừa được xuất hóa đơn (kho xử lý) thì không lưu đè.
-      const fresh = await fetchOrderForEdit(meta.orderId);
+      const fresh = await fetchOrderForEdit(meta.docId);
       if ((fresh.invoices ?? []).some((i) => i.status !== 2)) {
         toast.error('Đơn hàng đã ra hóa đơn, không thể lưu thay đổi. Quay lại để xem trạng thái mới nhất.');
         return false;
@@ -406,41 +463,60 @@ function OrderEditScreen() {
       }
 
       const body = buildOrderUpdate(c, meta, { confirm });
-      if (hasOrderFields(body)) await updateOrder(meta.orderId, body);
+      if (hasOrderFields(body)) await updateOrder(meta.docId, body);
     } catch (e) {
       toast.error(errorMessage(e));
       return false;
     }
-
-    // Phần ghi thêm: lỗi ở đây không làm hỏng phần đơn đã lưu.
-    const paid = perms.viewPayment ? c.paidAmount : 0;
-    if (paid > 0 && c.payKind) {
-      try {
-        await addOrderPayment({
-          orderId: meta.orderId,
-          amount: paid,
-          paymentMethod: c.payKind,
-          ...(c.payKind === 'transfer' && c.accountId ? { accountId: c.accountId } : null),
-        });
-      } catch {
-        toast.error('Chưa ghi được tiền khách trả thêm, hãy ghi lại trên web.');
-      }
-    }
-    const note = editPaymentNote(c, meta.original);
-    if (note) {
-      try {
-        await addPaymentNote('orders', meta.orderId, note);
-      } catch {
-        toast.error('Chưa ghi được hình thức thanh toán, hãy ghi lại trên web.');
-      }
-    }
-
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: ['doc'] }),
-      qc.invalidateQueries({ queryKey: ['docs'] }),
-      qc.invalidateQueries({ queryKey: ['dashboard'] }),
-    ]);
+    await savePayments(meta.docId, false);
+    await refresh();
     return true;
+  };
+
+  /**
+   * Lưu hóa đơn: chỉ gửi phần đã sửa. Đổi hàng / giảm giá / bảng giá thì
+   * backend tạo hóa đơn mới → trả về hóa đơn mới để mở ra xem.
+   */
+  const persistInvoice = async (): Promise<{ id: number; code: string } | null> => {
+    const c = store.getState();
+    const problem = validateOrderEdit(c, { canPay: perms.viewPayment, kind: 'invoice' }) ?? invoiceEditProblem(c, meta);
+    if (problem) {
+      toast.error(problem);
+      return null;
+    }
+
+    let result = { id: meta.docId, code: meta.code };
+    try {
+      const fresh = await fetchInvoiceForEdit(meta.docId);
+      if (Number(fresh.status) === 2) {
+        toast.error('Hóa đơn đã bị hủy (có thể đã được sửa thành hóa đơn mới). Quay lại để xem hóa đơn mới nhất.');
+        return null;
+      }
+      const finalized = Number(fresh.status) === 1 || Number(fresh.status) === 7;
+      if (finalized && !canDo(user, 'invoices:update_finalized')) {
+        toast.error(`Hóa đơn đã chuyển sang ${statusOf('invoice', fresh.status).label}, bạn không có quyền sửa nữa.`);
+        return null;
+      }
+      if (fresh.updatedAt && meta.updatedAt && fresh.updatedAt !== meta.updatedAt) {
+        const go = await ask(
+          'Hóa đơn vừa được sửa ở nơi khác',
+          'Lưu bây giờ sẽ ghi đè thay đổi đó bằng nội dung đang thấy trên màn hình.',
+          'Vẫn lưu',
+        );
+        if (!go) return null;
+      }
+      const body = buildInvoiceUpdate(c, meta);
+      if (hasOrderFields(body)) {
+        const saved = await updateInvoice(meta.docId, body);
+        if (saved?.id) result = { id: saved.id, code: saved.code ?? meta.code };
+      }
+    } catch (e) {
+      toast.error(errorMessage(e));
+      return null;
+    }
+    await savePayments(result.id, result.id !== meta.docId);
+    await refresh();
+    return result;
   };
 
   const runOnce = async (kind: Exclude<EditBusy, null>, task: () => Promise<void>) => {
@@ -461,7 +537,22 @@ function OrderEditScreen() {
         setExit({ go: () => router.back() });
         return;
       }
-      if (await persist(false)) {
+      if (meta.kind === 'invoice') {
+        const saved = await persistInvoice();
+        if (!saved) return;
+        if (saved.id !== meta.docId) {
+          toast.success(`Đã lưu thành hóa đơn mới ${saved.code}`);
+          setExit({
+            go: () =>
+              router.replace({ pathname: '/don-hang/[kind]/[id]', params: { kind: KIND_SLUG.invoice, id: String(saved.id) } }),
+          });
+          return;
+        }
+        toast.success(`Đã lưu hóa đơn ${meta.code}`);
+        setExit({ go: () => router.back() });
+        return;
+      }
+      if (await persistOrder(false)) {
         toast.success(`Đã lưu đơn ${meta.code}`);
         setExit({ go: () => router.back() });
       }
@@ -470,10 +561,10 @@ function OrderEditScreen() {
   const toInvoice = (confirm: boolean) =>
     void runOnce('invoice', async () => {
       if (changes?.any || confirm) {
-        if (!(await persist(confirm))) return;
+        if (!(await persistOrder(confirm))) return;
         toast.success(confirm ? `Đã xác nhận đơn ${meta.code}` : 'Đã lưu thay đổi của đơn');
       }
-      setExit({ go: () => router.replace({ pathname: '/don-hang/tao-hoa-don', params: { orderId: String(meta.orderId) } }) });
+      setExit({ go: () => router.replace({ pathname: '/don-hang/tao-hoa-don', params: { orderId: String(meta.docId) } }) });
     });
 
   const onInvoice = () => {
@@ -493,7 +584,7 @@ function OrderEditScreen() {
     <OrderEditView
       meta={meta}
       perms={perms}
-      canInvoice={canDo(user, 'invoices:create')}
+      canInvoice={meta.kind === 'order' && canDo(user, 'invoices:create')}
       busy={busy}
       bankAccounts={banks.data}
       promotions={promos.data}

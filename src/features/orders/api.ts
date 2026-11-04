@@ -2,7 +2,7 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-qu
 import { periodRange, type PeriodKey } from '@/core/format';
 import { http, type Query } from '@/core/http';
 import { useSession } from '@/core/session';
-import type { RawOrderForEdit } from './editOrder';
+import type { RawInvoiceForEdit, RawOrderForEdit } from './editOrder';
 import { toInvoiceDraft, type RawOrderForInvoice } from './fromOrder';
 import { dayBoundsIso, type DocKind, type StatusFilter } from './model';
 
@@ -404,3 +404,22 @@ export async function fetchOrderForEdit(orderId: number): Promise<RawOrderForEdi
 }
 
 export const updateOrder = (id: number, body: object) => http.put<unknown>(`/orders/${id}`, body);
+
+// ---------- Xử lý hóa đơn (sửa hóa đơn) ----------
+
+/** Hóa đơn mới nhất để mở ra sửa. */
+export async function fetchInvoiceForEdit(invoiceId: number): Promise<RawInvoiceForEdit> {
+  const raw = await http.get<RawInvoiceForEdit | null>(`/invoices/${invoiceId}`);
+  if (!raw) throw new Error('Không tìm thấy hóa đơn');
+  return raw;
+}
+
+/**
+ * Sửa hóa đơn. Đổi hàng / giảm giá / bảng giá thì backend hủy hóa đơn này
+ * và trả về hóa đơn mới (khác `id`, mã thêm đuôi .01…).
+ */
+export const updateInvoice = (id: number, body: object) => http.put<{ id: number; code: string } | null>(`/invoices/${id}`, body);
+
+/** Ghi tiền khách trả thêm cho hóa đơn. */
+export const addInvoicePayment = (body: { invoiceId: number; amount: number; paymentMethod: string; accountId?: number }) =>
+  http.post<unknown>('/invoice-payments', body);

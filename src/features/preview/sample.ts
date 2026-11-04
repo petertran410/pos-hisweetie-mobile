@@ -6,7 +6,7 @@ import type { DocDetail, DocRow } from '../orders/api';
 import type { BankAccount } from '../sales/api';
 import type { SaleCustomer, SaleProduct } from '../sales/cart';
 import type { SalePerms } from '../sales/perms';
-import { toOrderEdit, type RawOrderForEdit } from '../orders/editOrder';
+import { toInvoiceEdit, toOrderEdit, type RawOrderForEdit } from '../orders/editOrder';
 import { toInvoiceDraft, type InvoiceDraft } from '../orders/fromOrder';
 import { toStockMove, type RawProduct, type StockMove } from '../products/model';
 
@@ -258,6 +258,14 @@ const sampleRawOrder: RawOrderForEdit = {
 /** Đơn mẫu đang xử lý (sửa được hàng). */
 export const sampleOrderEdit = toOrderEdit(sampleRawOrder, 1);
 
+/** Hóa đơn mẫu đang xử lý (đã đổi số lượng 1 dòng). */
+export const sampleInvoiceEdit = (() => {
+  const { items, invoices: _invoices, ...rest } = sampleRawOrder;
+  const edit = toInvoiceEdit({ ...rest, id: 9, code: 'HD000124', status: 3, details: items }, 1);
+  const lines = edit.cart.lines.map((l, i) => (i === 0 ? { ...l, quantity: l.quantity + 1 } : l));
+  return { cart: { ...edit.cart, lines }, meta: edit.meta };
+})();
+
 /** Đơn mẫu có quà khuyến mãi: chỉ xem hàng, không đổi khách. */
 export const sampleOrderEditPromo = toOrderEdit(
   {
@@ -319,6 +327,8 @@ export const sampleRawProducts: RawProduct[] = [
     middleName: 'Trong nước',
     childName: 'Trà',
     tradeMark: { id: 1, name: 'Thương hiệu mẫu' },
+    // Ảnh giả (tên miền dành cho ví dụ) để xem khung ảnh nhiều tấm.
+    images: [{ image: 'https://example.com/mau-1.jpg' }, { image: 'https://example.com/mau-2.jpg' }],
     description: 'Trà đen dùng pha trà sữa (mô tả mẫu).',
     orderTemplate: 'Giao kèm hóa đơn',
     createdAt: '2026-03-12T08:00:00.000Z',

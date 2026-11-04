@@ -172,21 +172,39 @@ describe('invoiceActions (giống web)', () => {
   const all = { update: true, cancel: true };
 
   it('hóa đơn đang xử lý: đổi trạng thái, kết thúc, hủy', () => {
-    expect(invoiceActions({ status: 3 }, all, false)).toEqual({ changeStatus: true, complete: true, cancel: true });
-    expect(invoiceActions({ status: 7 }, all, false)).toEqual({ changeStatus: true, complete: true, cancel: true });
+    expect(invoiceActions({ status: 3 }, all, false)).toEqual({ process: true, changeStatus: true, complete: true, cancel: true });
+    expect(invoiceActions({ status: 7 }, all, false)).toEqual({ process: false, changeStatus: true, complete: true, cancel: true });
+  });
+
+  it('xử lý hóa đơn: không với hóa đơn đã hủy; giao thành công / hoàn thành cần thêm quyền', () => {
+    expect([3, 5, 6, 4, 8, 7, 1, 2].map((status) => invoiceActions({ status }, all, false).process)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
+    const finalized = { ...all, updateFinalized: true };
+    expect([7, 1, 2].map((status) => invoiceActions({ status }, finalized, false).process)).toEqual([true, true, false]);
+    expect(invoiceActions({ status: 3 }, all, true).process).toBe(false);
+    expect(invoiceActions({ status: 3 }, { ...all, update: false }, false).process).toBe(false);
   });
 
   it('hoàn thành: chỉ còn hủy; đã hủy: không còn thao tác', () => {
-    expect(invoiceActions({ status: 1 }, all, false)).toEqual({ changeStatus: false, complete: false, cancel: true });
-    expect(invoiceActions({ status: 2 }, all, false)).toEqual({ changeStatus: false, complete: false, cancel: false });
+    expect(invoiceActions({ status: 1 }, all, false)).toEqual({ process: false, changeStatus: false, complete: false, cancel: true });
+    expect(invoiceActions({ status: 2 }, all, false)).toEqual({ process: false, changeStatus: false, complete: false, cancel: false });
   });
 
   it('có phiếu đóng hàng thu tiền mặt: khóa đổi trạng thái và hủy, vẫn kết thúc được', () => {
-    expect(invoiceActions({ status: 6 }, all, true)).toEqual({ changeStatus: false, complete: true, cancel: false });
+    expect(invoiceActions({ status: 6 }, all, true)).toEqual({ process: false, changeStatus: false, complete: true, cancel: false });
   });
 
   it('thiếu quyền thì ẩn thao tác', () => {
     expect(invoiceActions({ status: 3 }, { update: false, cancel: true }, false)).toEqual({
+      process: false,
       changeStatus: false,
       complete: false,
       cancel: true,

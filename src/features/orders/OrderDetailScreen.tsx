@@ -28,6 +28,7 @@ import {
 import {
   cancelInvoice,
   cancelOrder,
+  fetchInvoiceForEdit,
   fetchOrderForEdit,
   PAYMENT_METHOD,
   updateInvoiceStatus,
@@ -37,7 +38,7 @@ import {
   type DocDetail,
   type DocLine,
 } from './api';
-import { toOrderEdit } from './editOrder';
+import { toInvoiceEdit, toOrderEdit } from './editOrder';
 import { ORDER_EDIT_PATH, startOrderEdit } from './editScope';
 import {
   INVOICE_STATUS,
@@ -127,7 +128,7 @@ export interface OrderDetailViewProps {
   onOpenInvoice: (id: number) => void;
   /** Thao tác đổi trạng thái / kết thúc / hủy. */
   actions?: {
-    /** Tạo hóa đơn từ đơn đặt hàng. */
+    /** "Xử lý đơn hàng" / "Xử lý hóa đơn": mở màn sửa. */
     canProcess?: boolean;
     onProcess?: () => void;
     canChangeStatus: boolean;
@@ -160,7 +161,12 @@ export function OrderDetailView({ doc, canPrint, onPrint, onOpenOrder, onOpenInv
       footer={
         actions?.canProcess && actions.onProcess ? (
           <View style={styles.footer}>
-            <Button title="Xử lý đơn hàng" icon="receipt" onPress={actions.onProcess} disabled={actions.busy} />
+            <Button
+              title={doc.kind === 'invoice' ? 'Xử lý hóa đơn' : 'Xử lý đơn hàng'}
+              icon="receipt"
+              onPress={actions.onProcess}
+              disabled={actions.busy}
+            />
           </View>
         ) : undefined
       }
@@ -389,7 +395,11 @@ export default function OrderDetailScreen() {
   const doc = useDocDetail(kind, id);
   const [busy, setBusy] = useState(false);
   const isAdmin = !!user?.roles?.some((r) => r === 'Super Admin' || r === 'Admin');
-  const invoicePerms = { update: canDo(user, 'invoices:update'), cancel: canDo(user, 'invoices:cancel') };
+  const invoicePerms = {
+    update: canDo(user, 'invoices:update'),
+    cancel: canDo(user, 'invoices:cancel'),
+    updateFinalized: canDo(user, 'invoices:update_finalized'),
+  };
   // Chỉ cần kiểm tra phiếu đóng hàng khi người dùng có thể thao tác hóa đơn.
   const cashLocked = useCashPackingLock(id, kind === 'invoice' && !isAdmin && (invoicePerms.update || invoicePerms.cancel));
   const canPrint = canDo(user, kind === 'invoice' ? 'invoices:print' : 'orders:print') && canDo(user, 'print_templates:view');
@@ -472,6 +482,33 @@ export default function OrderDetailScreen() {
     }
   };
 
+  /**
+   * "Xử lý hóa đơn" (giống web): tải hóa đơn mới nhất rồi mở màn sửa (dùng
+   * chung màn với Xử lý đơn hàng).
+   */
+  const processInvoice = async () => {
+    setBusy(true);
+    try {
+      const { cart, meta } = toInvoiceEdit(await fetchInvoiceForEdit(data.id), branchId);
+      const now = invoiceActions(meta, invoicePerms, false);
+      if (!now.process) {
+        toast.error(
+          meta.status === 2
+            ? 'Hóa đơn đã bị hủy, không sửa được nữa.'
+            : `Hóa đơn đang ở trạng thái ${statusOf('invoice', meta.status).label}, bạn không có quyền sửa.`,
+        );
+        void qc.invalidateQueries({ queryKey: ['doc'] });
+        return;
+      }
+      startOrderEdit(cart, meta);
+      router.push({ pathname: ORDER_EDIT_PATH, params: { id: String(data.id), kind: KIND_SLUG.invoice } } as never);
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const actions: OrderDetailViewProps['actions'] = orderAllowed
     ? {
         canProcess: orderAllowed.process,
@@ -517,6 +554,14 @@ export default function OrderDetailScreen() {
       }
     : invoiceAllowed
       ? {
+          canProcess: invoiceAllowed.process,
+          onProcess: () => {
+            if (branchId && data.branchId && data.branchId !== branchId) {
+              Alert.alert('Hóa đơn của chi nhánh khác', `Vui lòng đổi sang ${data.branchName ?? 'chi nhánh của hóa đơn'} để xử lý hóa đơn này.`);
+              return;
+            }
+            void processInvoice();
+          },
           canChangeStatus: invoiceAllowed.changeStatus,
           canComplete: invoiceAllowed.complete,
           canCancel: invoiceAllowed.cancel,

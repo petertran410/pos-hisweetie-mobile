@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { dateTimeVN, dateVN, money, qty } from '@/core/format';
 import { errorMessage } from '@/core/http';
 import { useSession } from '@/core/session';
@@ -16,6 +16,7 @@ import {
   ErrorState,
   Icon,
   IconButton,
+  ImageViewer,
   LoadingState,
   Page,
   Pill,
@@ -64,11 +65,15 @@ const isSafeImage = (uri: string) => uri.startsWith('https://') || (__DEV__ && u
 function Gallery({ images }: { images: string[] }) {
   const { width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
+  // Bề rộng thật của vùng ảnh (trong thẻ, đã trừ lề trang và lề thẻ).
+  const [boxW, setBoxW] = useState(0);
+  // Ảnh đang mở xem toàn màn hình; null = đang đóng.
+  const [viewing, setViewing] = useState<number | null>(null);
   const safe = images.filter(isSafeImage);
-  const w = width - 32;
+  const w = boxW || width - 64;
   if (!safe.length) return null;
   return (
-    <View style={{ gap: 8 }}>
+    <View style={{ gap: 8 }} onLayout={(e) => setBoxW(Math.round(e.nativeEvent.layout.width))}>
       <ScrollView
         horizontal
         pagingEnabled
@@ -76,8 +81,14 @@ function Gallery({ images }: { images: string[] }) {
         onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / w))}
         style={[styles.gallery, { width: w }]}
         accessibilityLabel={`Ảnh hàng hóa, ${safe.length} ảnh`}>
-        {safe.map((uri) => (
-          <Image key={uri} source={{ uri }} style={{ width: w, height: Math.min(w, 280) }} contentFit="contain" transition={150} />
+        {safe.map((uri, i) => (
+          <Pressable
+            key={uri}
+            onPress={() => setViewing(i)}
+            accessibilityRole="imagebutton"
+            accessibilityLabel={`Xem ảnh ${i + 1} cỡ lớn`}>
+            <Image source={{ uri }} style={{ width: w, height: Math.min(w, 280) }} contentFit="contain" transition={150} />
+          </Pressable>
         ))}
       </ScrollView>
       {safe.length > 1 ? (
@@ -87,6 +98,7 @@ function Gallery({ images }: { images: string[] }) {
           ))}
         </View>
       ) : null}
+      <ImageViewer images={safe} start={viewing ?? 0} visible={viewing !== null} onClose={() => setViewing(null)} />
     </View>
   );
 }
@@ -624,7 +636,7 @@ export default function ProductDetailScreen() {
 
 const styles = StyleSheet.create({
   head: { padding: 16, gap: 10 },
-  gallery: { borderRadius: 12, backgroundColor: '#F7F9FB' },
+  gallery: { borderRadius: 12, overflow: 'hidden', backgroundColor: '#F7F9FB' },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#D5DEE6' },
   dotOn: { backgroundColor: C.brand, width: 16 },

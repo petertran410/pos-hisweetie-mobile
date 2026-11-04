@@ -1,14 +1,19 @@
 /**
- * "Xử lý đơn hàng" (giống web): mở đơn đặt hàng ra sửa rồi Lưu, hoặc chuyển
- * sang tạo hóa đơn. Đơn được nạp vào 1 giỏ riêng, không đụng giỏ Bán hàng.
+ * "Xử lý đơn hàng" / "Xử lý hóa đơn" (giống web): mở chứng từ ra sửa rồi Lưu
+ * (đơn đặt hàng còn chuyển được sang tạo hóa đơn). Chứng từ được nạp vào 1
+ * giỏ riêng, không đụng giỏ Bán hàng.
  *
- * Khi lưu chỉ gửi phần đã đổi: backend (`PUT /orders/:id`) gửi lại `items`
- * là tính lại khuyến mãi, gửi lại bảng giá là tra lại bảng giá. Đơn có
- * khuyến mãi thì app không sửa hàng/khách (app chưa áp dụng khuyến mãi).
+ * Khi lưu chỉ gửi phần đã đổi. Đơn đặt hàng (`PUT /orders/:id`): gửi lại
+ * `items` là tính lại khuyến mãi, gửi lại bảng giá là tra lại bảng giá.
+ * Hóa đơn (`PUT /invoices/:id`): đổi hàng / giảm giá / bảng giá thì backend
+ * hủy hóa đơn cũ và tạo hóa đơn mới (mã thêm đuôi .01, .02…).
+ * Chứng từ có khuyến mãi thì app không sửa hàng/khách (app chưa áp dụng
+ * khuyến mãi).
  */
 import { toSaleCustomer, toSaleProduct, type RawCustomer, type RawProduct } from '../sales/mappers';
 import { cartTotals, EMPTY_CART, EMPTY_DELIVERY, type CartLine, type CartState, type Delivery, type LineOrigin } from '../sales/cart';
 import type { Discount } from '../sales/totals';
+import type { DocKind } from './model';
 
 const num = (v: unknown): number => {
   const n = Number(v);
@@ -69,8 +74,16 @@ export interface RawOrderForEdit {
   invoices?: { status: number }[];
 }
 
+/** Phần dữ liệu `GET /invoices/:id` cần để sửa hóa đơn (dòng hàng ở `details`). */
+export interface RawInvoiceForEdit extends Omit<RawOrderForEdit, 'items' | 'invoices'> {
+  details?: RawEditItem[];
+  orderId?: number | null;
+}
+
 export interface OrderEditMeta {
-  orderId: number;
+  /** Đơn đặt hàng hay hóa đơn. */
+  kind: DocKind;
+  docId: number;
   code: string;
   status: number;
   branchId: number | null;
@@ -125,8 +138,12 @@ function toLine(it: RawEditItem, branchId: number | null): CartLine {
   };
 }
 
-export function toOrderEdit(r: RawOrderForEdit, branchId: number | null): { cart: CartState; meta: OrderEditMeta } {
-  const items = r.items ?? [];
+function toDocEdit(
+  kind: DocKind,
+  r: RawOrderForEdit | RawInvoiceForEdit,
+  items: RawEditItem[],
+  branchId: number | null,
+): { cart: CartState; meta: OrderEditMeta } {
   const lines = items.map((it) => toLine(it, branchId));
   const ratio = num(r.discountRatio);
   const orderDiscount: Discount = ratio > 0 ? { type: 'percent', value: ratio } : { type: 'amount', value: num(r.discount) };
@@ -145,7 +162,7 @@ export function toOrderEdit(r: RawOrderForEdit, branchId: number | null): { cart
   const payKind = note?.paymentType === 'cash' || note?.paymentType === 'transfer' ? note.paymentType : null;
   const cart: CartState = {
     ...EMPTY_CART,
-    mode: 'order',
+    mode: kind,
     lines,
     customer: r.customer ? toSaleCustomer(r.customer) : null,
     delivery,
@@ -162,13 +179,14 @@ export function toOrderEdit(r: RawOrderForEdit, branchId: number | null): { cart
   return {
     cart,
     meta: {
-      orderId: r.id,
+      kind,
+      docId: r.id,
       code: r.code,
       status: num(r.status),
       branchId: r.branchId ?? null,
       updatedAt: r.updatedAt ?? null,
       promoLocked: lines.some((l) => l.origin?.lineType !== 'normal') || items.some((it) => it.promotionId != null),
-      invoiced: (r.invoices ?? []).some((i) => i.status !== 2),
+      invoiced: kind === 'order' && ((r as RawOrderForEdit).invoices ?? []).some((i) => i.status !== 2),
       paidBefore: (r.payments ?? []).filter((p) => p.status !== 2).reduce((s, p) => s + num(p.amount), 0),
       parcel: {
         weight: num(d?.weight),
@@ -181,6 +199,10 @@ export function toOrderEdit(r: RawOrderForEdit, branchId: number | null): { cart
     },
   };
 }
+
+export const toOrderEdit = (r: RawOrderForEdit, branchId: number | null) => toDocEdit('order', r, r.items ?? [], branchId);
+
+export const toInvoiceEdit = (r: RawInvoiceForEdit, branchId: number | null) => toDocEdit('invoice', r, r.details ?? [], branchId);
 
 const lineKey = (l: CartLine) =>
   [l.product.id, l.quantity, l.price, l.discount, l.note.trim(), l.origin?.conditionType ?? 'normal', l.origin?.soldExpiryDate ?? ''].join(
@@ -212,9 +234,10 @@ export function editChanges(cart: CartState, original: CartState) {
 export type EditChanges = ReturnType<typeof editChanges>;
 
 /** Lỗi trước khi lưu (thứ tự giống web). */
-export function validateOrderEdit(cart: CartState, opts: { canPay: boolean }): string | null {
-  if (!cart.customer) return 'Vui lòng chọn khách hàng trước khi lưu đơn hàng';
-  if (cart.lines.length === 0) return 'Vui lòng thêm sản phẩm vào đơn hàng';
+export function validateOrderEdit(cart: CartState, opts: { canPay: boolean; kind?: DocKind }): string | null {
+  const noun = opts.kind === 'invoice' ? 'hóa đơn' : 'đơn hàng';
+  if (!cart.customer) return `Vui lòng chọn khách hàng trước khi lưu ${noun}`;
+  if (cart.lines.length === 0) return `Vui lòng thêm sản phẩm vào ${noun}`;
   if (!cart.payKind) return 'Vui lòng chọn phương thức thanh toán: chuyển khoản hoặc tiền mặt';
   if (cart.payKind === 'cash' && !(cart.cashAmount >= 0)) return 'Số tiền mặt không hợp lệ';
   const paid = opts.canPay ? cart.paidAmount : 0;
@@ -281,4 +304,75 @@ export const hasOrderFields = (body: object) => Object.keys(body).length > 0;
 export function editPaymentNote(cart: CartState, original: CartState): { paymentType: string; amount?: number } | null {
   if (!cart.payKind || !editChanges(cart, original).payNote) return null;
   return cart.payKind === 'cash' ? { paymentType: 'cash', amount: cart.cashAmount } : { paymentType: 'transfer' };
+}
+
+// ---------- Hóa đơn ----------
+
+/** Dòng hàng cho `PUT /invoices/:id` (tên trường theo DTO hóa đơn). */
+const toInvoiceItem = (l: CartLine) => ({
+  productId: l.product.id,
+  productCode: l.product.code,
+  productName: l.product.name,
+  quantity: l.quantity,
+  quantityUnit: l.origin?.quantityUnit ?? 'base',
+  conversionValueSnapshot: l.origin?.conversionValueSnapshot ?? Math.max(1, l.product.conversionValue ?? 1),
+  price: l.price,
+  discount: l.discount,
+  discountRatio: 0,
+  totalPrice: (l.price - l.discount) * l.quantity,
+  note: l.note,
+  conditionType: l.origin?.conditionType ?? 'normal',
+  ...(l.origin?.soldExpiryDate ? { soldExpiryDate: l.origin.soldExpiryDate } : null),
+  enabledPromotionIds: [],
+});
+
+/**
+ * Hóa đơn: giảm giá / bảng giá chỉ được backend lưu kèm `items` → đổi hàng,
+ * giảm giá hoặc bảng giá thì gửi lại cả dòng hàng.
+ */
+const invoiceSendsItems = (c: EditChanges, meta: OrderEditMeta) => !meta.promoLocked && (c.lines || c.discount || c.priceBook);
+
+/** Hóa đơn có khuyến mãi: app không đổi giảm giá / bảng giá (sẽ làm sai khuyến mãi). */
+export function invoiceEditProblem(cart: CartState, meta: OrderEditMeta): string | null {
+  if (meta.kind !== 'invoice' || !meta.promoLocked) return null;
+  const c = editChanges(cart, meta.original);
+  if (c.discount || c.priceBook) return 'Hóa đơn có khuyến mãi: app chưa đổi được giảm giá hoặc bảng giá. Hãy sửa trên web.';
+  return null;
+}
+
+/** Body cho `PUT /invoices/:id`: chỉ những phần đã sửa. */
+export function buildInvoiceUpdate(cart: CartState, meta: OrderEditMeta) {
+  const c = editChanges(cart, meta.original);
+  const t = cartTotals(cart);
+  const percent = cart.orderDiscount.type === 'percent' && cart.orderDiscount.value > 0;
+  const d = cart.delivery;
+  const sendItems = invoiceSendsItems(c, meta);
+  return {
+    ...(c.customer && cart.customer ? { customerId: cart.customer.id } : null),
+    ...(c.shipping ? { shippingFee: t.shipping } : null),
+    ...(c.note ? { description: cart.note.trim() } : null),
+    ...(c.delivery || c.customer
+      ? {
+          delivery: {
+            receiver: d.receiver.trim(),
+            contactNumber: d.contactNumber.trim(),
+            address: d.address.trim(),
+            locationName: d.locationName || undefined,
+            wardName: d.wardName || undefined,
+            noteForDriver: d.noteForDriver.trim() || undefined,
+            ...meta.parcel,
+          },
+        }
+      : null),
+    // App chưa áp dụng khuyến mãi: giữ đúng các dòng đang thấy trên màn hình.
+    ...(sendItems
+      ? {
+          priceBookId: cart.priceBookId ?? 0,
+          discountAmount: t.orderDiscount,
+          discountRatio: percent ? Math.min(100, cart.orderDiscount.value) : 0,
+          skipPromotions: true,
+          items: cart.lines.map(toInvoiceItem),
+        }
+      : null),
+  };
 }

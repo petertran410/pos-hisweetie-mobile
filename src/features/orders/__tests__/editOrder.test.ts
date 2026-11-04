@@ -1,11 +1,15 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  buildInvoiceUpdate,
   buildOrderUpdate,
   editChanges,
   editPaymentNote,
   hasOrderFields,
+  invoiceEditProblem,
+  toInvoiceEdit,
   toOrderEdit,
   validateOrderEdit,
+  type RawInvoiceForEdit,
   type RawOrderForEdit,
 } from '../editOrder';
 
@@ -86,7 +90,7 @@ describe('toOrderEdit', () => {
       note: 'Giao sáng',
       priceBookId: 2,
     });
-    expect(meta).toMatchObject({ orderId: 7, status: 5, promoLocked: false, invoiced: false, paidBefore: 20000 });
+    expect(meta).toMatchObject({ kind: 'order', docId: 7, status: 5, promoLocked: false, invoiced: false, paidBefore: 20000 });
     expect(meta.parcel).toEqual({ weight: 1500, weightUnit: 'g', length: 20, width: 10, height: 10 });
   });
 
@@ -218,5 +222,78 @@ describe('validateOrderEdit', () => {
     const transfer = { ...cart, payKind: 'transfer' as const, paidAmount: 5000, accountId: null };
     expect(validateOrderEdit(transfer, { canPay: true })).toMatch(/tài khoản nhận/);
     expect(validateOrderEdit(transfer, { canPay: false })).toBeNull();
+  });
+});
+
+describe('sửa hóa đơn', () => {
+  const rawInvoice = (over: Partial<RawInvoiceForEdit> = {}): RawInvoiceForEdit => {
+    const { items, invoices: _invoices, ...rest } = raw();
+    return { ...rest, id: 21, code: 'HD000021', status: 3, details: items, ...over };
+  };
+
+  it('nạp hóa đơn: dòng hàng từ `details`, loại chứng từ, tiền đã thu', () => {
+    const { cart, meta } = toInvoiceEdit(rawInvoice(), 1);
+    expect(cart.mode).toBe('invoice');
+    expect(cart.lines).toHaveLength(2);
+    expect(meta).toMatchObject({ kind: 'invoice', docId: 21, code: 'HD000021', invoiced: false, paidBefore: 20000 });
+  });
+
+  it('không đổi gì: không gửi gì', () => {
+    const { cart, meta } = toInvoiceEdit(rawInvoice(), 1);
+    expect(buildInvoiceUpdate(cart, meta)).toEqual({});
+  });
+
+  it('chỉ đổi ghi chú / phí giao / giao hàng: không gửi dòng hàng', () => {
+    const { cart, meta } = toInvoiceEdit(rawInvoice(), 1);
+    const next = { ...cart, note: 'Giao chiều', shippingFee: 20000, delivery: { ...cart.delivery, address: '9 Lý Thái Tổ' } };
+    const body = buildInvoiceUpdate(next, meta);
+    expect(body).toMatchObject({ description: 'Giao chiều', shippingFee: 20000, delivery: expect.objectContaining({ address: '9 Lý Thái Tổ', weight: 1500 }) });
+    expect(body).not.toHaveProperty('items');
+  });
+
+  it('đổi số lượng: gửi đủ dòng hàng (tên trường hóa đơn) + giảm giá + bảng giá', () => {
+    const { cart, meta } = toInvoiceEdit(rawInvoice(), 1);
+    const next = { ...cart, lines: cart.lines.map((l, i) => (i === 0 ? { ...l, quantity: 3 } : l)) };
+    const body = buildInvoiceUpdate(next, meta) as Record<string, unknown>;
+    expect(body).toMatchObject({ priceBookId: 2, discountAmount: 10000, discountRatio: 0, skipPromotions: true });
+    expect((body.items as unknown[])[0]).toEqual({
+      productId: 100,
+      productCode: 'SIRO',
+      productName: 'Siro dâu',
+      quantity: 3,
+      quantityUnit: 'carton',
+      conversionValueSnapshot: 12,
+      price: 50000,
+      discount: 5000,
+      discountRatio: 0,
+      totalPrice: 135000,
+      note: '',
+      conditionType: 'normal',
+      enabledPromotionIds: [],
+    });
+    expect((body.items as Record<string, unknown>[])[1]).toMatchObject({ soldExpiryDate: '2026-12-01T00:00:00.000Z', conditionType: 'near_expiry' });
+  });
+
+  it('chỉ đổi ghi chú dòng: vẫn gửi dòng hàng', () => {
+    const r = rawInvoice({ details: [{ id: 1, productId: 100, productCode: 'SIRO', productName: 'Siro', quantity: '2', price: '50000', discount: '0' }] });
+    const { cart, meta } = toInvoiceEdit(r, 1);
+    const next = { ...cart, lines: cart.lines.map((l) => ({ ...l, note: 'ít đá' })) };
+    expect(buildInvoiceUpdate(next, meta)).toHaveProperty('items');
+  });
+
+  it('đổi giảm giá đơn: gửi kèm dòng hàng (backend chỉ lưu giảm giá cùng dòng hàng)', () => {
+    const { cart, meta } = toInvoiceEdit(rawInvoice(), 1);
+    const next = { ...cart, orderDiscount: { type: 'amount' as const, value: 15000 } };
+    expect(buildInvoiceUpdate(next, meta)).toMatchObject({ discountAmount: 15000, items: expect.any(Array) });
+  });
+
+  it('hóa đơn có khuyến mãi: không gửi dòng hàng, chặn đổi giảm giá', () => {
+    const r = rawInvoice({ details: [{ id: 1, productId: 1, productCode: 'A', productName: 'A', quantity: '1', price: '10', promotionId: 4 }] });
+    const { cart, meta } = toInvoiceEdit(r, 1);
+    expect(meta.promoLocked).toBe(true);
+    const next = { ...cart, lines: cart.lines.map((l) => ({ ...l, quantity: 5 })), note: 'mới' };
+    expect(buildInvoiceUpdate(next, meta)).toEqual({ description: 'mới' });
+    expect(invoiceEditProblem({ ...cart, orderDiscount: { type: 'amount', value: 1 } }, meta)).toMatch(/khuyến mãi/);
+    expect(invoiceEditProblem(next, meta)).toBeNull();
   });
 });
