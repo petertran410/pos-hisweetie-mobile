@@ -25,14 +25,14 @@ Yarn 1 không tự cài thư viện "peer" như npm, nên các thư viện peer 
 
 Các lệnh dưới tự chạy `yarn verify` trước, lỗi thì dừng. Địa chỉ backend lấy từ biến môi trường EAS của kênh tương ứng (không lấy `.env` trên máy).
 
-| Lệnh | Việc làm |
-| --- | --- |
-| `yarn update:prod` | Đẩy bản cập nhật qua mạng cho app đang dùng (kênh `production`). Lời nhắn lấy từ commit cuối; muốn ghi khác: `yarn update:prod -m "…"` |
-| `yarn update:preview` | Như trên, cho bản thử nội bộ (kênh `preview`) |
-| `yarn build:prod` | Build bản App Store trên EAS |
-| `yarn build:prod:submit` | Build bản App Store rồi tự gửi lên TestFlight |
-| `yarn submit` | Gửi bản build App Store mới nhất lên TestFlight |
-| `yarn build:preview` | Build bản cài nội bộ (ad hoc) |
+| Lệnh                     | Việc làm                                                                                                                               |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `yarn update:prod`       | Đẩy bản cập nhật qua mạng cho app đang dùng (kênh `production`). Lời nhắn lấy từ commit cuối; muốn ghi khác: `yarn update:prod -m "…"` |
+| `yarn update:preview`    | Như trên, cho bản thử nội bộ (kênh `preview`)                                                                                          |
+| `yarn build:prod`        | Build bản App Store trên EAS                                                                                                           |
+| `yarn build:prod:submit` | Build bản App Store rồi tự gửi lên TestFlight                                                                                          |
+| `yarn submit`            | Gửi bản build App Store mới nhất lên TestFlight                                                                                        |
+| `yarn build:preview`     | Build bản cài nội bộ (ad hoc)                                                                                                          |
 
 Cập nhật qua mạng chỉ dùng được khi chỉ đổi mã JS / giao diện. Thêm thư viện native, đổi quyền, icon hay cấu hình app thì phải build lại.
 
