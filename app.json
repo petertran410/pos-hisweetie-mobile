@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "HiSweetie POS",
+    "name": "POS",
     "slug": "pos-hisweetie-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logo-lermao.png",
     "scheme": "hisweetiepos",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/logo-lermao.png",
       "bundleIdentifier": "com.hisweetievietnam.pos",
       "supportsTablet": false,
       "infoPlist": {
@@ -20,15 +20,15 @@
       "package": "com.hisweetievietnam.pos",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/logo-lermao.png",
+        "backgroundImage": "./assets/images/logo-lermao.png",
+        "monochromeImage": "./assets/images/logo-lermao.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/logo-lermao.png"
     },
     "plugins": [
       "expo-router",
@@ -36,7 +36,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#FFFFFF",
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/logo-lermao.png",
           "imageWidth": 76
         }
       ],
