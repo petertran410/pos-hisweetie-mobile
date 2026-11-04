@@ -1,14 +1,15 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { C, Icon, PressableScale, SheetHeader, TextField, Txt } from '@/ui';
+import { C, Divider, Select, SheetHeader } from '@/ui';
+import { FormCard, TextRow } from '../products/formParts';
 import { addressToDelivery, type CustomerAddress, type Delivery, type SaleCustomer } from './cart';
 import { useSaleScope, useScopedCart } from './scope';
 
 const addressLine = (a: CustomerAddress) =>
   [a.address, a.newWardName || a.wardName, a.newCityName || a.locationName || a.cityName].filter(Boolean).join(', ');
 
-/** Sửa thông tin giao hàng; khách có nhiều địa chỉ thì chọn nhanh. */
+/** Sửa thông tin giao hàng; khách có nhiều địa chỉ thì chọn nhanh trong danh sách. */
 export function DeliveryView({
   customer,
   initial,
@@ -21,6 +22,12 @@ export function DeliveryView({
   const [d, setD] = useState(initial);
   const set = (patch: Partial<Delivery>) => setD((prev) => ({ ...prev, ...patch }));
   const addresses = customer?.addresses ?? [];
+  const current = customer
+    ? addresses.find((a) => {
+        const picked = addressToDelivery(customer, a);
+        return picked.address === d.address && picked.receiver === d.receiver;
+      })
+    : undefined;
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -31,62 +38,54 @@ export function DeliveryView({
         keyboardDismissMode="interactive"
         automaticallyAdjustKeyboardInsets>
         {customer && addresses.length > 1 ? (
-          <View style={{ gap: 8 }}>
-            <Txt variant="label" weight="semibold">
-              Địa chỉ của khách
-            </Txt>
-            {addresses.map((a) => {
-              const picked = addressToDelivery(customer, a);
-              const on = picked.address === d.address && picked.receiver === d.receiver;
-              return (
-                <PressableScale
-                  key={a.id}
-                  onPress={() => setD({ ...picked, noteForDriver: d.noteForDriver })}
-                  haptic="selection"
-                  accessibilityLabel={`${a.label ?? 'Địa chỉ'}: ${addressLine(a)}`}
-                  scaleTo={0.98}
-                  style={[styles.address, on ? styles.addressOn : null]}>
-                  <Icon name={on ? 'circle-check' : 'store'} size={20} color={on ? C.brand : C.muted} />
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Txt variant="body" weight="semibold" numberOfLines={1}>
-                      {a.label || a.receiver || customer.name}
-                      {a.isDefault ? ' · Mặc định' : ''}
-                    </Txt>
-                    <Txt variant="caption" color={C.muted} numberOfLines={2}>
-                      {addressLine(a) || 'Chưa có địa chỉ'}
-                    </Txt>
-                  </View>
-                </PressableScale>
-              );
-            })}
-          </View>
+          <Select
+            variant="field"
+            label="Địa chỉ của khách"
+            placeholder="Chọn địa chỉ đã lưu"
+            options={addresses.map((a) => ({
+              value: a.id,
+              label: `${a.label || a.receiver || customer.name}${a.isDefault ? ' · Mặc định' : ''}`,
+              sub: addressLine(a) || 'Chưa có địa chỉ',
+            }))}
+            value={current?.id ?? null}
+            onChange={(id) => {
+              const a = addresses.find((x) => x.id === id);
+              if (a) setD({ ...addressToDelivery(customer, a), noteForDriver: d.noteForDriver });
+            }}
+          />
         ) : null}
 
-        <TextField label="Người nhận" value={d.receiver} onChangeText={(t) => set({ receiver: t })} textContentType="name" />
-        <TextField
-          label="Số điện thoại"
-          value={d.contactNumber}
-          onChangeText={(t) => set({ contactNumber: t })}
-          keyboardType="phone-pad"
-          textContentType="telephoneNumber"
-        />
-        <TextField
-          label="Địa chỉ"
-          value={d.address}
-          onChangeText={(t) => set({ address: t })}
-          textContentType="fullStreetAddress"
-          multiline
-        />
-        <TextField label="Phường / xã" value={d.wardName} onChangeText={(t) => set({ wardName: t })} />
-        <TextField label="Tỉnh / thành phố" value={d.locationName} onChangeText={(t) => set({ locationName: t })} />
-        <TextField
-          label="Ghi chú cho tài xế"
-          value={d.noteForDriver}
-          onChangeText={(t) => set({ noteForDriver: t })}
-          placeholder="Không bắt buộc"
-          maxLength={1000}
-          multiline
-        />
+        <FormCard title="Người nhận">
+          <TextRow label="Tên" value={d.receiver} onChange={(t) => set({ receiver: t })} textContentType="name" placeholder="Người nhận hàng" />
+          <Divider />
+          <TextRow
+            label="Điện thoại"
+            value={d.contactNumber}
+            onChange={(t) => set({ contactNumber: t })}
+            keyboardType="phone-pad"
+            textContentType="telephoneNumber"
+            placeholder="Số liên hệ"
+          />
+        </FormCard>
+
+        <FormCard title="Địa chỉ giao">
+          <TextRow label="Địa chỉ" value={d.address} onChange={(t) => set({ address: t })} textContentType="fullStreetAddress" placeholder="Số nhà, đường" />
+          <Divider />
+          <TextRow label="Phường / xã" value={d.wardName} onChange={(t) => set({ wardName: t })} />
+          <Divider />
+          <TextRow label="Tỉnh / TP" value={d.locationName} onChange={(t) => set({ locationName: t })} />
+        </FormCard>
+
+        <FormCard>
+          <TextRow
+            label="Ghi chú cho tài xế"
+            value={d.noteForDriver}
+            onChange={(t) => set({ noteForDriver: t })}
+            placeholder="Không bắt buộc"
+            maxLength={1000}
+            multiline
+          />
+        </FormCard>
       </ScrollView>
     </View>
   );
@@ -115,16 +114,5 @@ export default function DeliveryScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 16, paddingBottom: 40 },
-  address: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    borderRadius: 14,
-    backgroundColor: C.card,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  addressOn: { borderColor: C.brand, borderWidth: 1.5 },
+  content: { padding: 16, gap: 18, paddingBottom: 40 },
 });

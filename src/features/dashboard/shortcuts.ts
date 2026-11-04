@@ -17,7 +17,7 @@ export const SHORTCUTS: ShortcutDef[] = [
   { key: 'ban-hang', label: 'Bán hàng', icon: 'shopping-cart', color: 'teal', permissions: ['orders:create', 'invoices:create'] },
   { key: 'hoa-don', label: 'Hóa đơn', icon: 'receipt-text', color: 'blue', permissions: ['invoices:view'] },
   { key: 'dat-hang', label: 'Đặt hàng', icon: 'clipboard-list', color: 'violet', permissions: ['orders:view'] },
-  { key: 'khach-hang', label: 'Khách hàng', icon: 'users', color: 'green', permissions: ['customers:view'] },
+  { key: 'khach-hang', label: 'Khách hàng', icon: 'users', color: 'green', permissions: ['customers:view'], href: '/khach-hang' },
   {
     key: 'bao-don',
     label: 'Báo đơn',

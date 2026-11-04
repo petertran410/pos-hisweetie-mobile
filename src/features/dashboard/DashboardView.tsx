@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { money, shortWhen, vnd } from '@/core/format';
+import { isRange } from '@/core/period';
 import type { PermissionHolder } from '@/core/can';
 import {
   C,
@@ -13,6 +15,8 @@ import {
   IconBadge,
   InfoRow,
   Page,
+  PeriodModal,
+  periodText,
   PressableScale,
   Section,
   ShortcutGrid,
@@ -23,10 +27,10 @@ import {
 } from '@/ui';
 import type { DashRange, DashboardStats, RecentOrder, TaskType, TopBuyer, TopProduct, TrendPoint } from './api';
 import { formatQtySold, RankList, RevenueCard } from './components';
-import { deltaTone, formatDelta, greetingFor, RANGE_OPTIONS, shortName, TASK_ORDER, TASKS } from './model';
+import { dashRangeDates, deltaTone, formatDelta, greetingFor, RANGE_OPTIONS, shortName, TASK_ORDER, TASKS } from './model';
 import { allowedShortcuts } from './shortcuts';
 
-const RANGE_ORDER = RANGE_OPTIONS.map((o) => o.value);
+const RANGE_ORDER: string[] = [...RANGE_OPTIONS.map((o) => o.value), 'custom'];
 
 export interface DashboardData {
   /** Đang tải lần đầu (chưa có số liệu). */
@@ -73,7 +77,10 @@ export function DashboardView({
   now = new Date(),
 }: DashboardViewProps) {
   const s = data.stats;
-  const periodLabel = RANGE_OPTIONS.find((o) => o.value === range)?.label ?? '';
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const custom = isRange(range);
+  const rangeKey = custom ? 'custom' : range;
+  const periodLabel = periodText(RANGE_OPTIONS, range, now);
   const shortcuts: ShortcutItem[] = allowedShortcuts(user).map((d) => ({
     key: d.key,
     icon: d.icon,
@@ -106,14 +113,40 @@ export function DashboardView({
 
   return (
     <Page header={header} refreshing={refreshing} onRefresh={onRefresh}>
-      <ChipGroup fill options={[...RANGE_OPTIONS]} value={range} onChange={onRangeChange} />
+      <View style={{ gap: 8 }}>
+        <ChipGroup fill options={RANGE_OPTIONS} value={custom ? null : range} onChange={onRangeChange} />
+        <PressableScale
+          onPress={() => setRangeOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={custom ? `Khoảng ngày ${periodLabel}. Bấm để đổi` : 'Chọn khoảng ngày khác'}
+          scaleTo={0.96}
+          style={[styles.rangeBtn, custom ? styles.rangeBtnOn : null]}>
+          <Icon name="calendar-range" size={16} color={custom ? C.white : C.brand} />
+          <Txt variant="label" weight="semibold" color={custom ? C.white : C.brand} numeric>
+            {custom ? periodLabel : 'Chọn khoảng ngày'}
+          </Txt>
+          <Icon name="chevron-down" size={15} color={custom ? C.white : C.brand} />
+        </PressableScale>
+      </View>
+      <PeriodModal
+        visible={rangeOpen}
+        title="Thời gian"
+        options={RANGE_OPTIONS}
+        value={range}
+        initialRange={dashRangeDates(range, now)}
+        onChange={(v) => {
+          setRangeOpen(false);
+          onRangeChange(v);
+        }}
+        onClose={() => setRangeOpen(false)}
+      />
 
       {data.statsError ? (
         <ErrorState error={data.statsError} onRetry={onRetry} />
       ) : (
         <>
           <Section index={0} title="Kết quả bán hàng">
-            <TabPanel value={range} order={RANGE_ORDER} style={styles.panel}>
+            <TabPanel value={rangeKey} order={RANGE_ORDER} style={styles.panel}>
               <RevenueCard
                 revenue={s?.currentRevenue}
                 change={s?.revenueChange}
@@ -236,7 +269,7 @@ export function DashboardView({
 
           {data.products && data.products.length > 0 ? (
             <Section index={4} title="Bán chạy">
-              <TabPanel value={range} order={RANGE_ORDER}>
+              <TabPanel value={rangeKey} order={RANGE_ORDER}>
                 <RankList
                   items={data.products.map((p) => ({
                     key: p.productId,
@@ -251,7 +284,7 @@ export function DashboardView({
 
           {data.buyers && data.buyers.length > 0 ? (
             <Section index={5} title="Khách mua nhiều">
-              <TabPanel value={range} order={RANGE_ORDER}>
+              <TabPanel value={rangeKey} order={RANGE_ORDER}>
                 <RankList
                   items={data.buyers.map((b) => ({
                     key: b.id,
@@ -293,6 +326,17 @@ export function DashboardView({
 }
 
 const styles = StyleSheet.create({
+  rangeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    minHeight: 34,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: C.brandSoft,
+  },
+  rangeBtnOn: { backgroundColor: C.brand },
   panel: { gap: 12 },
   branch: {
     flexDirection: 'row',

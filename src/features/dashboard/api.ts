@@ -1,9 +1,18 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { http } from '@/core/http';
+import { dayBoundsIso, isRange, type DateRange } from '@/core/period';
 import { useSession } from '@/core/session';
 
-/** Khớp `RangeKey` của backend `/dashboard/*`. */
-export type DashRange = 'today' | 'yesterday' | 'week' | 'month';
+/** Kỳ có sẵn của Tổng quan (khớp `RangeKey` của backend) hoặc khoảng ngày tự chọn. */
+export type DashPreset = 'today' | 'yesterday' | 'week' | 'month';
+export type DashRange = DashPreset | DateRange;
+
+/** Tham số kỳ cho API: khoảng tự chọn gửi `range=custom` kèm `from`/`to` (ISO). */
+export function rangeParams(range: DashRange): { range: string; from?: string; to?: string } {
+  if (!isRange(range)) return { range };
+  const b = dayBoundsIso(range.from, range.to);
+  return { range: 'custom', from: b.fromIso, to: b.toIso };
+}
 export type TaskType = 'orders' | 'debt' | 'cod' | 'stock';
 
 export interface DashboardStats {
@@ -80,7 +89,7 @@ export function useDashboardStats(range: DashRange) {
     queryKey: ['dashboard', 'stats', range, branchId],
     // Đổi kỳ: giữ số cũ trong lúc tải để số liệu chạy mượt sang số mới.
     placeholderData: keepPreviousData,
-    queryFn: () => http.get<DashboardStats>('/dashboard/stats', { range, branchId }),
+    queryFn: () => http.get<DashboardStats>('/dashboard/stats', { ...rangeParams(range), branchId }),
   });
 }
 
@@ -90,7 +99,7 @@ export function useRevenueTrend(range: DashRange) {
     queryKey: ['dashboard', 'trend', range, branchId],
     // Đổi kỳ: giữ số cũ trong lúc tải để số liệu chạy mượt sang số mới.
     placeholderData: keepPreviousData,
-    queryFn: () => http.get<TrendPoint[]>('/dashboard/revenue-trend', { range, branchId }),
+    queryFn: () => http.get<TrendPoint[]>('/dashboard/revenue-trend', { ...rangeParams(range), branchId }),
   });
 }
 
@@ -119,7 +128,7 @@ export function useTopProducts(range: DashRange) {
     // Đổi kỳ: giữ số cũ trong lúc tải để số liệu chạy mượt sang số mới.
     placeholderData: keepPreviousData,
     queryFn: () =>
-      http.get<TopProduct[]>('/dashboard/top-products', { range, branchId, limit: 5, metric: 'rev' }),
+      http.get<TopProduct[]>('/dashboard/top-products', { ...rangeParams(range), branchId, limit: 5, metric: 'rev' }),
   });
 }
 
@@ -129,7 +138,7 @@ export function useTopBuyers(range: DashRange) {
     queryKey: ['dashboard', 'top-buyers', range, branchId],
     // Đổi kỳ: giữ số cũ trong lúc tải để số liệu chạy mượt sang số mới.
     placeholderData: keepPreviousData,
-    queryFn: () => http.get<TopBuyer[]>('/dashboard/top-buyers', { range, branchId, limit: 5 }),
+    queryFn: () => http.get<TopBuyer[]>('/dashboard/top-buyers', { ...rangeParams(range), branchId, limit: 5 }),
   });
 }
 

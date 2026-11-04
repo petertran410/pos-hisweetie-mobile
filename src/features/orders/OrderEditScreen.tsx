@@ -9,7 +9,7 @@ import { useSession } from '@/core/session';
 import {
   addOrderPayment,
   addPaymentNote,
-  bankLabel,
+  bankOptions,
   useBankAccounts,
   usePromotionCheck,
   type BankAccount,
@@ -34,13 +34,14 @@ import {
   Pill,
   PressableScale,
   Section,
+  Select,
   SubHeader,
   TabPanel,
   TextField,
   toast,
   Txt,
 } from '@/ui';
-import { addInvoicePayment, fetchInvoiceForEdit, fetchOrderForEdit, updateInvoice, updateOrder } from './api';
+import { addInvoicePayment, fetchInvoiceForEdit, fetchOrderForEdit, refreshAfterDocChange, updateInvoice, updateOrder } from './api';
 import {
   buildInvoiceUpdate,
   buildOrderUpdate,
@@ -51,7 +52,7 @@ import {
   validateOrderEdit,
   type OrderEditMeta,
 } from './editOrder';
-import { ORDER_EDIT_PICKER, useOrderEditMeta, withOrderEdit } from './editScope';
+import { markEditOpen, useDocRoutes, useOrderEditMeta, withOrderEdit } from './editScope';
 import { kindFromSlug, KIND_SLUG, ORDER_STATUS, statusOf } from './model';
 
 const PAY_ORDER: PayKind[] = ['transfer', 'cash'];
@@ -130,22 +131,20 @@ function EditPaymentCard({ perms, paidBefore, bankAccounts }: { perms: SalePerms
           ) : null}
 
           {cart.payKind === 'transfer' && paid > 0 ? (
-            <View style={{ gap: 8 }}>
-              <Txt variant="label" weight="semibold">
-                Tài khoản nhận
+            bankAccounts?.length ? (
+              <Select
+                variant="field"
+                label="Tài khoản nhận"
+                placeholder="Chọn tài khoản ngân hàng"
+                options={bankOptions(bankAccounts)}
+                value={cart.accountId ?? null}
+                onChange={cart.setAccount}
+              />
+            ) : (
+              <Txt variant="caption" color={C.muted}>
+                Chưa có tài khoản ngân hàng nào.
               </Txt>
-              {bankAccounts?.length ? (
-                <ChipGroup
-                  options={bankAccounts.map((a) => ({ value: String(a.id), label: bankLabel(a) }))}
-                  value={cart.accountId ? String(cart.accountId) : null}
-                  onChange={(v) => cart.setAccount(Number(v))}
-                />
-              ) : (
-                <Txt variant="caption" color={C.muted}>
-                  Chưa có tài khoản ngân hàng nào.
-                </Txt>
-              )}
-            </View>
+            )
           ) : null}
         </TabPanel>
       ) : (
@@ -332,6 +331,7 @@ function OrderEditScreen() {
   const kind = kindFromSlug(params.kind);
   const meta = useOrderEditMeta((s) => s.meta);
   const { store, paths } = useSaleScope();
+  const routes = useDocRoutes();
   const cart = useScopedCart((s) => s);
   const perms = useSalePerms();
   const user = useSession((s) => s.user);
@@ -342,6 +342,9 @@ function OrderEditScreen() {
   // Đã chọn "Bỏ thay đổi": thôi chặn rời màn.
   const [discarding, setDiscarding] = useState(false);
   const busyRef = useRef(false);
+
+  // Cho màn chi tiết ở tab khác biết đơn này đang mở để hỏi trước khi ghi đè.
+  useEffect(() => markEditOpen(), []);
 
   const banks = useBankAccounts(perms.viewPayment && cart.payKind === 'transfer' && cart.paidAmount > 0);
   const changes = meta ? editChanges(cart, meta.original) : null;
@@ -421,12 +424,7 @@ function OrderEditScreen() {
     }
   };
 
-  const refresh = () =>
-    Promise.all([
-      qc.invalidateQueries({ queryKey: ['doc'] }),
-      qc.invalidateQueries({ queryKey: ['docs'] }),
-      qc.invalidateQueries({ queryKey: ['dashboard'] }),
-    ]);
+  const refresh = () => refreshAfterDocChange(qc);
 
   /**
    * Lưu đơn đặt hàng: chỉ gửi phần đã sửa, rồi ghi tiền khách trả thêm và
@@ -544,7 +542,7 @@ function OrderEditScreen() {
           toast.success(`Đã lưu thành hóa đơn mới ${saved.code}`);
           setExit({
             go: () =>
-              router.replace({ pathname: '/don-hang/[kind]/[id]', params: { kind: KIND_SLUG.invoice, id: String(saved.id) } }),
+              router.replace({ pathname: routes.detail, params: { kind: KIND_SLUG.invoice, id: String(saved.id) } } as never),
           });
           return;
         }
@@ -564,7 +562,7 @@ function OrderEditScreen() {
         if (!(await persistOrder(confirm))) return;
         toast.success(confirm ? `Đã xác nhận đơn ${meta.code}` : 'Đã lưu thay đổi của đơn');
       }
-      setExit({ go: () => router.replace({ pathname: '/don-hang/tao-hoa-don', params: { orderId: String(meta.docId) } }) });
+      setExit({ go: () => router.replace({ pathname: routes.invoiceDraft, params: { orderId: String(meta.docId) } } as never) });
     });
 
   const onInvoice = () => {
@@ -594,7 +592,7 @@ function OrderEditScreen() {
       onOpenLine={(rowId) => router.push({ pathname: paths.line, params: { rowId } } as never)}
       onOpenDelivery={() => router.push(paths.delivery as never)}
       onOpenDiscount={() => router.push(paths.discount as never)}
-      onAddMore={perms.products ? () => router.push(ORDER_EDIT_PICKER as never) : undefined}
+      onAddMore={perms.products ? () => router.push(routes.editPicker as never) : undefined}
     />
   );
 }

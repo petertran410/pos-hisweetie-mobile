@@ -40,6 +40,12 @@ describe('listQuery', () => {
     expect(q).not.toHaveProperty('paymentStatus');
   });
 
+  it('khoảng ngày tự chọn: gửi từ đầu ngày bắt đầu đến cuối ngày kết thúc', () => {
+    const q = listQuery('invoice', { search: '', status: 'all', period: { from: '2026-10-01', to: '2026-10-15' } }, 2, 1, NOW);
+    expect(q.fromPurchaseDate).toBe(new Date(2026, 9, 1, 0, 0, 0, 0).toISOString());
+    expect(q.toPurchaseDate).toBe(new Date(2026, 9, 15, 23, 59, 59, 999).toISOString());
+  });
+
   it('toàn thời gian, tất cả trạng thái: không gửi ngày hay trạng thái', () => {
     const q = listQuery('order', { search: '', status: 'all', period: 'all' }, 2, 1, NOW);
     expect(q.fromDate).toBeUndefined();

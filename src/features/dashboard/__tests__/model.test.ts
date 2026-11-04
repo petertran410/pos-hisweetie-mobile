@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  dashRangeDates,
   deltaTone,
   formatDelta,
   greetingFor,
@@ -48,5 +49,15 @@ describe('dashboard helpers', () => {
     expect(deltaTone(5)).toBe('success');
     expect(deltaTone(-1)).toBe('danger');
     expect(deltaTone(0)).toBe('neutral');
+  });
+});
+
+describe('dashRangeDates', () => {
+  const NOW = new Date(2026, 10, 4, 9, 0);
+  it('kỳ có sẵn ra khoảng ngày để lịch mở đúng chỗ; khoảng tự chọn giữ nguyên', () => {
+    expect(dashRangeDates('today', NOW)).toEqual({ from: '2026-11-04', to: '2026-11-04' });
+    expect(dashRangeDates('week', NOW)).toEqual({ from: '2026-10-29', to: '2026-11-04' });
+    expect(dashRangeDates('month', NOW)).toEqual({ from: '2026-11-01', to: '2026-11-04' });
+    expect(dashRangeDates({ from: '2026-10-01', to: '2026-10-15' }, NOW)).toEqual({ from: '2026-10-01', to: '2026-10-15' });
   });
 });

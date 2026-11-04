@@ -54,7 +54,7 @@ export function CustomerPickerView({
               icon="users"
               color="slate"
               title="Không tìm thấy khách"
-              message="Thử tìm bằng số điện thoại hoặc mã khách. Khách mới hãy tạo trên web."
+              message="Thử tìm bằng số điện thoại hoặc mã khách. Khách mới hãy thêm ở tab Khách hàng."
             />
           }
           renderItem={({ item }) => {

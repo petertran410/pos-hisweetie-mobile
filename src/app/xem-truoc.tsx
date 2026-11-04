@@ -17,7 +17,10 @@ import {
   sampleInvoiceEdit,
   sampleOrderEdit,
   sampleOrderEditPromo,
+  sampleDebtEntries,
   sampleDocRows,
+  sampleRawCustomers,
+  sampleUnpaid,
   samplePrintContent,
   sampleProducts,
   sampleRawProducts,
@@ -63,6 +66,29 @@ import { MoreView } from '@/features/shell/MoreScreen';
 import { TabBar } from '@/features/shell/TabBar';
 import { TAB_DEFS } from '@/features/shell/tabs';
 import LoginScreen from '@/features/auth/LoginScreen';
+import { AddressFormView } from '@/features/customers/AddressFormScreen';
+import { CustomerDetailView, type CustomerTab } from '@/features/customers/CustomerDetailScreen';
+import { CustomerFilterView } from '@/features/customers/CustomerFilterScreen';
+import { CustomerFormView } from '@/features/customers/CustomerFormScreen';
+import { CustomersView } from '@/features/customers/CustomersScreen';
+import { emptyAddress, newCustomerForm, toAddressForm, toCustomerForm, type AddressForm, type CustomerForm } from '@/features/customers/form';
+import { PROVINCES, searchPlaces } from '@/features/customers/locations';
+import {
+  allocatePayment,
+  availableCredit,
+  customerPerms,
+  DEFAULT_FILTERS as CUSTOMER_FILTERS,
+  defaultOffsets,
+  setInvoiceOffset,
+  setInvoicePay,
+  sumAmounts,
+  toCustomerDetail,
+  toCustomerRow,
+  type CustomerFilters,
+  type InvoiceAmounts,
+} from '@/features/customers/model';
+import { PaymentView } from '@/features/customers/PaymentScreen';
+import { PickList } from '@/features/customers/PickerScreens';
 import { ActionCard, Page, TitleHeader, toast } from '@/ui';
 
 const SCREENS = [
@@ -99,6 +125,15 @@ const SCREENS = [
   { key: 'chon-nhom', title: 'Chọn nhóm hàng' },
   { key: 'chon-tp', title: 'Chọn thành phần' },
   { key: 'gia-von', title: 'Áp dụng giá vốn' },
+  { key: 'khach-hang', title: 'Khách hàng' },
+  { key: 'loc-kh', title: 'Bộ lọc khách hàng' },
+  { key: 'ct-kh', title: 'Chi tiết khách (có khách con)' },
+  { key: 'ct-kh-con', title: 'Chi tiết khách con' },
+  { key: 'them-kh', title: 'Thêm khách hàng' },
+  { key: 'sua-kh', title: 'Sửa khách hàng' },
+  { key: 'dia-chi-kh', title: 'Sửa địa chỉ khách' },
+  { key: 'chon-tinh', title: 'Chọn tỉnh / thành' },
+  { key: 'thu-no', title: 'Thu nợ' },
 ] as const;
 
 /** Form mẫu theo màn xem trước. */
@@ -168,7 +203,7 @@ export default function PreviewScreen() {
   const [search, setSearch] = useState('');
   const [docKind, setDocKind] = useState<DocKind>('order');
   const [docStatus, setDocStatus] = useState<StatusFilter>('all');
-  const [docPeriod, setDocPeriod] = useState<import('@/core/format').PeriodKey | 'all'>('last7');
+  const [docPeriod, setDocPeriod] = useState<import('@/core/period').PeriodChoice>('last7');
   const lines = useCart((st) => st.lines);
   const cart = useCart();
 
@@ -178,6 +213,26 @@ export default function PreviewScreen() {
   const [bucket, setBucket] = useState<ConditionBucket>('DAMAGED');
   const productPermsAll = productPerms(sampleUser);
   const [previewForm, setPreviewForm] = useState<{ key: string; form: ProductForm } | null>(null);
+  const [customerFilters, setCustomerFilters] = useState<CustomerFilters>(CUSTOMER_FILTERS);
+  const [customerTab, setCustomerTab] = useState<CustomerTab>('info');
+  const [customerForm, setCustomerForm] = useState<{ key: string; form: CustomerForm } | null>(null);
+  const [addressForm, setAddressForm] = useState<AddressForm>(() =>
+    toAddressForm({
+      ...sampleRawCustomers[0].addresses?.[0],
+      cityCode: '79',
+      cityName: 'Thành phố Hồ Chí Minh',
+      districtCode: '760',
+      districtName: 'Quận 1',
+      wardCode: '26734',
+      wardName: 'Phường Bến Thành',
+    }),
+  );
+  const [payAmount, setPayAmount] = useState(0);
+  const [payManual, setPayManual] = useState<InvoiceAmounts | null>(null);
+  const [payOffsets, setPayOffsets] = useState<InvoiceAmounts | null>(null);
+  const [payAllocate, setPayAllocate] = useState(true);
+  const [payMethod, setPayMethod] = useState<'cash' | 'transfer'>('cash');
+  const customerPermsAll = customerPerms(sampleUser);
 
   useEffect(() => {
     if (man && ['gio-hang', 'sua-hang', 'giao-hang', 'giam-gia'].includes(man)) seedCart();
@@ -523,6 +578,164 @@ export default function PreviewScreen() {
       />
     );
   if (man === 'gia-von') return <CostScopeView branches={sampleBranches} currentBranchId={1} onCancel={toView('sua-hh')} onConfirm={noop} />;
+  if (man === 'khach-hang') {
+    const q = search.trim().toLowerCase();
+    const rows = sampleRawCustomers
+      .map(toCustomerRow)
+      .filter((r) => customerFilters.status === 'all' || r.isActive === (customerFilters.status === 'active'))
+      .filter((r) => !q || r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q));
+    return (
+      <CustomersView
+        perms={customerPermsAll}
+        search={search}
+        onSearch={setSearch}
+        filters={customerFilters}
+        onStatus={(status) => setCustomerFilters((f) => ({ ...f, status }))}
+        onSort={(sort) => setCustomerFilters((f) => ({ ...f, sort }))}
+        onOpenFilters={toView('loc-kh')}
+        onCreate={toView('them-kh')}
+        rows={rows}
+        totals={{ count: 1284, totalDebt: 86_450_000, totalPurchased: 0 }}
+        onOpen={(r) => router.setParams({ man: r.isChild ? 'ct-kh-con' : 'ct-kh' })}
+      />
+    );
+  }
+  if (man === 'loc-kh')
+    return (
+      <CustomerFilterView
+        draft={customerFilters}
+        onChange={(patch) => setCustomerFilters((f) => ({ ...f, ...patch }))}
+        showDebt
+        groups={{ items: ['Khách sỉ', 'Khách lẻ', 'Đại lý', 'Quán trà', 'Online'].map((name, i) => ({ id: i + 1, name })), loading: false }}
+        onApply={toView('khach-hang')}
+        onReset={() => setCustomerFilters((f) => ({ ...CUSTOMER_FILTERS, status: f.status, sort: f.sort }))}
+        onCancel={toView('khach-hang')}
+      />
+    );
+  if (man === 'ct-kh' || man === 'ct-kh-con') {
+    const raw = man === 'ct-kh' ? sampleRawCustomers[0] : sampleRawCustomers[2];
+    const docs = (kind: DocKind) => ({
+      rows: sampleDocRows.map((r) => (kind === 'invoice' ? { ...r, code: r.code.replace('DH', 'HD'), status: [3, 7, 1, 2, 6][r.id % 5] } : r)),
+      total: 24,
+      loading: false,
+      hasMore: true,
+      loadingMore: false,
+      onMore: noop,
+      onRetry: noop,
+    });
+    return (
+      <CustomerDetailView
+        d={toCustomerDetail(raw)}
+        perms={customerPermsAll}
+        tab={customerTab}
+        onTab={setCustomerTab}
+        invoices={docs('invoice')}
+        orders={docs('order')}
+        debt={{ entries: sampleDebtEntries, loading: false, onRetry: noop, withChildren: true, onWithChildren: noop }}
+        onEdit={toView('sua-kh')}
+        onSaveNote={noop}
+        onAddAddress={toView('dia-chi-kh')}
+        onAddressPress={toView('dia-chi-kh')}
+        onOpenDoc={noop}
+        onOpenCustomer={(id) => router.setParams({ man: id === 21 ? 'ct-kh' : 'ct-kh-con' })}
+        onCollect={toView('thu-no')}
+        onToggleActive={noop}
+      />
+    );
+  }
+  if (man === 'them-kh' || man === 'sua-kh') {
+    const current =
+      customerForm?.key === man
+        ? customerForm.form
+        : man === 'them-kh'
+          ? newCustomerForm()
+          : toCustomerForm(sampleRawCustomers[0], { id: 7, name: 'Nguyễn Thị Lan' });
+    return (
+      <CustomerFormView
+        form={current}
+        editing={man === 'sua-kh'}
+        code={current.code}
+        perms={customerPermsAll}
+        hasChildren={man === 'sua-kh'}
+        onChange={(patch) => setCustomerForm({ key: man, form: { ...current, ...patch } })}
+        onPick={noop}
+        onAddress={toView('dia-chi-kh')}
+        onLookupTax={noop}
+        onSave={noop}
+      />
+    );
+  }
+  if (man === 'dia-chi-kh')
+    return (
+      <AddressFormView
+        address={addressForm}
+        isNew={false}
+        lockedDefault={!!addressForm.isDefault}
+        onChange={(patch) => setAddressForm((a) => ({ ...a, ...patch }))}
+        onPick={(level) => (level === 'newCity' ? router.setParams({ man: 'chon-tinh' }) : noop())}
+        onSave={noop}
+        onDelete={noop}
+        onCancel={() => setAddressForm(emptyAddress(false))}
+      />
+    );
+  if (man === 'chon-tinh')
+    return (
+      <PickList
+        title="Tỉnh / thành phố"
+        placeholder="Tìm tỉnh, thành phố"
+        items={searchPlaces(PROVINCES, search).map((p) => ({ key: p.code, title: p.name }))}
+        selected={['79']}
+        search={search}
+        onSearch={setSearch}
+        empty="Thử gõ tên khác."
+        onPick={toView('dia-chi-kh')}
+      />
+    );
+  if (man === 'thu-no') {
+    const credit = availableCredit(sampleUnpaid, 1_550_000);
+    const offsets = payOffsets ?? (payAmount > 0 ? defaultOffsets(sampleUnpaid, credit) : {});
+    const payments = payAllocate ? (payManual ?? allocatePayment(payAmount, sampleUnpaid, offsets)) : {};
+    return (
+      <PaymentView
+        name="Chuỗi mẫu Trà Mây"
+        debt={1_550_000}
+        hasChildren
+        amount={payAmount}
+        onAmount={(n) => {
+          setPayAmount(n);
+          setPayManual(null);
+        }}
+        method={payMethod}
+        onMethod={setPayMethod}
+        accounts={sampleBanks}
+        accountId={1}
+        onAccount={noop}
+        note=""
+        onNote={noop}
+        invoices={sampleUnpaid}
+        allocate={payAllocate}
+        onAllocate={(v) => {
+          setPayAllocate(v);
+          setPayManual(null);
+        }}
+        payments={payments}
+        onPay={(invId, n) => {
+          const next = setInvoicePay(sampleUnpaid, payments, offsets, invId, n);
+          setPayManual(next);
+          setPayAmount(Math.max(0, payAmount + sumAmounts(next) - sumAmounts(payments)));
+        }}
+        onClearPayments={() => {
+          setPayManual({});
+          setPayAmount(Math.max(0, payAmount - sumAmounts(payments)));
+        }}
+        credit={credit}
+        offsets={offsets}
+        onOffset={(invId, n) => setPayOffsets(setInvoiceOffset(sampleUnpaid, offsets, credit, invId, n))}
+        onSubmit={noop}
+        onCancel={toView('ct-kh')}
+      />
+    );
+  }
   if (man === 'chi-nhanh')
     return <BranchPickerView branches={sampleBranches} branchId={1} switching={null} onPick={noop} />;
 

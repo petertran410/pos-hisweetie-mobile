@@ -31,6 +31,7 @@ import {
   fetchInvoiceForEdit,
   fetchOrderForEdit,
   PAYMENT_METHOD,
+  refreshAfterDocChange,
   updateInvoiceStatus,
   updateOrderStatus,
   useCashPackingLock,
@@ -39,7 +40,7 @@ import {
   type DocLine,
 } from './api';
 import { toInvoiceEdit, toOrderEdit } from './editOrder';
-import { ORDER_EDIT_PATH, startOrderEdit } from './editScope';
+import { confirmReplaceEdit, startOrderEdit, useDocRoutes } from './editScope';
 import {
   INVOICE_STATUS,
   INVOICE_STEPS,
@@ -393,6 +394,7 @@ export default function OrderDetailScreen() {
   const branchId = useSession((s) => s.branchId);
   const qc = useQueryClient();
   const doc = useDocDetail(kind, id);
+  const routes = useDocRoutes();
   const [busy, setBusy] = useState(false);
   const isAdmin = !!user?.roles?.some((r) => r === 'Super Admin' || r === 'Admin');
   const invoicePerms = {
@@ -414,7 +416,7 @@ export default function OrderDetailScreen() {
 
   const data = doc.data;
   const open = (k: DocKind, docId: number) =>
-    router.push({ pathname: '/don-hang/[kind]/[id]', params: { kind: KIND_SLUG[k], id: String(docId) } });
+    router.push({ pathname: routes.detail, params: { kind: KIND_SLUG[k], id: String(docId) } } as never);
 
   /** Gọi API, báo kết quả, làm mới chi tiết + danh sách + tổng quan. */
   const run = async (task: () => Promise<unknown>, done: string): Promise<boolean> => {
@@ -422,12 +424,8 @@ export default function OrderDetailScreen() {
     try {
       await task();
       toast.success(done);
-      await Promise.all([
-        // Đổi hóa đơn cũng làm đổi đơn đặt hàng gốc: làm mới mọi chi tiết.
-        qc.invalidateQueries({ queryKey: ['doc'] }),
-        qc.invalidateQueries({ queryKey: ['docs'] }),
-        qc.invalidateQueries({ queryKey: ['dashboard'] }),
-      ]);
+      // Đổi hóa đơn cũng làm đổi đơn đặt hàng gốc: làm mới mọi chi tiết.
+      await refreshAfterDocChange(qc);
       return true;
     } catch (e) {
       toast.error(errorMessage(e));
@@ -448,7 +446,7 @@ export default function OrderDetailScreen() {
           cancel: canDo(user, 'orders:cancel'),
         })
       : null;
-  const openInvoiceDraft = () => router.push({ pathname: '/don-hang/tao-hoa-don', params: { orderId: String(data.id) } });
+  const openInvoiceDraft = () => router.push({ pathname: routes.invoiceDraft, params: { orderId: String(data.id) } } as never);
   const invoiceAllowed = kind === 'invoice' ? invoiceActions(data, invoicePerms, cashLocked) : null;
 
   /**
@@ -473,8 +471,9 @@ export default function OrderDetailScreen() {
         openInvoiceDraft();
         return;
       }
+      if (!(await confirmReplaceEdit())) return;
       startOrderEdit(cart, meta);
-      router.push({ pathname: ORDER_EDIT_PATH, params: { id: String(data.id) } } as never);
+      router.push({ pathname: routes.edit, params: { id: String(data.id) } } as never);
     } catch (e) {
       toast.error(errorMessage(e));
     } finally {
@@ -500,8 +499,9 @@ export default function OrderDetailScreen() {
         void qc.invalidateQueries({ queryKey: ['doc'] });
         return;
       }
+      if (!(await confirmReplaceEdit())) return;
       startOrderEdit(cart, meta);
-      router.push({ pathname: ORDER_EDIT_PATH, params: { id: String(data.id), kind: KIND_SLUG.invoice } } as never);
+      router.push({ pathname: routes.edit, params: { id: String(data.id), kind: KIND_SLUG.invoice } } as never);
     } catch (e) {
       toast.error(errorMessage(e));
     } finally {
@@ -607,7 +607,7 @@ export default function OrderDetailScreen() {
     <OrderDetailView
       doc={data}
       canPrint={canPrint}
-      onPrint={() => router.push({ pathname: '/don-hang/phieu-in', params: { kind, id: String(data.id), code: data.code } })}
+      onPrint={() => router.push({ pathname: routes.print, params: { kind, id: String(data.id), code: data.code } } as never)}
       onOpenOrder={(orderId) => open('order', orderId)}
       onOpenInvoice={(invoiceId) => open('invoice', invoiceId)}
       actions={actions}

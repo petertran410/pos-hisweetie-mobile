@@ -1,46 +1,8 @@
 import { StyleSheet, View } from 'react-native';
 import { money, qty } from '@/core/format';
-import { C, Icon, Pill, PressableScale, radius, toneColors, Txt } from '@/ui';
+import { C, Pill, PressableScale, toneColors, Txt } from '@/ui';
 import { Thumb } from '../sales/components';
 import { typeLabel, type ProductRow } from './model';
-
-/** Chip chọn nhiều (bấm lại để bỏ chọn), xuống dòng khi hết chỗ. */
-export function ToggleChips<T extends string | number>({
-  options,
-  selected,
-  onToggle,
-  label,
-}: {
-  options: { value: T; label: string }[];
-  selected: readonly T[];
-  onToggle: (value: T) => void;
-  /** Tên nhóm, đọc kèm cho VoiceOver. */
-  label: string;
-}) {
-  return (
-    <View style={styles.wrap}>
-      {options.map((o) => {
-        const on = selected.includes(o.value);
-        return (
-          <PressableScale
-            key={String(o.value)}
-            onPress={() => onToggle(o.value)}
-            haptic="selection"
-            scaleTo={0.94}
-            accessibilityRole="checkbox"
-            accessibilityLabel={`${label}: ${o.label}`}
-            accessibilityState={{ checked: on }}
-            style={[styles.chip, on ? styles.chipOn : null]}>
-            {on ? <Icon name="check" size={15} color={C.brand} strokeWidth={2.4} /> : null}
-            <Txt variant="label" weight={on ? 'semibold' : 'medium'} color={on ? C.brand : C.text} numberOfLines={1}>
-              {o.label}
-            </Txt>
-          </PressableScale>
-        );
-      })}
-    </View>
-  );
-}
 
 /** Dòng "nhãn … giá trị" trong thẻ thông tin. */
 export function KV({ label, value, tone }: { label: string; value: string; tone?: 'danger' | 'success' | 'muted' }) {
@@ -149,20 +111,6 @@ export function ProductCard({
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    minHeight: 36,
-    paddingHorizontal: 13,
-    borderRadius: radius.pill,
-    borderWidth: 1.2,
-    borderColor: '#CFD8E0',
-    backgroundColor: C.card,
-    maxWidth: '100%',
-  },
-  chipOn: { borderColor: C.brand, backgroundColor: C.brandSoft },
   kv: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 9 },
   cell: { width: '33.33%', paddingVertical: 8, paddingRight: 8, gap: 2 },
   card: {

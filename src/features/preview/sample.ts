@@ -9,6 +9,7 @@ import type { SalePerms } from '../sales/perms';
 import { toInvoiceEdit, toOrderEdit, type RawOrderForEdit } from '../orders/editOrder';
 import { toInvoiceDraft, type InvoiceDraft } from '../orders/fromOrder';
 import { toStockMove, type RawProduct, type StockMove } from '../products/model';
+import { toDebtEntry, type DebtEntry, type RawCustomer, type UnpaidInvoice } from '../customers/model';
 
 export const sampleUser = {
   name: 'Nguyễn Thị Lan',
@@ -410,3 +411,87 @@ export const sampleStockMoves: StockMove[] = [
   { id: 3, transactionType: 'STOCK_AUDIT', refType: 'stock_audit', refId: 2, refCode: 'KK000012', quantity: '0', tonCuoi: '5', costPrice: '120000', transactionDate: '2026-10-28T17:30:00.000Z' },
   { id: 4, transactionType: 'TRANSFER_OUT', refType: 'transfer', refId: 7, refCode: 'CH000007', partnerName: 'Chi nhánh mẫu B', quantity: '-10', tonCuoi: '5', costPrice: '120000', transactionDate: '2026-10-25T10:00:00.000Z' },
 ].map((r) => toStockMove(r));
+
+/** Khách mẫu dạng dữ liệu API (danh sách, chi tiết, form). */
+export const sampleRawCustomers: RawCustomer[] = [
+  {
+    id: 21,
+    code: 'KH000021',
+    name: 'Chuỗi mẫu Trà Mây',
+    type: 1,
+    organization: 'Công ty mẫu Trà Mây',
+    taxCode: '0100000001',
+    contactNumber: '0900 000 111',
+    phone: '0900 000 112',
+    email: 'mau@example.com',
+    totalDebt: '1250000',
+    totalPurchased: '48600000',
+    totalRevenue: '47900000',
+    totalInvoiced: '48600000',
+    isActive: true,
+    createdAt: '2026-03-12T03:00:00.000Z',
+    comments: 'Giao trước 10h sáng, gọi trước khi tới.',
+    invoiceBuyerName: 'Chị Mây',
+    invoiceAddress: '25 Đường Mẫu',
+    invoiceEmail: 'hoadon@example.com',
+    branch: { id: 1, name: 'Chi nhánh mẫu 1' },
+    addresses: [
+      { id: 1, label: 'Quán chính', receiver: 'Chị Mây', contactNumber: '0900 000 111', address: '25 Đường Mẫu', newWardName: 'Phường Mẫu', newCityName: 'Thành phố Mẫu', newCityCode: '79', newWardCode: '26734', isDefault: true },
+      { id: 2, label: 'Kho', receiver: 'Anh Nam', contactNumber: '0900 000 222', address: '9 Đường Thử', wardName: 'Phường 3', districtName: 'Quận Thử', cityName: 'TP. Mẫu', cityCode: '79' },
+    ],
+    customerGroupDetails: [{ customerGroup: { id: 1, name: 'Khách sỉ' } }],
+    children: [
+      { id: 22, code: 'KH000021.1', name: 'Trà Mây chi nhánh 1', contactNumber: '0900 000 121', totalDebt: '300000', isActive: true },
+      { id: 23, code: 'KH000021.2', name: 'Trà Mây chi nhánh 2', contactNumber: null, totalDebt: '0', isActive: false },
+    ],
+  },
+  {
+    id: 24,
+    code: 'KH000024',
+    name: 'Tiệm mẫu Gió Chiều',
+    type: 0,
+    contactNumber: '0900 000 333',
+    totalDebt: '0',
+    totalPurchased: '12300000',
+    totalRevenue: '12300000',
+    isActive: true,
+    addresses: [{ id: 3, address: '8 Phố Mẫu', newWardName: 'Phường Gió', newCityName: 'Thủ đô Mẫu', newCityCode: '01', isDefault: true }],
+  },
+  {
+    id: 22,
+    code: 'KH000021.1',
+    name: 'Trà Mây chi nhánh 1',
+    type: 0,
+    contactNumber: '0900 000 121',
+    totalDebt: '300000',
+    totalPurchased: '5200000',
+    totalRevenue: '5200000',
+    isActive: true,
+    parentId: 21,
+    parent: { id: 21, code: 'KH000021', name: 'Chuỗi mẫu Trà Mây' },
+    addresses: [],
+  },
+  {
+    id: 25,
+    code: 'KH000025',
+    name: 'Quán mẫu Lối Nhỏ (đã ngừng)',
+    type: 0,
+    phone: '0900 000 444',
+    totalDebt: '0',
+    totalPurchased: '0',
+    isActive: false,
+    addresses: [],
+  },
+];
+
+export const sampleDebtEntries: DebtEntry[] = [
+  { type: 'payment', id: 9, code: 'TT000045', date: ago(0, 9, 30), amount: 500_000, debtSnapshot: 1_250_000, branch: { name: 'Chi nhánh mẫu 1' } },
+  { type: 'invoice', id: 8, code: 'HD000210', date: ago(1, 15, 10), amount: 1_100_000, debtSnapshot: 1_750_000, branch: { name: 'Chi nhánh mẫu 1' } },
+  { type: 'return_order', id: 7, code: 'TH000012', date: ago(2, 11, 0), amount: 150_000, debtSnapshot: 650_000, branch: { name: 'Chi nhánh mẫu 1' } },
+  { type: 'invoice', id: 6, code: 'HD000198', date: ago(4, 10, 20), amount: 800_000, debtSnapshot: 800_000, branch: { name: 'Chi nhánh mẫu 1' } },
+].map(toDebtEntry);
+
+export const sampleUnpaid: UnpaidInvoice[] = [
+  { id: 6, code: 'HD000198', date: ago(4, 10, 20), debt: 650_000, total: 800_000, customerName: 'Chuỗi mẫu Trà Mây' },
+  { id: 8, code: 'HD000210', date: ago(1, 15, 10), debt: 1_100_000, total: 1_100_000, customerName: 'Trà Mây chi nhánh 1' },
+];

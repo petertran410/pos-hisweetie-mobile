@@ -1,5 +1,5 @@
-import { TabStack } from '@/features/shell/TabStack';
+import { CustomersStack } from '@/features/customers/CustomersStack';
 
 export default function Layout() {
-  return <TabStack name="khach-hang" />;
+  return <CustomersStack />;
 }

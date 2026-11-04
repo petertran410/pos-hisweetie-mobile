@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
-import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/core/session';
-import { Button, C, PressableScale, SheetHeader, Txt } from '@/ui';
+import { Button, C, Divider, MultiSelect, Select, SheetHeader } from '@/ui';
 import { useCategories, useTrademarks, type NamedItem } from './api';
-import { ToggleChips } from './components';
 import { setProductFilters, useProductFilters } from './filters';
+import { FormCard } from './formParts';
 import {
   activeFilterCount,
   CARGO_TYPES,
@@ -20,71 +20,22 @@ import {
   type ProductFilters,
 } from './model';
 
-/** Danh sách dài chỉ hiện vài mục đầu, bấm để xem hết. */
-const PREVIEW = 12;
-
-function Group({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <View style={styles.group}>
-      <Txt variant="label" weight="semibold" color={C.muted}>
-        {title}
-      </Txt>
-      {children}
-    </View>
-  );
-}
-
-/** Bỏ chọn nếu đã chọn, không thì thêm vào. */
-const toggle = <T,>(list: readonly T[], v: T): T[] => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
-
-function LongChips<T extends string | number>({
-  title,
-  items,
-  selected,
-  onToggle,
-  loading,
-}: {
-  title: string;
-  items: { value: T; label: string }[];
-  selected: readonly T[];
-  onToggle: (v: T) => void;
-  loading?: boolean;
-}) {
-  const [all, setAll] = useState(false);
-  // Mục đã chọn luôn hiện, kể cả khi nằm ngoài phần xem trước.
-  const shown = all ? items : items.filter((it, i) => i < PREVIEW || selected.includes(it.value));
-  return (
-    <Group title={title}>
-      {loading ? (
-        <ActivityIndicator color={C.brand} style={{ alignSelf: 'flex-start' }} />
-      ) : items.length === 0 ? (
-        <Txt variant="caption" color={C.faint}>
-          Chưa có dữ liệu
-        </Txt>
-      ) : (
-        <>
-          <ToggleChips options={shown} selected={selected} onToggle={onToggle} label={title} />
-          {items.length > shown.length || (all && items.length > PREVIEW) ? (
-            <PressableScale onPress={() => setAll((v) => !v)} hitSlop={8} scaleTo={0.95} accessibilityRole="button">
-              <Txt variant="label" weight="semibold" color={C.brand}>
-                {all ? 'Thu gọn' : `Xem tất cả (${items.length})`}
-              </Txt>
-            </PressableScale>
-          ) : null}
-        </>
-      )}
-    </Group>
-  );
-}
-
-const byName = (list: NamedItem[] | undefined) => (list ?? []).map((c) => ({ value: c.name, label: c.name }));
-const byId = (list: NamedItem[] | undefined) => (list ?? []).map((c) => ({ value: c.id, label: c.name }));
+const byName = (list: NamedItem[]) => list.map((c) => ({ value: c.name, label: c.name }));
+const byId = (list: NamedItem[]) => list.map((c) => ({ value: c.id, label: c.name }));
 
 const NAME_KEY: Record<CategoryLevel, 'parentNames' | 'middleNames' | 'childNames'> = {
   parent: 'parentNames',
   middle: 'middleNames',
   child: 'childNames',
 };
+
+const DIRECT_SALE = [
+  { value: 'yes' as const, label: 'Có' },
+  { value: 'no' as const, label: 'Không' },
+];
+
+/** Chữ hiện ở dòng chọn danh sách đang tải / rỗng. */
+const listHint = (s: { items: NamedItem[]; loading: boolean }) => (s.loading ? 'Đang tải…' : s.items.length ? 'Tất cả' : 'Chưa có dữ liệu');
 
 export interface ProductFilterViewProps {
   draft: ProductFilters;
@@ -96,84 +47,77 @@ export interface ProductFilterViewProps {
   onCancel?: () => void;
 }
 
-/** Sheet bộ lọc hàng hóa (giống bộ lọc bên trái của web). */
+/** Sheet bộ lọc hàng hóa (giống bộ lọc bên trái của web), gọn thành các dòng chọn. */
 export function ProductFilterView({ draft, onChange, categories, trademarks, onApply, onReset, onCancel }: ProductFilterViewProps) {
   const insets = useSafeAreaInsets();
   const count = activeFilterCount(draft);
-  const single = <K extends keyof ProductFilters>(key: K, value: ProductFilters[K]) =>
-    onChange({ [key]: draft[key] === value ? null : value } as Partial<ProductFilters>);
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <SheetHeader title="Bộ lọc" onCancel={onCancel} actionLabel="Áp dụng" onAction={onApply} />
       <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 24 }]}>
-        <Group title="Loại sản phẩm">
-          <ToggleChips
-            options={PRODUCT_TYPES}
-            selected={draft.types}
-            onToggle={(t) => onChange({ types: toggle(draft.types, t) })}
-            label="Loại sản phẩm"
-          />
-        </Group>
-
-        {categories
-          ? CATEGORY_LEVELS.map((lv) => (
-              <LongChips
-                key={lv.value}
-                title={lv.label}
-                items={byName(categories[lv.value].items)}
-                loading={categories[lv.value].loading}
-                selected={draft[NAME_KEY[lv.value]]}
-                onToggle={(name) => onChange({ [NAME_KEY[lv.value]]: toggle(draft[NAME_KEY[lv.value]], name) })}
+        <FormCard title="Phân loại">
+          <MultiSelect label="Loại sản phẩm" options={PRODUCT_TYPES} value={draft.types} onChange={(types) => onChange({ types })} />
+          {categories
+            ? CATEGORY_LEVELS.map((lv) => {
+                const src = categories[lv.value];
+                return (
+                  <View key={lv.value}>
+                    <Divider />
+                    <MultiSelect
+                      label={lv.label}
+                      options={byName(src.items)}
+                      value={draft[NAME_KEY[lv.value]]}
+                      onChange={(names) => onChange({ [NAME_KEY[lv.value]]: names })}
+                      placeholder={listHint(src)}
+                      disabled={src.loading || src.items.length === 0}
+                    />
+                  </View>
+                );
+              })
+            : null}
+          {trademarks ? (
+            <>
+              <Divider />
+              <MultiSelect
+                label="Thương hiệu"
+                options={byId(trademarks.items)}
+                value={draft.tradeMarkIds}
+                onChange={(tradeMarkIds) => onChange({ tradeMarkIds })}
+                placeholder={listHint(trademarks)}
+                disabled={trademarks.loading || trademarks.items.length === 0}
               />
-            ))
-          : null}
+            </>
+          ) : null}
+        </FormCard>
 
-        {trademarks ? (
-          <LongChips
-            title="Thương hiệu"
-            items={byId(trademarks.items)}
-            loading={trademarks.loading}
-            selected={draft.tradeMarkIds}
-            onToggle={(id) => onChange({ tradeMarkIds: toggle(draft.tradeMarkIds, id) })}
-          />
-        ) : null}
-
-        <Group title="Tồn kho">
-          <ToggleChips
-            options={STOCK_FILTERS}
-            selected={draft.stock ? [draft.stock] : []}
-            onToggle={(v) => single('stock', v)}
-            label="Tồn kho"
-          />
-        </Group>
-        <Group title="Tình trạng tồn">
-          <ToggleChips
-            options={CONDITION_FILTERS}
-            selected={draft.condition ? [draft.condition] : []}
-            onToggle={(v) => single('condition', v)}
+        <FormCard title="Tồn kho và bán hàng">
+          <Select label="Tồn kho" options={STOCK_FILTERS} value={draft.stock} onChange={(stock) => onChange({ stock })} clearLabel="Tất cả" />
+          <Divider />
+          <Select
             label="Tình trạng tồn"
+            options={CONDITION_FILTERS}
+            value={draft.condition}
+            onChange={(condition) => onChange({ condition })}
+            clearLabel="Tất cả"
           />
-        </Group>
-        <Group title="Bán trực tiếp">
-          <ToggleChips
-            options={[
-              { value: 'yes', label: 'Có' },
-              { value: 'no', label: 'Không' },
-            ]}
-            selected={draft.directSale === null ? [] : [draft.directSale ? 'yes' : 'no']}
-            onToggle={(v) => single('directSale', v === 'yes')}
+          <Divider />
+          <Select
             label="Bán trực tiếp"
+            options={DIRECT_SALE}
+            value={draft.directSale === null ? null : draft.directSale ? 'yes' : 'no'}
+            onChange={(v) => onChange({ directSale: v === null ? null : v === 'yes' })}
+            clearLabel="Tất cả"
           />
-        </Group>
-        <Group title="Loại vận chuyển">
-          <ToggleChips
-            options={CARGO_TYPES}
-            selected={draft.cargoType ? [draft.cargoType] : []}
-            onToggle={(v) => single('cargoType', v)}
+          <Divider />
+          <Select
             label="Loại vận chuyển"
+            options={CARGO_TYPES}
+            value={draft.cargoType}
+            onChange={(cargoType) => onChange({ cargoType })}
+            clearLabel="Tất cả"
           />
-        </Group>
+        </FormCard>
 
         {count > 0 ? <Button title={`Xóa ${count} bộ lọc`} icon="x" variant="outline" size="medium" onPress={onReset} style={{ marginTop: 8 }} /> : null}
       </ScrollView>
@@ -214,6 +158,5 @@ export default function ProductFilterScreen() {
 }
 
 const styles = StyleSheet.create({
-  body: { padding: 16, gap: 22 },
-  group: { gap: 10 },
+  body: { padding: 16, gap: 18 },
 });

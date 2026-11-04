@@ -22,6 +22,7 @@ import {
   Pill,
   PressableScale,
   Section,
+  Select,
   SubHeader,
   TabPanel,
   TextField,
@@ -31,7 +32,7 @@ import {
 import {
   addOrderPayment,
   addPaymentNote,
-  bankLabel,
+  bankOptions,
   createOrder,
   createPosInvoice,
   useBankAccounts,
@@ -211,22 +212,20 @@ function PaymentCard({ perms, mode, bankAccounts }: { perms: SalePerms; mode: Sa
           ) : null}
 
           {cart.payKind === 'transfer' && paid > 0 ? (
-            <View style={{ gap: 8 }}>
-              <Txt variant="label" weight="semibold">
-                Tài khoản nhận
+            bankAccounts?.length ? (
+              <Select
+                variant="field"
+                label="Tài khoản nhận"
+                placeholder="Chọn tài khoản ngân hàng"
+                options={bankOptions(bankAccounts)}
+                value={cart.accountId ?? null}
+                onChange={cart.setAccount}
+              />
+            ) : (
+              <Txt variant="caption" color={C.muted}>
+                Chưa có tài khoản ngân hàng nào.
               </Txt>
-              {bankAccounts?.length ? (
-                <ChipGroup
-                  options={bankAccounts.map((a) => ({ value: String(a.id), label: bankLabel(a) }))}
-                  value={cart.accountId ? String(cart.accountId) : null}
-                  onChange={(v) => cart.setAccount(Number(v))}
-                />
-              ) : (
-                <Txt variant="caption" color={C.muted}>
-                  Chưa có tài khoản ngân hàng nào.
-                </Txt>
-              )}
-            </View>
+            )
           ) : null}
         </TabPanel>
       ) : (

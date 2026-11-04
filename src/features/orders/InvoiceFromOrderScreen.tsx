@@ -30,7 +30,8 @@ import {
   toast,
   Txt,
 } from '@/ui';
-import { createInvoiceFromOrder, useInvoiceDraft } from './api';
+import { createInvoiceFromOrder, refreshAfterDocChange, useInvoiceDraft } from './api';
+import { useDocRoutes } from './editScope';
 import {
   buildFromOrderPayload,
   defaultQuantities,
@@ -277,6 +278,7 @@ export default function InvoiceFromOrderScreen() {
   const branchId = useSession((s) => s.branchId);
   const qc = useQueryClient();
   const draft = useInvoiceDraft(orderId);
+  const routes = useDocRoutes();
   const busyRef = useRef(false);
   const [busy, setBusy] = useState(false);
 
@@ -332,16 +334,11 @@ export default function InvoiceFromOrderScreen() {
     }
     toast.success(`Đã tạo hóa đơn ${invoice.code}`);
     if (noteFailed) toast.error('Chưa ghi được hình thức thanh toán, hãy ghi lại trên web.');
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: ['doc'] }),
-      qc.invalidateQueries({ queryKey: ['docs'] }),
-      qc.invalidateQueries({ queryKey: ['dashboard'] }),
-      qc.invalidateQueries({ queryKey: ['sales', 'products'] }),
-    ]);
+    await refreshAfterDocChange(qc);
     busyRef.current = false;
     setBusy(false);
     // Thay màn tạo bằng chi tiết hóa đơn vừa tạo; quay lại là về đơn hàng.
-    router.replace({ pathname: '/don-hang/[kind]/[id]', params: { kind: KIND_SLUG.invoice, id: String(invoice.id) } });
+    router.replace({ pathname: routes.detail, params: { kind: KIND_SLUG.invoice, id: String(invoice.id) } } as never);
   };
 
   return (

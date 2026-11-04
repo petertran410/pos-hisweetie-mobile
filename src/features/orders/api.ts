@@ -1,5 +1,5 @@
-import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { periodRange, type PeriodKey } from '@/core/format';
+import { keepPreviousData, useInfiniteQuery, useQuery, type QueryClient, type QueryKey } from '@tanstack/react-query';
+import { resolvePeriod, type PeriodChoice } from '@/core/period';
 import { http, type Query } from '@/core/http';
 import { useSession } from '@/core/session';
 import type { RawInvoiceForEdit, RawOrderForEdit } from './editOrder';
@@ -12,6 +12,30 @@ const num = (v: unknown): number => {
 };
 
 const PAGE_SIZE = 20;
+
+/**
+ * Sau khi đổi chứng từ: làm mới chi tiết, danh sách, tổng quan, số liệu khách
+ * (nợ, lịch sử mua) và tồn kho / thẻ kho của hàng (tạo, hủy hóa đơn làm đổi tồn).
+ */
+export function refreshAfterDocChange(qc: QueryClient, extra: QueryKey[] = []) {
+  const keys: QueryKey[] = [
+    ['doc'],
+    ['docs'],
+    ['dashboard'],
+    ['customer'],
+    ['customers'],
+    ['customer-docs'],
+    ['customer-debt'],
+    ['product'],
+    ['products'],
+    ['product-logs'],
+    ['product-condition'],
+    ['product-condition-logs'],
+    ['sales', 'products'],
+    ...extra,
+  ];
+  return Promise.all(keys.map((queryKey) => qc.invalidateQueries({ queryKey })));
+}
 
 // ---------- Danh sách ----------
 
@@ -61,7 +85,8 @@ export function toDocRow(kind: DocKind, r: RawRow): DocRow {
 export interface DocFilters {
   search: string;
   status: StatusFilter;
-  period: PeriodKey | 'all';
+  /** Kỳ có sẵn, "all" hoặc khoảng ngày tự chọn. */
+  period: PeriodChoice;
 }
 
 /**
@@ -70,7 +95,7 @@ export interface DocFilters {
  */
 export function listQuery(kind: DocKind, f: DocFilters, branchId: number | null, page: number, now = new Date()): Query {
   const q: Query = { page, limit: PAGE_SIZE, includeStatusCounts: true, search: f.search || undefined };
-  const range = f.period === 'all' ? null : periodRange(f.period, now);
+  const range = resolvePeriod(f.period, now);
   const bounds = range ? dayBoundsIso(range.from, range.to) : null;
   if (kind === 'invoice') {
     q.branchIds = branchId ? [branchId] : undefined;

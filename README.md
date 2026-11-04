@@ -4,15 +4,21 @@ App bán hàng nội bộ cho iPhone, viết bằng Expo (React Native).
 
 ## Chạy thử
 
-1. Cài thư viện: `npm install`
+Dự án dùng **Yarn 1** (`yarn.lock`), giống web và backend. Đừng dùng `npm install`: npm sẽ tạo thêm `package-lock.json`.
+
+1. Cài thư viện: `yarn install`
 2. Tạo file `.env` từ mẫu: `cp .env.example .env`, rồi điền `EXPO_PUBLIC_API_URL`
-3. Chạy: `npx expo start`, mở bằng app **Expo Go** trên iPhone (cùng Wi‑Fi với máy tính)
+3. Chạy: `yarn start` (xóa bộ nhớ đệm: `yarn start -c`), mở bằng app **Expo Go** trên iPhone (cùng Wi‑Fi với máy tính)
+
+Thêm thư viện: `npx expo install <tên>` (tự chọn bản hợp với Expo SDK và tự dùng yarn).
+
+Yarn 1 không tự cài thư viện "peer" như npm, nên các thư viện peer cần thiết (`@expo/log-box`, `@expo/metro-runtime`, `@babel/runtime`, `@babel/core`...) được khai báo thẳng trong `package.json`. Sau khi thêm thư viện mới, chạy `yarn install` và xem dòng `unmet peer dependency`.
 
 ## Kiểm tra
 
-- `npm run typecheck`
-- `npm run lint`
-- `npm test`
+- `yarn typecheck`
+- `yarn lint`
+- `yarn test`
 
 ## Quy tắc bảo mật
 

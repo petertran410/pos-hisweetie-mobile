@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActionSheetIOS, ActivityIndicator, Alert, Platform, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { money } from '@/core/format';
 import { useSession } from '@/core/session';
 import { useDebounced } from '@/core/useDebounced';
@@ -14,6 +14,7 @@ import {
   Icon,
   IconButton,
   PageBackground,
+  pickFromSheet,
   PressableScale,
   SearchField,
   Skeleton,
@@ -41,21 +42,6 @@ import {
 } from './model';
 
 const STATUS_ORDER = STATUS_FILTERS.map((s) => s.value);
-
-/** Bảng chọn kiểu iOS; mục đang chọn có dấu ✓. */
-function pickFromSheet<T>(title: string, items: { value: T; label: string }[], current: T | null, onPick: (v: T) => void) {
-  const labels = items.map((it) => (it.value === current ? `✓ ${it.label}` : it.label));
-  if (Platform.OS === 'ios') {
-    ActionSheetIOS.showActionSheetWithOptions({ title, options: [...labels, 'Hủy'], cancelButtonIndex: labels.length }, (i) => {
-      if (i < items.length) onPick(items[i].value);
-    });
-    return;
-  }
-  Alert.alert(title, undefined, [
-    ...items.map((it, i) => ({ text: labels[i], onPress: () => onPick(it.value) })),
-    { text: 'Hủy', style: 'cancel' as const },
-  ]);
-}
 
 /** Hỏi loại hàng muốn thêm rồi mở form. */
 export function pickNewType(onPick: (t: ProductType) => void) {

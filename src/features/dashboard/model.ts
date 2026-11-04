@@ -1,12 +1,21 @@
+import { periodRange, type PeriodKey } from '@/core/format';
+import { isRange, type DateRange } from '@/core/period';
 import type { AccentName, IconName, Tone } from '@/ui';
-import type { TaskType } from './api';
+import type { DashPreset, DashRange, TaskType } from './api';
 
-export const RANGE_OPTIONS = [
+export const RANGE_OPTIONS: { value: DashPreset; label: string }[] = [
   { value: 'today', label: 'Hôm nay' },
   { value: 'yesterday', label: 'Hôm qua' },
   { value: 'week', label: 'Tuần này' },
   { value: 'month', label: 'Tháng này' },
-] as const;
+];
+
+const PRESET_PERIOD: Record<DashPreset, PeriodKey> = { today: 'today', yesterday: 'yesterday', week: 'last7', month: 'thisMonth' };
+
+/** Khoảng ngày của kỳ đang xem (để lịch chọn ngày mở sẵn đúng chỗ). */
+export function dashRangeDates(range: DashRange, now = new Date()): DateRange {
+  return isRange(range) ? range : periodRange(PRESET_PERIOD[range], now);
+}
 
 /** "+12,5%" / "-3%" / "0%"; null khi không có kỳ trước để so. */
 export function formatDelta(pct: number | null | undefined): string | null {

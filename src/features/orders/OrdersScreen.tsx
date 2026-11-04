@@ -1,9 +1,10 @@
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActionSheetIOS, ActivityIndicator, Alert, Platform, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { canDo } from '@/core/can';
-import { money, timeVN, type PeriodKey } from '@/core/format';
+import { money, timeVN } from '@/core/format';
+import { resolvePeriod, type PeriodChoice } from '@/core/period';
 import { useSession } from '@/core/session';
 import { useDebounced } from '@/core/useDebounced';
 import { usePullRefresh } from '@/core/usePullRefresh';
@@ -14,6 +15,8 @@ import {
   ErrorState,
   Icon,
   PageBackground,
+  PeriodModal,
+  periodText,
   Pill,
   PressableScale,
   SearchField,
@@ -102,24 +105,6 @@ function ListSkeleton() {
   );
 }
 
-/** Chọn khoảng thời gian bằng bảng chọn của iOS. */
-function pickPeriod(current: PeriodKey | 'all', onPick: (p: PeriodKey | 'all') => void) {
-  const labels = PERIOD_FILTERS.map((p) => (p.value === current ? `✓ ${p.label}` : p.label));
-  if (Platform.OS === 'ios') {
-    ActionSheetIOS.showActionSheetWithOptions(
-      { title: 'Xem đơn trong khoảng', options: [...labels, 'Hủy'], cancelButtonIndex: labels.length },
-      (i) => {
-        if (i < PERIOD_FILTERS.length) onPick(PERIOD_FILTERS[i].value);
-      },
-    );
-    return;
-  }
-  Alert.alert('Xem đơn trong khoảng', undefined, [
-    ...PERIOD_FILTERS.map((p) => ({ text: p.label, onPress: () => onPick(p.value) })),
-    { text: 'Hủy', style: 'cancel' as const },
-  ]);
-}
-
 export interface OrdersViewProps {
   kinds: DocKind[];
   kind: DocKind;
@@ -127,7 +112,7 @@ export interface OrdersViewProps {
   filters: DocFilters;
   onSearch: (s: string) => void;
   onStatus: (s: StatusFilter) => void;
-  onPeriod: (p: PeriodKey | 'all') => void;
+  onPeriod: (p: PeriodChoice) => void;
   rows: DocRow[];
   total?: number;
   counts?: StatusCounts;
@@ -145,7 +130,8 @@ export interface OrdersViewProps {
 /** Danh sách hóa đơn / đơn đặt hàng: tìm, lọc trạng thái, lọc thời gian, nhóm theo ngày. */
 export function OrdersView(p: OrdersViewProps) {
   const statusOrder = ['all', ...(p.kind === 'invoice' ? INVOICE_FILTERS.map(String) : ORDER_FILTERS)];
-  const period = PERIOD_FILTERS.find((x) => x.value === p.filters.period)?.label ?? '';
+  const [periodOpen, setPeriodOpen] = useState(false);
+  const period = periodText(PERIOD_FILTERS, p.filters.period, p.now);
   const items = groupByDay(p.rows, p.now);
   const what = p.kind === 'invoice' ? 'hóa đơn' : 'đơn đặt hàng';
 
@@ -174,7 +160,7 @@ export function OrdersView(p: OrdersViewProps) {
               {p.total !== undefined ? `${money(p.total)} ${what}` : ' '}
             </Txt>
             <PressableScale
-              onPress={() => pickPeriod(p.filters.period, p.onPeriod)}
+              onPress={() => setPeriodOpen(true)}
               accessibilityLabel={`Thời gian: ${period}. Bấm để đổi`}
               scaleTo={0.95}
               style={styles.period}>
@@ -231,6 +217,18 @@ export function OrdersView(p: OrdersViewProps) {
           )}
         </TabPanel>
       </TabPanel>
+      <PeriodModal
+        visible={periodOpen}
+        title="Thời gian"
+        options={PERIOD_FILTERS}
+        value={p.filters.period}
+        initialRange={resolvePeriod(p.filters.period, p.now)}
+        onChange={(v) => {
+          setPeriodOpen(false);
+          p.onPeriod(v);
+        }}
+        onClose={() => setPeriodOpen(false)}
+      />
     </View>
   );
 }
@@ -241,7 +239,7 @@ export default function OrdersScreen() {
   const [kind, setKind] = useState<DocKind>(kinds[0] ?? 'order');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<Record<DocKind, StatusFilter>>({ order: 'all', invoice: 'all' });
-  const [period, setPeriod] = useState<PeriodKey | 'all'>('last7');
+  const [period, setPeriod] = useState<PeriodChoice>('last7');
   const term = useDebounced(search.trim(), 350);
   const active = kinds.includes(kind) ? kind : (kinds[0] ?? 'order');
   const filters: DocFilters = { search: term, status: status[active], period };

@@ -63,15 +63,7 @@ export const PERIOD_FILTERS: { value: PeriodKey | 'all'; label: string }[] = [
   { value: 'all', label: 'Toàn thời gian' },
 ];
 
-/** yyyy-mm-dd (giờ máy) → ISO đầu ngày / cuối ngày (giống web gửi). */
-export function dayBoundsIso(from: string, to: string): { fromIso: string; toIso: string } {
-  const [fy, fm, fd] = from.split('-').map(Number);
-  const [ty, tm, td] = to.split('-').map(Number);
-  return {
-    fromIso: new Date(fy, fm - 1, fd, 0, 0, 0, 0).toISOString(),
-    toIso: new Date(ty, tm - 1, td, 23, 59, 59, 999).toISOString(),
-  };
-}
+export { dayBoundsIso } from '@/core/period';
 
 /** Tình trạng thanh toán suy ra từ số tiền (hóa đơn không có trường riêng). */
 export function payState(paid: number, debt: number): { label: string; tone: Tone } {

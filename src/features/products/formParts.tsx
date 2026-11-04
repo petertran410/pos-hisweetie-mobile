@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { StyleSheet, Switch, TextInput, View } from 'react-native';
+import { StyleSheet, Switch, TextInput, View, type TextInputProps } from 'react-native';
 import { parseQty, qty } from '@/core/format';
 import { C, fonts, Icon, PressableScale, radius, toneColors, Txt } from '@/ui';
 
@@ -139,18 +139,25 @@ export function TextRow({
   multiline,
   autoCapitalize,
   maxLength,
+  keyboardType,
+  textContentType,
+  right,
 }: {
   label: string;
   value: string;
   onChange: (t: string) => void;
   placeholder?: string;
   multiline?: boolean;
-  autoCapitalize?: 'none' | 'sentences' | 'characters';
+  autoCapitalize?: 'none' | 'sentences' | 'characters' | 'words';
   maxLength?: number;
+  keyboardType?: TextInputProps['keyboardType'];
+  textContentType?: TextInputProps['textContentType'];
+  /** Nút nhỏ bên phải ô (vd "Tra cứu"). */
+  right?: ReactNode;
 }) {
   return (
     <View style={[styles.textRow, multiline ? { alignItems: 'stretch', flexDirection: 'column', gap: 6 } : null]}>
-      <Txt variant="body" color={C.muted} style={multiline ? null : { width: 92 }}>
+      <Txt variant="body" color={C.muted} style={multiline ? null : { width: 92, flexShrink: 0 }}>
         {label}
       </Txt>
       <TextInput
@@ -162,9 +169,12 @@ export function TextRow({
         autoCapitalize={autoCapitalize}
         autoCorrect={false}
         maxLength={maxLength}
+        keyboardType={keyboardType}
+        textContentType={textContentType}
         accessibilityLabel={label}
         style={[styles.text, multiline ? styles.multiline : null]}
       />
+      {right}
     </View>
   );
 }
@@ -226,7 +236,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   textRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingVertical: 8 },
-  text: { flex: 1, fontSize: 16, fontFamily: fonts.regular, color: C.text, paddingVertical: 6 },
+  text: { flex: 1, minWidth: 0, fontSize: 16, fontFamily: fonts.regular, color: C.text, paddingVertical: 6 },
   multiline: { minHeight: 72, textAlignVertical: 'top', paddingTop: 4 },
   toggle: { flexDirection: 'row', borderRadius: radius.pill, backgroundColor: '#EEF2F6', padding: 2 },
   toggleItem: { minWidth: 36, height: 28, paddingHorizontal: 8, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },

@@ -165,10 +165,18 @@ export function useBankAccounts(enabled: boolean) {
 }
 
 /** "VCB · ****6789" */
+/** "VCB · 0123456789": hiện đủ số tài khoản để chọn đúng tài khoản nhận. */
 export function bankLabel(a: BankAccount): string {
-  const tail = a.accountNumber ? `****${a.accountNumber.slice(-4)}` : '';
-  return [a.bankCode || a.bankName, tail].filter(Boolean).join(' · ');
+  return [a.bankCode || a.bankName, a.accountNumber].filter(Boolean).join(' · ') || `Tài khoản #${a.id}`;
 }
+
+/** Chọn tài khoản nhận: tên ngân hàng + số tài khoản, dòng phụ là chủ tài khoản. */
+export const bankOptions = (list: BankAccount[]) =>
+  list.map((a) => ({
+    value: a.id,
+    label: bankLabel(a),
+    sub: [a.bankCode ? a.bankName : null, a.accountHolder].filter(Boolean).join(' · ') || null,
+  }));
 
 // ---------- Khuyến mãi (chỉ để cảnh báo) ----------
 

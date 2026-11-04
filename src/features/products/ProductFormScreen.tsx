@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { money } from '@/core/format';
 import { errorMessage } from '@/core/http';
 import { useSession } from '@/core/session';
-import { Button, C, ChipGroup, Divider, EmptyState, fonts, Icon, Page, PressableScale, SubHeader, toast, Txt } from '@/ui';
+import { Button, C, Divider, EmptyState, fonts, Icon, Page, pickFromSheet, PressableScale, Select, SubHeader, toast, Txt } from '@/ui';
 import { createProduct, updateProduct, uploadProductImage } from './api';
 import { ComboEditor, FormulaEditor } from './ComponentsEditor';
 import { CostScopeModal } from './CostScopeModal';
@@ -30,7 +30,7 @@ import {
   type ProductForm,
 } from './form';
 import { FormCard, Note, NumRow, PickRow, SwitchRow, TextRow, UnitToggle } from './formParts';
-import { CARGO_TYPES, productPerms, typeLabel, type CargoType, type ProductPerms } from './model';
+import { CARGO_TYPES, productPerms, typeLabel, type ProductPerms } from './model';
 
 export type PickTarget = 'parent' | 'middle' | 'child' | 'trademark' | 'unit';
 
@@ -108,22 +108,25 @@ function Attributes({ form, onChange }: { form: ProductForm; onChange: (patch: P
           </View>
         </View>
       ))}
-      <View style={[styles.presets, form.attributes.length ? styles.presetsTop : null]}>
-        {ATTRIBUTE_PRESETS.filter((p) => !form.attributes.some((a) => a.name.trim() === p)).map((p) => (
-          <PressableScale key={p} onPress={() => add(p)} accessibilityLabel={`Thêm thuộc tính ${p}`} scaleTo={0.94} style={styles.preset}>
-            <Icon name="plus" size={14} color={C.brand} />
-            <Txt variant="label" weight="semibold" color={C.brand}>
-              {p}
-            </Txt>
-          </PressableScale>
-        ))}
-        <PressableScale onPress={() => add('')} accessibilityLabel="Thêm thuộc tính tùy chỉnh" scaleTo={0.94} style={styles.preset}>
-          <Icon name="plus" size={14} color={C.brand} />
-          <Txt variant="label" weight="semibold" color={C.brand}>
-            Tùy chỉnh
-          </Txt>
-        </PressableScale>
-      </View>
+      {form.attributes.length ? <Divider /> : null}
+      <PressableScale
+        onPress={() =>
+          pickFromSheet(
+            'Thêm thuộc tính',
+            [...ATTRIBUTE_PRESETS.filter((p) => !form.attributes.some((a) => a.name.trim() === p)), 'Tùy chỉnh'].map((p) => ({ value: p, label: p })),
+            null,
+            (p) => add(p === 'Tùy chỉnh' ? '' : p),
+          )
+        }
+        accessibilityRole="button"
+        accessibilityLabel="Thêm thuộc tính"
+        scaleTo={0.98}
+        style={styles.addAttr}>
+        <Icon name="plus" size={16} color={C.brand} />
+        <Txt variant="body" weight="semibold" color={C.brand}>
+          Thêm thuộc tính
+        </Txt>
+      </PressableScale>
     </FormCard>
   );
 }
@@ -198,14 +201,14 @@ export function ProductFormView({ form, editing, code, perms, onChange, onPickIm
         {physical ? (
           <>
             <Divider />
-            <View style={styles.chipRow}>
-              <Txt variant="body" color={C.muted}>
-                Loại vận chuyển
-              </Txt>
-              <View style={{ flex: 1 }}>
-                <ChipGroup<CargoType> fill options={CARGO_TYPES} value={form.cargoType} onChange={(v) => onChange({ cargoType: v })} />
-              </View>
-            </View>
+            <Select
+              label="Loại vận chuyển"
+              options={CARGO_TYPES}
+              value={form.cargoType}
+              onChange={(v) => {
+                if (v) onChange({ cargoType: v });
+              }}
+            />
           </>
         ) : null}
       </FormCard>
@@ -525,22 +528,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(16,33,40,0.6)',
   },
-  chipRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
   rowHint: { paddingBottom: 10, marginTop: -4 },
   rowHintRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 10, marginTop: -4 },
   attrRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50 },
   attrInput: { fontSize: 16, fontFamily: fonts.regular, color: C.text, paddingVertical: 10 },
-  presets: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 12 },
-  presetsTop: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border },
-  preset: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    height: 34,
-    borderRadius: 999,
-    backgroundColor: C.brandSoft,
-  },
+  addAttr: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 50 },
   footer: {
     paddingHorizontal: 16,
     paddingTop: 12,

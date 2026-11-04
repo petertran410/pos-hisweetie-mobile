@@ -6,11 +6,13 @@ import Banknote from 'lucide-react-native/icons/banknote';
 import BookOpen from 'lucide-react-native/icons/book-open';
 import Boxes from 'lucide-react-native/icons/boxes';
 import Building from 'lucide-react-native/icons/building';
+import CalendarRange from 'lucide-react-native/icons/calendar-range';
 import Camera from 'lucide-react-native/icons/camera';
 import ChartColumn from 'lucide-react-native/icons/chart-column';
 import ChartPie from 'lucide-react-native/icons/chart-pie';
 import Check from 'lucide-react-native/icons/check';
 import ChevronDown from 'lucide-react-native/icons/chevron-down';
+import ChevronLeft from 'lucide-react-native/icons/chevron-left';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import CircleCheck from 'lucide-react-native/icons/circle-check';
 import CirclePlus from 'lucide-react-native/icons/circle-plus';
@@ -90,11 +92,13 @@ const ICONS = {
   'book-open': BookOpen,
   boxes: Boxes,
   building: Building,
+  'calendar-range': CalendarRange,
   camera: Camera,
   'chart-column': ChartColumn,
   'chart-pie': ChartPie,
   check: Check,
   'chevron-down': ChevronDown,
+  'chevron-left': ChevronLeft,
   'chevron-right': ChevronRight,
   'circle-check': CircleCheck,
   'circle-plus': CirclePlus,
