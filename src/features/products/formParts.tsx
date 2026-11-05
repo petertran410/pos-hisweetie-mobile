@@ -142,10 +142,13 @@ export function TextRow({
   keyboardType,
   textContentType,
   right,
+  align = 'left',
 }: {
   label: string;
   value: string;
   onChange: (t: string) => void;
+  /** `right`: chữ nhập canh phải, thẳng hàng với giá trị của các dòng chọn trong cùng thẻ. */
+  align?: 'left' | 'right';
   placeholder?: string;
   multiline?: boolean;
   autoCapitalize?: 'none' | 'sentences' | 'characters' | 'words';
@@ -172,7 +175,7 @@ export function TextRow({
         keyboardType={keyboardType}
         textContentType={textContentType}
         accessibilityLabel={label}
-        style={[styles.text, multiline ? styles.multiline : null]}
+        style={[styles.text, multiline ? styles.multiline : null, align === 'right' && !multiline ? { textAlign: 'right' } : null]}
       />
       {right}
     </View>

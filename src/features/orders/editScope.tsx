@@ -17,7 +17,7 @@ export const useOrderEditMeta = create<{ meta: OrderEditMeta | null }>(() => ({ 
  * từ thẻ kho) đều có đủ các màn này, để thao tác xong bấm quay lại vẫn về đúng
  * chỗ đã mở.
  */
-export type DocBase = '/don-hang' | '/khach-hang' | '/hang-hoa';
+export type DocBase = '/don-hang' | '/khach-hang' | '/hang-hoa' | '/bao-don';
 
 function makeScope(base: DocBase): SaleScope {
   return {
@@ -40,6 +40,7 @@ const SCOPES: Record<DocBase, SaleScope> = {
   '/don-hang': ORDER_EDIT_SCOPE,
   '/khach-hang': makeScope('/khach-hang'),
   '/hang-hoa': makeScope('/hang-hoa'),
+  '/bao-don': makeScope('/bao-don'),
 };
 
 const DocBaseContext = createContext<DocBase>('/don-hang');

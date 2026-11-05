@@ -21,6 +21,8 @@ import {
   sampleDocRows,
   sampleRawCustomers,
   sampleUnpaid,
+  samplePackDetail,
+  samplePackRows,
   samplePrintContent,
   sampleProducts,
   sampleRawProducts,
@@ -88,6 +90,19 @@ import {
   type InvoiceAmounts,
 } from '@/features/customers/model';
 import { PaymentView } from '@/features/customers/PaymentScreen';
+import { PackingDetailView } from '@/features/packing/PackingDetailScreen';
+import { PackingFormView } from '@/features/packing/PackingFormScreen';
+import { PackFilterView } from '@/features/packing/PackFilterScreen';
+import { PackingListView } from '@/features/packing/PackingListScreen';
+import {
+  applyDocPay,
+  DEFAULT_PACK_FILTERS,
+  newPackForm,
+  packPerms,
+  toPackForm,
+  type PackFilters,
+  type PackForm,
+} from '@/features/packing/model';
 import { PickList } from '@/features/customers/PickerScreens';
 import { ActionCard, Page, TitleHeader, toast } from '@/ui';
 
@@ -134,6 +149,11 @@ const SCREENS = [
   { key: 'dia-chi-kh', title: 'Sửa địa chỉ khách' },
   { key: 'chon-tinh', title: 'Chọn tỉnh / thành' },
   { key: 'thu-no', title: 'Thu nợ' },
+  { key: 'bao-don', title: 'Báo đơn' },
+  { key: 'loc-bao-don', title: 'Bộ lọc báo đơn' },
+  { key: 'ct-bao-don', title: 'Chi tiết phiếu giao hàng' },
+  { key: 'tao-giao-hang', title: 'Tạo phiếu giao hàng' },
+  { key: 'tao-loading', title: 'Tạo phiếu loading' },
 ] as const;
 
 /** Form mẫu theo màn xem trước. */
@@ -233,6 +253,9 @@ export default function PreviewScreen() {
   const [payAllocate, setPayAllocate] = useState(true);
   const [payMethod, setPayMethod] = useState<'cash' | 'transfer'>('cash');
   const customerPermsAll = customerPerms(sampleUser);
+  const packPermsAll = packPerms(sampleUser);
+  const [packFilters, setPackFilters] = useState<PackFilters>(DEFAULT_PACK_FILTERS);
+  const [packForm, setPackForm] = useState<{ key: string; form: PackForm } | null>(null);
 
   useEffect(() => {
     if (man && ['gio-hang', 'sua-hang', 'giao-hang', 'giam-gia'].includes(man)) seedCart();
@@ -733,6 +756,58 @@ export default function PreviewScreen() {
         onOffset={(invId, n) => setPayOffsets(setInvoiceOffset(sampleUnpaid, offsets, credit, invId, n))}
         onSubmit={noop}
         onCancel={toView('ct-kh')}
+      />
+    );
+  }
+  if (man === 'bao-don')
+    return (
+      <PackingListView
+        perms={packPermsAll}
+        search={search}
+        onSearch={setSearch}
+        filters={packFilters}
+        onType={(type) => setPackFilters((f) => ({ ...f, type }))}
+        onPeriod={(period) => setPackFilters((f) => ({ ...f, period }))}
+        onOpenFilters={toView('loc-bao-don')}
+        onCreate={(t) => router.setParams({ man: t === 'loading' ? 'tao-loading' : 'tao-giao-hang' })}
+        overview={{ stats: { total: 42, delivered: 30, pending: 12 }, onPress: noop }}
+        rows={samplePackRows.filter((r) => packFilters.type === 'all' || r.type === packFilters.type)}
+        total={samplePackRows.length}
+        onOpen={toView('ct-bao-don')}
+      />
+    );
+  if (man === 'loc-bao-don')
+    return <PackFilterView draft={packFilters} branches={sampleBranches} branchId={1} onChange={(patch) => setPackFilters((f) => ({ ...f, ...patch }))} onApply={toView('bao-don')} onReset={noop} onCancel={toView('bao-don')} />;
+  if (man === 'ct-bao-don')
+    return <PackingDetailView detail={samplePackDetail} perms={packPermsAll} onEdit={toView('tao-giao-hang')} onCancel={noop} onResend={noop} onOpenDoc={noop} />;
+  if (man === 'tao-giao-hang' || man === 'tao-loading') {
+    const seed =
+      man === 'tao-giao-hang'
+        ? applyDocPay({
+            ...toPackForm(samplePackDetail),
+            payAuto: true,
+            docs: samplePackDetail.docs.map((d, i) => ({ ...d, payNote: i === 0 ? { cash: true, amount: 850_000 } : { cash: false, amount: 0 } })),
+            images: [...toPackForm(samplePackDetail).images, { key: 'up', uri: 'https://example.com/uploads/bao-don/mau-4.jpg', url: null, state: 'uploading' as const, name: 'Ảnh', type: 'image/jpeg', size: null }],
+          })
+        : { ...newPackForm('loading', 1, samplePackDetail.docs.slice(0, 1)) };
+    const form = packForm?.key === man ? packForm.form : seed;
+    const patch = (p: Partial<PackForm>) => setPackForm({ key: man, form: { ...form, ...p } });
+    return (
+      <PackingFormView
+        form={form}
+        perms={packPermsAll}
+        editing={false}
+        branches={sampleBranches}
+        staff={[{ id: 3, name: 'Trần Văn Nam' }, { id: 4, name: 'Nguyễn Thị Lan' }]}
+        onChange={patch}
+        onDocMode={(docMode) => patch({ docMode, docs: [] })}
+        onBranch={(branchId) => patch({ branchId })}
+        onPickDocs={noop}
+        onScan={noop}
+        onRemoveDoc={(id) => patch({ docs: form.docs.filter((d) => d.id !== id) })}
+        onAddPhotos={noop}
+        onAddExpense={noop}
+        onSave={noop}
       />
     );
   }

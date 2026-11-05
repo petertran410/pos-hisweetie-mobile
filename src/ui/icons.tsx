@@ -19,6 +19,11 @@ import CirclePlus from 'lucide-react-native/icons/circle-plus';
 import CircleX from 'lucide-react-native/icons/circle-x';
 import ClipboardList from 'lucide-react-native/icons/clipboard-list';
 import Clock from 'lucide-react-native/icons/clock';
+import Container from 'lucide-react-native/icons/container';
+import QrCode from 'lucide-react-native/icons/qr-code';
+import Paperclip from 'lucide-react-native/icons/paperclip';
+import Send from 'lucide-react-native/icons/send';
+import Images from 'lucide-react-native/icons/images';
 import Coins from 'lucide-react-native/icons/coins';
 import Copy from 'lucide-react-native/icons/copy';
 import CreditCard from 'lucide-react-native/icons/credit-card';
@@ -97,6 +102,11 @@ const ICONS = {
   'chart-column': ChartColumn,
   'chart-pie': ChartPie,
   check: Check,
+  'container': Container,
+  'qr-code': QrCode,
+  'paperclip': Paperclip,
+  'send': Send,
+  'images': Images,
   'chevron-down': ChevronDown,
   'chevron-left': ChevronLeft,
   'chevron-right': ChevronRight,

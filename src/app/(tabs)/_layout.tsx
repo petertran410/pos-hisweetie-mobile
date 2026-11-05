@@ -4,10 +4,14 @@ import { setActiveTab } from '@/features/shell/TabStack';
 import { TAB_DEFS, useTabs } from '@/features/shell/tabs';
 import { tabTransition } from '@/features/shell/tabTransition';
 
-/** Thanh tab tự vẽ; tab không có quyền thì ẩn (href: null). */
+/**
+ * Thanh tab tự vẽ (chỉ vẽ tối đa 4 tab + "Thêm"). Chỉ ẩn hẳn (href: null) tab
+ * không có quyền: expo-router chuyển tab bị ẩn về tab đầu tiên, nên tab có
+ * quyền nhưng dồn vào "Thêm" (vd Báo đơn) phải để mở được.
+ */
 export default function TabsLayout() {
-  const { visible } = useTabs();
-  const shown = new Set(visible.map((t) => t.key));
+  const { visible, overflow } = useTabs();
+  const shown = new Set([...visible, ...overflow].map((t) => t.key));
   return (
     <Tabs
       screenOptions={{ headerShown: false, ...tabTransition }}

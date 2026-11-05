@@ -14,9 +14,9 @@ export interface ShortcutDef {
 
 /** Lối tắt chức năng trên Tổng quan, theo thứ tự hay dùng khi bán hàng. */
 export const SHORTCUTS: ShortcutDef[] = [
-  { key: 'ban-hang', label: 'Bán hàng', icon: 'shopping-cart', color: 'teal', permissions: ['orders:create', 'invoices:create'] },
-  { key: 'hoa-don', label: 'Hóa đơn', icon: 'receipt-text', color: 'blue', permissions: ['invoices:view'] },
-  { key: 'dat-hang', label: 'Đặt hàng', icon: 'clipboard-list', color: 'violet', permissions: ['orders:view'] },
+  { key: 'ban-hang', label: 'Bán hàng', icon: 'shopping-cart', color: 'teal', permissions: ['orders:create', 'invoices:create'], href: '/ban-hang' },
+  { key: 'hoa-don', label: 'Hóa đơn', icon: 'receipt-text', color: 'blue', permissions: ['invoices:view'], href: '/don-hang?kind=hoa-don' },
+  { key: 'dat-hang', label: 'Đặt hàng', icon: 'clipboard-list', color: 'violet', permissions: ['orders:view'], href: '/don-hang?kind=dat-hang' },
   { key: 'khach-hang', label: 'Khách hàng', icon: 'users', color: 'green', permissions: ['customers:view'], href: '/khach-hang' },
   {
     key: 'bao-don',
@@ -24,6 +24,7 @@ export const SHORTCUTS: ShortcutDef[] = [
     icon: 'truck',
     color: 'orange',
     permissions: ['packing_slips:view', 'packing_slips:create', 'packing_hangs:create', 'packing_loadings:create'],
+    href: '/bao-don',
   },
   { key: 'hang-hoa', label: 'Hàng hóa', icon: 'boxes', color: 'pink', permissions: ['products:view'], href: '/hang-hoa' },
   { key: 'so-quy', label: 'Sổ quỹ', icon: 'book-open', color: 'teal', permissions: ['cash_flows:view'] },

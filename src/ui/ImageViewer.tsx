@@ -7,6 +7,7 @@ import { Icon } from './icons';
 import { PressableScale } from './motion';
 import { Txt } from './Text';
 import { C } from './theme';
+import { mediaUri } from '@/core/config';
 
 /**
  * Xem ảnh toàn màn hình: vuốt ngang để đổi ảnh, chụm 2 ngón để phóng to
@@ -57,7 +58,7 @@ function ViewerBody({ images, start, onClose }: { images: string[]; start: numbe
             showsHorizontalScrollIndicator={false}
             showsVerticalScrollIndicator={false}
             accessibilityLabel={`Ảnh ${i + 1} trên ${images.length}`}>
-            <Image source={{ uri }} style={{ width, height }} contentFit="contain" transition={150} />
+            <Image source={{ uri: mediaUri(uri) }} style={{ width, height }} contentFit="contain" transition={150} />
           </ScrollView>
         ))}
       </ScrollView>

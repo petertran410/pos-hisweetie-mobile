@@ -1,5 +1,5 @@
-import { TabStack } from '@/features/shell/TabStack';
+import { PackingStack } from '@/features/packing/PackingStack';
 
 export default function Layout() {
-  return <TabStack name="bao-don" />;
+  return <PackingStack />;
 }

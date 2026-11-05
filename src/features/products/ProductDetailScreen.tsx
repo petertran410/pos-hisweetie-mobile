@@ -48,6 +48,7 @@ import {
   type StockLevel,
   type StockMove,
 } from './model';
+import { mediaUri } from '@/core/config';
 
 export type DetailTab = 'info' | 'stock' | 'card' | 'condition' | 'desc';
 const TABS: { value: DetailTab; label: string }[] = [
@@ -87,7 +88,7 @@ function Gallery({ images }: { images: string[] }) {
             onPress={() => setViewing(i)}
             accessibilityRole="imagebutton"
             accessibilityLabel={`Xem ảnh ${i + 1} cỡ lớn`}>
-            <Image source={{ uri }} style={{ width: w, height: Math.min(w, 280) }} contentFit="contain" transition={150} />
+            <Image source={{ uri: mediaUri(uri) }} style={{ width: w, height: Math.min(w, 280) }} contentFit="contain" transition={150} />
           </Pressable>
         ))}
       </ScrollView>

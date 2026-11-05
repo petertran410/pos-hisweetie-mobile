@@ -65,6 +65,37 @@ function errorFromBody(status: number, data: unknown): ApiError {
   return new ApiError('Có lỗi xảy ra', status);
 }
 
+const NETWORK_ERROR = 'Không thể kết nối tới máy chủ. Kiểm tra mạng và thử lại';
+const TIMEOUT_ERROR = 'Kết nối tới máy chủ quá thời gian, vui lòng thử lại';
+
+/**
+ * Gửi multipart (ảnh, tệp) bằng XMLHttpRequest của React Native. `fetch` của
+ * Expo không nhận phần tệp dạng `{ uri, name, type }`; XHR đọc tệp thẳng từ
+ * máy (không nạp cả tệp vào bộ nhớ JS) nên cũng nhẹ hơn.
+ */
+export function sendMultipart(
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  form: FormData,
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<{ status: number; text: string }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url);
+    for (const [key, value] of Object.entries(headers)) xhr.setRequestHeader(key, value);
+    xhr.timeout = timeoutMs;
+    xhr.withCredentials = false;
+    xhr.onload = () => resolve({ status: xhr.status, text: typeof xhr.responseText === 'string' ? xhr.responseText : '' });
+    xhr.onerror = () => reject(new ApiError(NETWORK_ERROR, 0));
+    xhr.ontimeout = () => reject(new ApiError(TIMEOUT_ERROR, 0));
+    xhr.onabort = () => reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    signal?.addEventListener('abort', () => xhr.abort());
+    xhr.send(form);
+  });
+}
+
 /** Gọi API không tự làm mới token (dùng cho đăng nhập / làm mới token). */
 export async function rawRequest<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {
@@ -76,34 +107,39 @@ export async function rawRequest<T>(path: string, opts: RequestOptions = {}): Pr
   if (requestContext.deviceId) headers['X-Device-Id'] = requestContext.deviceId;
   if (requestContext.branchId) headers['X-Branch-Id'] = String(requestContext.branchId);
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 30_000);
-  opts.signal?.addEventListener('abort', () => controller.abort());
-
-  let res: Response;
-  try {
-    res = await fetch(buildUrl(path, opts.query), {
-      method: opts.method ?? 'GET',
-      headers,
-      body: opts.form ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)),
-      // App không dùng cookie: refresh token nằm trong Keychain.
-      credentials: 'omit',
-      signal: controller.signal,
-    });
-  } catch (e) {
-    const aborted = (e as { name?: string })?.name === 'AbortError';
-    if (aborted && opts.signal?.aborted) throw e;
-    throw new ApiError(
-      aborted
-        ? 'Kết nối tới máy chủ quá thời gian, vui lòng thử lại'
-        : 'Không thể kết nối tới máy chủ. Kiểm tra mạng và thử lại',
-      0,
-    );
-  } finally {
-    clearTimeout(timer);
+  const url = buildUrl(path, opts.query);
+  const timeoutMs = opts.timeoutMs ?? 30_000;
+  let status: number;
+  let text: string;
+  if (opts.form) {
+    const res = await sendMultipart(url, opts.method ?? 'POST', headers, opts.form, timeoutMs, opts.signal);
+    status = res.status;
+    text = res.text;
+  } else {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    opts.signal?.addEventListener('abort', () => controller.abort());
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: opts.method ?? 'GET',
+        headers,
+        body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+        // App không dùng cookie: refresh token nằm trong Keychain.
+        credentials: 'omit',
+        signal: controller.signal,
+      });
+    } catch (e) {
+      const aborted = (e as { name?: string })?.name === 'AbortError';
+      if (aborted && opts.signal?.aborted) throw e;
+      throw new ApiError(aborted ? TIMEOUT_ERROR : NETWORK_ERROR, 0);
+    } finally {
+      clearTimeout(timer);
+    }
+    status = res.status;
+    text = await res.text();
   }
 
-  const text = await res.text();
   let data: unknown = null;
   if (text) {
     try {
@@ -112,6 +148,6 @@ export async function rawRequest<T>(path: string, opts: RequestOptions = {}): Pr
       data = text;
     }
   }
-  if (!res.ok) throw errorFromBody(res.status, data);
+  if (status < 200 || status >= 300) throw errorFromBody(status, data);
   return data as T;
 }

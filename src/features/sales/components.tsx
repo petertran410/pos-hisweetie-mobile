@@ -5,14 +5,16 @@ import { StyleSheet, View } from 'react-native';
 import { money, qty } from '@/core/format';
 import { C, gradients, Icon, Pill, PressableScale, QtyStepper, radius, shadow, Txt } from '@/ui';
 import type { CartLine, SaleProduct } from './cart';
+import { mediaUri } from '@/core/config';
 
 /** Ảnh sản phẩm (chỉ nhận https ở bản phát hành); không có ảnh thì hiện biểu tượng. */
 export function Thumb({ uri, size = 52 }: { uri?: string | null; size?: number }) {
-  const ok = !!uri && (uri.startsWith('https://') || (__DEV__ && uri.startsWith('http://')));
+  const src = uri ? mediaUri(uri) : null;
+  const ok = !!src && (src.startsWith('https://') || (__DEV__ && src.startsWith('http://')));
   return (
     <View style={[styles.thumb, { width: size, height: size }]}>
       {ok ? (
-        <Image source={{ uri: uri as string }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+        <Image source={{ uri: src as string }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
       ) : (
         <Icon name="package" size={size * 0.42} color={C.faint} />
       )}

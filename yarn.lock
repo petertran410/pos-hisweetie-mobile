@@ -4093,6 +4093,11 @@ expo-device@~58.0.5:
   dependencies:
     ua-parser-js "^0.7.33"
 
+expo-document-picker@~58.0.4:
+  version "58.0.4"
+  resolved "https://registry.yarnpkg.com/expo-document-picker/-/expo-document-picker-58.0.4.tgz#a2a15719bae4298c1cef4aeae38db501cb6e429e"
+  integrity sha512-rxs+9RrpI55/BEGNB/3sXjoBG6yZDLyn6Z7KzjbbBLdX8bE2cZT4IozQ3Q5wufaEEeaHQn48EgPiuMoTsAidpg==
+
 expo-eas-client@~58.0.2:
   version "58.0.2"
   resolved "https://registry.yarnpkg.com/expo-eas-client/-/expo-eas-client-58.0.2.tgz#765312be671aba4d9f8e0982a7acb5ae18ad3242"
@@ -4122,6 +4127,13 @@ expo-image-loader@~58.0.3:
   version "58.0.3"
   resolved "https://registry.yarnpkg.com/expo-image-loader/-/expo-image-loader-58.0.3.tgz#a67add1a5a6545429ebefb3a5dc76c185964ad1a"
   integrity sha512-zlHudxC8OObyqCHmvdxJqURI7886KJ0cUJyn7R/a8FOD9fP837xKDN+u4SIt7XsSSVPNXzMd4Y7mN0pmup8NGA==
+
+expo-image-manipulator@~58.0.16:
+  version "58.0.16"
+  resolved "https://registry.yarnpkg.com/expo-image-manipulator/-/expo-image-manipulator-58.0.16.tgz#26470fef16774729a1d21a3761eafc00e274cf3f"
+  integrity sha512-KY4Y4GjyaPuvRrZWQ2qDDPC0+q4xOpz9rydrK8/jexU+zwCMHsQGalOPjFwZrC0QhvGxfvvG9H/Qwv6Yh9vlOg==
+  dependencies:
+    expo-image-loader "~58.0.3"
 
 expo-image-picker@~58.0.10:
   version "58.0.10"

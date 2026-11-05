@@ -46,9 +46,17 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "HiSweetie POS dùng camera để quét mã vạch sản phẩm khi bán hàng.",
+          "cameraPermission": "HiSweetie POS dùng camera để quét mã vạch sản phẩm, quét mã QR chứng từ và chụp ảnh báo đơn.",
           "microphonePermission": false,
           "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "HiSweetie POS dùng ảnh trong máy để đính kèm vào báo đơn và hàng hóa.",
+          "cameraPermission": "HiSweetie POS dùng camera để quét mã vạch sản phẩm, quét mã QR chứng từ và chụp ảnh báo đơn.",
+          "microphonePermission": false
         }
       ],
       "./modules/lark-sso/app.plugin.js"

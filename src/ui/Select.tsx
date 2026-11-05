@@ -275,12 +275,15 @@ export function MultiSelect<T>({
   value,
   onChange,
   placeholder = 'Tất cả',
+  clearLabel,
   disabled,
   variant = 'row',
 }: FieldProps & {
   options: SelectOption<T>[];
   value: readonly T[];
   onChange: (v: T[]) => void;
+  /** Dòng đầu để bỏ chọn hết; mặc định là `placeholder`, null = không có dòng này. */
+  clearLabel?: string | null;
 }) {
   const [draft, setDraft] = useState<T[] | null>(null);
   const labels = options.filter((o) => value.includes(o.value)).map((o) => o.label);
@@ -301,7 +304,7 @@ export function MultiSelect<T>({
             options={options}
             selected={draft}
             multiple
-            clearLabel={placeholder}
+            clearLabel={clearLabel === null ? undefined : (clearLabel ?? placeholder)}
             onPick={(v) => {
               if (v === null) setDraft([]);
               else setDraft(draft.includes(v) ? draft.filter((x) => x !== v) : [...draft, v]);

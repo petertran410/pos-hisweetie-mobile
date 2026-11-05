@@ -63,7 +63,9 @@ export function TabBar({
     ...visible.map((t) => ({ name: t.key, label: t.label, icon: t.icon })),
     { name: 'them', label: 'Thêm', icon: 'layout-grid' },
   ];
-  const activeName = state.routes[state.index]?.name;
+  // Tab dồn vào "Thêm" (vd Báo đơn) đang mở thì sáng ô "Thêm".
+  const routeName = state.routes[state.index]?.name;
+  const activeName = items.some((i) => i.name === routeName) ? routeName : 'them';
   const activeIndex = Math.max(0, items.findIndex((i) => i.name === activeName));
 
   const [rowWidth, setRowWidth] = useState(0);

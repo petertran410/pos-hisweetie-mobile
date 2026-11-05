@@ -32,6 +32,10 @@ export function refreshAfterDocChange(qc: QueryClient, extra: QueryKey[] = []) {
     ['product-condition'],
     ['product-condition-logs'],
     ['sales', 'products'],
+    // Báo đơn hiện mã / trạng thái hóa đơn.
+    ['packings'],
+    ['packing'],
+    ['delivery-overview'],
     ...extra,
   ];
   return Promise.all(keys.map((queryKey) => qc.invalidateQueries({ queryKey })));

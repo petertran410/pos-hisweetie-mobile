@@ -10,6 +10,7 @@ import { toInvoiceEdit, toOrderEdit, type RawOrderForEdit } from '../orders/edit
 import { toInvoiceDraft, type InvoiceDraft } from '../orders/fromOrder';
 import { toStockMove, type RawProduct, type StockMove } from '../products/model';
 import { toDebtEntry, type DebtEntry, type RawCustomer, type UnpaidInvoice } from '../customers/model';
+import { toPackDetail, toPackRow, type PackRow, type RawPacking } from '../packing/model';
 
 export const sampleUser = {
   name: 'Nguyễn Thị Lan',
@@ -495,3 +496,81 @@ export const sampleUnpaid: UnpaidInvoice[] = [
   { id: 6, code: 'HD000198', date: ago(4, 10, 20), debt: 650_000, total: 800_000, customerName: 'Chuỗi mẫu Trà Mây' },
   { id: 8, code: 'HD000210', date: ago(1, 15, 10), debt: 1_100_000, total: 1_100_000, customerName: 'Trà Mây chi nhánh 1' },
 ];
+
+// ---------- Báo đơn ----------
+
+const packInv = (id: number, code: string, customer: string, total: number) => ({
+  invoice: { id, code, grandTotal: total, purchaseDate: ago(0, 8), branchId: 1, customer: { id, name: customer } },
+});
+
+export const sampleRawPackings: RawPacking[] = [
+  {
+    id: 31,
+    type: 'giao-hang',
+    code: 'BD000231',
+    numberOfPackages: 4,
+    paymentMethod: 'cash',
+    cashAmount: '1250000',
+    createdAt: ago(0, 10, 15),
+    creator: { name: 'Trần Văn Nam' },
+    branch: { id: 1, name: 'Chi nhánh mẫu A' },
+    imageCount: 3,
+    hasColdItems: true,
+    coldItemCount: 2,
+    invoices: [packInv(1, 'HD000301', 'Quán mẫu Trà Mây', 850000), packInv(2, 'HD000302', 'Tiệm mẫu Gió Chiều', 400000)],
+  },
+  {
+    id: 12,
+    type: 'loading',
+    code: 'DLD000112',
+    numberOfPackages: 6,
+    createdAt: ago(0, 9, 40),
+    creator: { name: 'Nguyễn Thị Lan' },
+    imageCount: 2,
+    invoices: [packInv(3, 'HD000298', 'Quán mẫu Lối Nhỏ', 1200000)],
+  },
+  {
+    id: 44,
+    type: 'dong-hang',
+    code: 'DDH000144',
+    numberOfPackages: 2,
+    createdAt: ago(1, 16, 5),
+    creator: { name: 'Lê Minh' },
+    imageCount: 0,
+    cancelledAt: ago(0, 8),
+    invoices: [packInv(4, 'HD000290', 'Quán mẫu Trà Mây', 560000)],
+  },
+  {
+    id: 30,
+    type: 'giao-hang',
+    code: 'BD000230',
+    numberOfPackages: 1,
+    paymentMethod: 'transfer',
+    createdAt: ago(1, 14, 20),
+    creator: { name: 'Trần Văn Nam' },
+    imageCount: 1,
+    invoices: [packInv(5, 'HD000285', 'Tiệm mẫu Gió Chiều', 320000)],
+  },
+];
+
+export const samplePackRows: PackRow[] = sampleRawPackings.map(toPackRow).filter((r): r is PackRow => !!r);
+
+export const samplePackDetail = toPackDetail('giao-hang', {
+  ...sampleRawPackings[0],
+  note: 'Giao trước 11h, gọi trước khi tới',
+  hasFeeGrab: true,
+  feeGrab: '45000',
+  hasCuocGuiHang: true,
+  cuocGuiHang: '30000',
+  expensePayer: { id: 3, name: 'Trần Văn Nam' },
+  coldItems: [
+    { invoiceCode: 'HD000301', productCode: 'KEM01', productName: 'Kem tươi mẫu 1kg' },
+    { invoiceCode: 'HD000302', productCode: 'TC02', productName: 'Trân châu lạnh mẫu' },
+  ],
+  images: [
+    { id: 1, imageUrl: 'https://example.com/uploads/bao-don/mau-1.jpg' },
+    { id: 2, imageUrl: 'https://example.com/uploads/bao-don/mau-2.jpg' },
+    { id: 3, imageUrl: 'https://example.com/uploads/bao-don/mau-3.jpg' },
+  ],
+  expenseFiles: [{ id: 1, fileUrl: 'https://example.com/uploads/bao-don/chi-phi/bien-nhan-grab.pdf', fileName: 'bien-nhan-grab.pdf', fileType: 'application/pdf', fileSize: 182000 }],
+});

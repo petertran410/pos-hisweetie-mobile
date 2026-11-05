@@ -30,9 +30,37 @@ export const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 /** Backend nhận diện app qua chuỗi này (danh sách "Thiết bị đăng nhập"). */
 export const USER_AGENT = `HiSweetiePOS/${APP_VERSION} (iPhone; iOS ${String(Platform.Version)})`;
 
-/** Ảnh có thể là URL tuyệt đối hoặc đường dẫn `/uploads/...`. */
-export function resolveFileUrl(path?: string | null): string | undefined {
-  if (!path) return undefined;
-  if (/^https?:\/\//i.test(path)) return path;
-  return `${API_ORIGIN}${path.startsWith("/") ? "" : "/"}${path}`;
+/** Máy trong mạng nội bộ (backend chạy local): localhost, *.local, IP LAN. */
+export function isPrivateHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return (
+    h === "localhost" ||
+    h === "0.0.0.0" ||
+    h.endsWith(".local") ||
+    /^127\./.test(h) ||
+    /^10\./.test(h) ||
+    /^192\.168\./.test(h) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h)
+  );
 }
+
+/**
+ * Ảnh có thể là URL tuyệt đối hoặc đường dẫn `/uploads/...`. Backend chạy local
+ * ghi địa chỉ ảnh theo `API_URL` của nó (vd `localhost` hay IP cũ của máy) mà
+ * iPhone không gọi tới được: ảnh `/uploads/` ở máy nội bộ thì lấy qua đúng máy
+ * chủ app đang gọi. Máy chủ thật (HTTPS, tên miền) giữ nguyên.
+ */
+export function resolveFileUrl(path?: string | null, origin: string = API_ORIGIN): string | undefined {
+  if (!path) return undefined;
+  const m = /^(https?):\/\/([^/:?#]+)(:\d+)?([/?#].*)?$/i.exec(path);
+  if (m) {
+    const rest = m[4] ?? "";
+    if (rest.startsWith("/uploads/") && isPrivateHost(m[2]) && !path.startsWith(`${origin}/`)) return `${origin}${rest}`;
+    return path;
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return path; // file://, ph://, data: … (ảnh trên máy)
+  return `${origin}${path.startsWith("/") ? "" : "/"}${path}`;
+}
+
+/** Nguồn ảnh để hiển thị (ảnh trên máy giữ nguyên). */
+export const mediaUri = (uri: string): string => resolveFileUrl(uri) ?? uri;

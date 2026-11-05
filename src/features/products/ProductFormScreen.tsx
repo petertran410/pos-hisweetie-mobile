@@ -31,6 +31,7 @@ import {
 } from './form';
 import { FormCard, Note, NumRow, PickRow, SwitchRow, TextRow, UnitToggle } from './formParts';
 import { CARGO_TYPES, productPerms, typeLabel, type ProductPerms } from './model';
+import { mediaUri } from '@/core/config';
 
 export type PickTarget = 'parent' | 'middle' | 'child' | 'trademark' | 'unit';
 
@@ -44,7 +45,7 @@ function Images({ form, onAdd, onRemove }: { form: ProductForm; onAdd: () => voi
       {form.images.map((img, i) => (
         <View key={img.key} style={styles.imageTile}>
           {isShowable(img.uri) ? (
-            <Image source={{ uri: img.uri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} />
+            <Image source={{ uri: mediaUri(img.uri) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={120} />
           ) : (
             <Icon name="package" size={26} color={C.faint} />
           )}

@@ -1,6 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { canDo } from '@/core/can';
 import { money, timeVN } from '@/core/format';
@@ -34,6 +34,7 @@ import {
   KIND_LABEL,
   KIND_ORDER,
   KIND_SLUG,
+  kindFromSlug,
   ORDER_FILTERS,
   ORDER_STATUS,
   PERIOD_FILTERS,
@@ -236,7 +237,19 @@ export function OrdersView(p: OrdersViewProps) {
 export default function OrdersScreen() {
   const user = useSession((s) => s.user);
   const kinds = KIND_ORDER.filter((k) => canDo(user, k === 'invoice' ? 'invoices:view' : 'orders:view'));
-  const [kind, setKind] = useState<DocKind>(kinds[0] ?? 'order');
+  // Lối tắt "Hóa đơn" / "Đặt hàng" ở Tổng quan mở thẳng đúng loại (?kind=hoa-don).
+  const params = useLocalSearchParams<{ kind?: string }>();
+  const wanted = params.kind ? kindFromSlug(params.kind) : null;
+  const [kind, setKind] = useState<DocKind>(wanted ?? kinds[0] ?? 'order');
+  const [seenKind, setSeenKind] = useState(params.kind);
+  if (params.kind !== seenKind) {
+    setSeenKind(params.kind);
+    if (wanted) setKind(wanted);
+  }
+  // Đã đổi loại theo lối tắt: bỏ tham số để lần bấm sau vẫn có tác dụng.
+  useEffect(() => {
+    if (params.kind) router.setParams({ kind: undefined });
+  }, [params.kind]);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<Record<DocKind, StatusFilter>>({ order: 'all', invoice: 'all' });
   const [period, setPeriod] = useState<PeriodChoice>('last7');
