@@ -769,9 +769,10 @@ export default function PreviewScreen() {
         onType={(type) => setPackFilters((f) => ({ ...f, type }))}
         onPeriod={(period) => setPackFilters((f) => ({ ...f, period }))}
         onOpenFilters={toView('loc-bao-don')}
+        onClearCashWarning={() => setPackFilters((f) => ({ ...f, cashWarning: false }))}
         onCreate={(t) => router.setParams({ man: t === 'loading' ? 'tao-loading' : 'tao-giao-hang' })}
         overview={{ stats: { total: 42, delivered: 30, pending: 12 }, onPress: noop }}
-        rows={samplePackRows.filter((r) => packFilters.type === 'all' || r.type === packFilters.type)}
+        rows={samplePackRows.filter((r) => (packFilters.type === 'all' || r.type === packFilters.type) && (!packFilters.cashWarning || !!r.cashWarning))}
         total={samplePackRows.length}
         onOpen={toView('ct-bao-don')}
       />

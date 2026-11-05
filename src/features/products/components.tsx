@@ -5,14 +5,14 @@ import { Thumb } from '../sales/components';
 import { typeLabel, type ProductRow } from './model';
 
 /** Dòng "nhãn … giá trị" trong thẻ thông tin. */
-export function KV({ label, value, tone }: { label: string; value: string; tone?: 'danger' | 'success' | 'muted' }) {
+export function KV({ label, value, tone, strong }: { label: string; value: string; tone?: 'danger' | 'success' | 'muted'; strong?: boolean }) {
   const color = tone === 'danger' ? toneColors.danger.fg : tone === 'success' ? toneColors.success.fg : tone === 'muted' ? C.muted : C.text;
   return (
     <View style={styles.kv}>
       <Txt variant="label" color={C.muted} style={{ flexShrink: 0, maxWidth: '45%' }}>
         {label}
       </Txt>
-      <Txt variant="body" weight="medium" color={color} align="right" numeric style={{ flex: 1 }}>
+      <Txt variant="body" weight={strong ? 'bold' : 'medium'} color={color} align="right" numeric style={{ flex: 1 }}>
         {value}
       </Txt>
     </View>

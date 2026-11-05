@@ -26,6 +26,7 @@ import {
   Skeleton,
   TabPanel,
   TitleHeader,
+  toneColors,
   Txt,
 } from '@/ui';
 import { PERIOD_FILTERS } from '../orders/model';
@@ -132,6 +133,8 @@ export interface PackingListViewProps {
   onType: (t: PackFilters['type']) => void;
   onPeriod: (p: PackFilters['period']) => void;
   onOpenFilters: () => void;
+  /** Tắt nhanh bộ lọc "Chỉ phiếu lệch tiền mặt". */
+  onClearCashWarning?: () => void;
   onCreate: (t: PackType) => void;
   overview?: { stats?: { total: number; delivered: number; pending: number }; loading?: boolean; onPress: () => void };
   rows: PackRow[];
@@ -171,6 +174,21 @@ export function PackingListView(p: PackingListViewProps) {
         <Txt variant="label" color={C.muted} style={{ flex: 1 }} numeric>
           {p.total !== undefined ? `${money(p.total)} phiếu` : ' '}
         </Txt>
+        {p.filters.cashWarning ? (
+          <PressableScale
+            onPress={p.onClearCashWarning}
+            disabled={!p.onClearCashWarning}
+            accessibilityRole="button"
+            accessibilityLabel="Đang lọc phiếu lệch tiền mặt. Bấm để bỏ lọc"
+            scaleTo={0.95}
+            style={[styles.pill, styles.warnPill]}>
+            <Icon name="triangle-alert" size={14} color={toneColors.danger.fg} />
+            <Txt variant="label" weight="semibold" color={toneColors.danger.fg}>
+              Lệch tiền mặt
+            </Txt>
+            {p.onClearCashWarning ? <Icon name="x" size={14} color={toneColors.danger.fg} /> : null}
+          </PressableScale>
+        ) : null}
         <PressableScale
           onPress={() => setPeriodOpen(true)}
           accessibilityLabel={`Thời gian: ${period}. Bấm để đổi`}
@@ -304,6 +322,7 @@ export default function PackingListScreen() {
       filters={filters}
       onType={(type) => setPackFilters({ type })}
       onPeriod={(period) => setPackFilters({ period })}
+      onClearCashWarning={() => setPackFilters({ cashWarning: false })}
       onOpenFilters={() => router.push('/bao-don/loc' as never)}
       onCreate={(t) => openNewPacking(t, branchId)}
       overview={
@@ -374,5 +393,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#CFE3E6',
   },
+  warnPill: { backgroundColor: toneColors.danger.bg, borderColor: toneColors.danger.bg, paddingHorizontal: 10 },
   skeleton: { padding: 14, borderRadius: 16, backgroundColor: C.card },
 });

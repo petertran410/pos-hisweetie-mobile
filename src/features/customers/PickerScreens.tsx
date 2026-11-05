@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useDebounced } from '@/core/useDebounced';
-import { C, EmptyState, ErrorState, Icon, LoadingState, PressableScale, SearchField, SheetHeader, Txt } from '@/ui';
+import { C, EmptyState, ErrorState, Icon, LoadingState, PressableScale, SearchField, SheetHeader, toneColors, Txt } from '@/ui';
 import { useCustomerGroups, useParentSearch, useStaff } from './api';
 import { patchAddressDraft, patchCustomerDraft, useAddressDraft, useCustomerDraft } from './draft';
 import type { Named } from './form';
@@ -13,6 +13,8 @@ interface Item {
   key: string;
   title: string;
   sub?: string | null;
+  /** Dòng cần chú ý (chữ đậm, màu cam), vd "Thu tiền mặt 850.000". */
+  note?: string | null;
 }
 
 /** Danh sách chọn có ô tìm (dùng chung cho các sheet chọn). */
@@ -71,7 +73,7 @@ export function PickList({
                 haptic="selection"
                 accessibilityRole={action ? 'checkbox' : 'button'}
                 accessibilityState={action ? { checked: on } : { selected: on }}
-                accessibilityLabel={[item.title, item.sub].filter(Boolean).join(', ')}
+                accessibilityLabel={[item.title, item.sub, item.note].filter(Boolean).join(', ')}
                 scaleTo={0.985}
                 style={[styles.row, on ? styles.rowOn : null]}>
                 <View style={{ flex: 1, gap: 2 }}>
@@ -81,6 +83,11 @@ export function PickList({
                   {item.sub ? (
                     <Txt variant="caption" color={C.muted} numberOfLines={1}>
                       {item.sub}
+                    </Txt>
+                  ) : null}
+                  {item.note ? (
+                    <Txt variant="caption" weight="bold" color={toneColors.warning.fg} numeric numberOfLines={1}>
+                      {item.note}
                     </Txt>
                   ) : null}
                 </View>

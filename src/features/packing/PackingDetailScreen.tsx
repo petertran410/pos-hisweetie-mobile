@@ -29,7 +29,7 @@ import { KIND_SLUG } from '../orders/model';
 import { KV } from '../products/components';
 import { Note } from '../products/formParts';
 import { cancelPacking, packingCancelCheck, refreshAfterPacking, resendLark, resendZalo, usePackingDetail } from './api';
-import { AttachmentTile, DocRow, FileLine, TypeBadge } from './components';
+import { AttachmentTile, CashWarningNote, DocRow, FileLine, TypeBadge } from './components';
 import { startPackDraft } from './draft';
 import { FEES, feeTotal, isImageFile, isPackType, PACK_TYPES, packPerms, toPackForm, type PackDetail, type PackPerms } from './model';
 import { mediaUri } from '@/core/config';
@@ -104,6 +104,7 @@ export function PackingDetailView(p: PackingDetailViewProps) {
       {cancelled ? (
         <Note tone="warning" text={`Phiếu đã hủy${d.cancelledByName ? ` bởi ${d.cancelledByName}` : ''} lúc ${dateTimeVN(d.cancelledAt)}.`} />
       ) : null}
+      {d.cashWarning ? <CashWarningNote warning={d.cashWarning} /> : null}
       {d.coldCount ? (
         <View style={styles.cold}>
           <View style={styles.coldHead}>
@@ -133,7 +134,7 @@ export function PackingDetailView(p: PackingDetailViewProps) {
         <Section index={1} title="Thanh toán và chi phí">
           <Card style={styles.block}>
             <KV label="Hình thức" value={d.payMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'} />
-            {d.payMethod === 'cash' ? <KV label="Tiền mặt cần thu" value={`${money(d.cashAmount)} ₫`} tone="danger" /> : null}
+            {d.payMethod === 'cash' ? <KV label="Tiền mặt cần thu" value={`${money(d.cashAmount)} ₫`} tone="danger" strong /> : null}
             {fees.length ? <Divider /> : null}
             {fees.map((f) => (
               <KV key={f.key} label={f.label} value={money(d.fees[f.key].amount)} />

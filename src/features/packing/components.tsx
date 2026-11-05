@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { dateVN, money, shortWhen } from '@/core/format';
 import { accents, accentSoft, C, Icon, PressableScale, radius, toneColors, Txt } from '@/ui';
-import { PACK_TYPES, type Attachment, type DocItem, type PackRow, type PackType } from './model';
+import { PACK_TYPES, type Attachment, type CashWarning, type DocItem, type PackRow, type PackType } from './model';
 import { mediaUri } from '@/core/config';
 
 /** Ảnh trên máy (đang chờ tải) hoặc ảnh HTTPS đã tải lên (không tải ảnh qua http thường). */
@@ -21,12 +21,37 @@ export function TypeBadge({ type, small }: { type: PackType; small?: boolean }) 
   );
 }
 
-function Meta({ icon, label, tone }: { icon: Parameters<typeof Icon>[0]['name']; label: string; tone?: string }) {
+function Meta({ icon, label, tone, strong }: { icon: Parameters<typeof Icon>[0]['name']; label: string; tone?: string; strong?: boolean }) {
   return (
     <View style={styles.meta}>
-      <Icon name={icon} size={13} color={tone ?? C.muted} />
-      <Txt variant="caption" color={tone ?? C.muted} numeric numberOfLines={1}>
+      <Icon name={icon} size={13} color={tone ?? C.muted} strokeWidth={strong ? 2.4 : undefined} />
+      <Txt variant="caption" weight={strong ? 'bold' : undefined} color={tone ?? C.muted} numeric numberOfLines={1}>
         {label}
+      </Txt>
+    </View>
+  );
+}
+
+/** Câu cảnh báo lệch tiền mặt giữa phiếu giao hàng và hóa đơn. */
+export function cashWarningText(w: CashWarning): string {
+  const codes = w.codes.length ? ` (${w.codes.join(', ')})` : '';
+  return w.kind === 'transfer'
+    ? `Hóa đơn ghi thu tiền mặt ${money(w.invoiceCash)} ₫${codes} nhưng phiếu chọn chuyển khoản.`
+    : `Tiền mặt cần thu ${money(w.slipCash)} ₫ khác hóa đơn ${money(w.invoiceCash)} ₫${codes}.`;
+}
+
+/** Khung đỏ cảnh báo lệch tiền mặt (chi tiết phiếu, form nhập phiếu). */
+export function CashWarningNote({ warning, title = 'Lệch tiền mặt với hóa đơn' }: { warning: CashWarning; title?: string }) {
+  return (
+    <View style={styles.cashWarn} accessibilityRole="alert">
+      <View style={styles.cashWarnHead}>
+        <Icon name="triangle-alert" size={16} color={toneColors.danger.fg} />
+        <Txt variant="label" weight="semibold" color={toneColors.danger.fg} style={{ flex: 1 }}>
+          {title}
+        </Txt>
+      </View>
+      <Txt variant="caption" color={toneColors.danger.fg} numeric>
+        {cashWarningText(warning)}
       </Txt>
     </View>
   );
@@ -35,9 +60,17 @@ function Meta({ icon, label, tone }: { icon: Parameters<typeof Icon>[0]['name'];
 /** Thẻ 1 phiếu trong danh sách. */
 export function PackCard({ row, onPress, now }: { row: PackRow; onPress: () => void; now?: Date }) {
   const codes = row.docCodes.length > 2 ? `${row.docCodes.slice(0, 2).join(', ')} +${row.docCodes.length - 2}` : row.docCodes.join(', ');
-  const a11y = [row.code, PACK_TYPES[row.type].label, row.cancelled ? 'đã hủy' : null, row.who, `${row.packages} kiện`].filter(Boolean).join(', ');
+  const warn = row.cancelled ? null : row.cashWarning;
+  const a11y = [row.code, PACK_TYPES[row.type].label, row.cancelled ? 'đã hủy' : null, warn ? 'lệch tiền mặt' : null, row.who, `${row.packages} kiện`]
+    .filter(Boolean)
+    .join(', ');
   return (
-    <PressableScale onPress={onPress} accessibilityRole="button" accessibilityLabel={a11y} scaleTo={0.985} style={[styles.card, row.cancelled ? { opacity: 0.6 } : null]}>
+    <PressableScale
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={a11y}
+      scaleTo={0.985}
+      style={[styles.card, warn ? styles.cardWarn : null, row.cancelled ? { opacity: 0.6 } : null]}>
       <View style={styles.cardHead}>
         <Txt variant="body" weight="bold" numeric style={{ flexShrink: 1 }} numberOfLines={1}>
           {row.code}
@@ -64,9 +97,19 @@ export function PackCard({ row, onPress, now }: { row: PackRow; onPress: () => v
         <Meta icon="package" label={`${row.packages} kiện`} />
         {row.imageCount ? <Meta icon="images" label={`${row.imageCount} ảnh`} /> : null}
         {row.coldCount ? <Meta icon="snowflake" label={`Hàng lạnh · ${row.coldCount}`} tone={accents.blue} /> : null}
-        {row.cash !== null ? <Meta icon="banknote" label={`Thu ${money(row.cash)}`} tone={toneColors.warning.fg} /> : null}
+        {row.cash !== null ? <Meta icon="banknote" label={`Thu ${money(row.cash)}`} tone={toneColors.warning.fg} strong /> : null}
         {row.transfer ? <Meta icon="landmark" label="Chuyển khoản" /> : null}
       </View>
+      {warn ? (
+        <View style={styles.cardWarnLine}>
+          <Icon name="triangle-alert" size={13} color={toneColors.danger.fg} strokeWidth={2.4} />
+          <Txt variant="caption" weight="semibold" color={toneColors.danger.fg} numeric style={{ flex: 1 }} numberOfLines={2}>
+            {warn.kind === 'transfer'
+              ? `HĐ thu tiền mặt ${money(warn.invoiceCash)} ₫, phiếu chọn chuyển khoản`
+              : `Lệch tiền mặt: phiếu ${money(warn.slipCash)} ₫, hóa đơn ${money(warn.invoiceCash)} ₫`}
+          </Txt>
+        </View>
+      ) : null}
       <Txt variant="caption" color={C.faint} numeric numberOfLines={1}>
         {[shortWhen(row.createdAt, now), row.creatorName].filter(Boolean).join(' · ')}
       </Txt>
@@ -89,7 +132,7 @@ export function DocRow({ doc, onPress, onRemove, packLabel }: { doc: DocItem; on
         {doc.coldCount || doc.packingCount || doc.payNote?.cash ? (
           <View style={styles.metaRow}>
             {doc.payNote?.cash ? (
-              <Meta icon="banknote" label={doc.payNote.amount ? `Thu tiền mặt ${money(doc.payNote.amount)}` : 'Thu tiền mặt'} tone={toneColors.warning.fg} />
+              <Meta icon="banknote" label={doc.payNote.amount ? `Thu tiền mặt ${money(doc.payNote.amount)}` : 'Thu tiền mặt'} tone={toneColors.warning.fg} strong />
             ) : null}
             {doc.coldCount ? <Meta icon="snowflake" label={`Hàng lạnh · ${doc.coldCount}`} tone={accents.blue} /> : null}
             {doc.packingCount ? <Meta icon="clipboard-list" label={`${packLabel ?? 'Đã báo'} ${doc.packingCount} lần`} tone={toneColors.warning.fg} /> : null}
@@ -214,6 +257,19 @@ const styles = StyleSheet.create({
   badgeSmall: { paddingHorizontal: 7, paddingVertical: 2 },
   card: { padding: 14, gap: 4, borderRadius: radius.card, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  cardWarn: { borderColor: toneColors.danger.fg, borderWidth: 1.5 },
+  cardWarnLine: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: toneColors.danger.bg,
+  },
+  cashWarn: { gap: 4, padding: 12, borderRadius: 12, backgroundColor: toneColors.danger.bg },
+  cashWarnHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 2, marginTop: 2 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   docRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
