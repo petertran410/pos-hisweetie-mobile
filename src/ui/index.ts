@@ -32,7 +32,9 @@ export {
   TabPanel,
   useCountUp,
   useScreenActive,
+  useScreenMode,
   useSwapDirection,
+  type ScreenMode,
 } from './motion';
 export { ToastHost, toast } from './Toast';
 export {

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
-import { C, FadeSwap, resetAfterLeave, Txt, useScreenActive } from '@/ui';
+import { C, FadeSwap, resetAfterLeave, Txt, useScreenMode } from '@/ui';
 import { easeOut } from '@/ui/motion';
 import type { TrendPoint } from './api';
 import {
@@ -51,23 +51,10 @@ function LegendItem({ color, label }: { color: string; label: string }) {
 export function TrendChart({ points, showProfit, height = 168 }: { points: TrendPoint[]; showProfit: boolean; height?: number }) {
   const [width, setWidth] = useState(0);
   const [sel, setSel] = useState<{ key: string; index: number } | null>(null);
-  const active = useScreenActive();
-  const reduced = useReducedMotion();
-  const reveal = useSharedValue(0);
-
   const plotW = Math.max(0, width - AXIS_W);
   const dataKey = points.map((p) => `${p.label}:${p.revenue}:${p.profit}`).join('|') + (showProfit ? '+' : '');
   const selected = sel && sel.key === dataKey ? sel.index : null;
-
-  useEffect(() => {
-    if (plotW <= 0) return;
-    if (reduced) reveal.set(plotW);
-    else if (active) {
-      reveal.set(0);
-      reveal.set(withTiming(plotW, { duration: 700, easing: easeOut }));
-    } else reveal.set(resetAfterLeave());
-  }, [active, dataKey, plotW, reduced, reveal]);
-  const clip = useAnimatedStyle(() => ({ width: reveal.get() }));
+  const clip = useReveal(plotW, dataKey);
 
   const onLayout = (e: LayoutChangeEvent) => setWidth(Math.round(e.nativeEvent.layout.width));
 
@@ -212,19 +199,26 @@ export function TrendChart({ points, showProfit, height = 168 }: { points: Trend
   );
 }
 
-/** Vùng vẽ hiện dần từ trái sang (ease-out, không nảy); quay lại màn thì chạy lại. */
+/**
+ * Vùng vẽ hiện dần từ trái sang (ease-out, không nảy); quay lại màn bằng thanh
+ * tab hoặc đổi số liệu thì chạy lại. Hiện sẵn lúc vuốt về thì vẽ đủ ngay, và
+ * vuốt về xong không vẽ lại.
+ */
 function useReveal(plotW: number, dataKey: string) {
-  const active = useScreenActive();
+  const mode = useScreenMode();
   const reduced = useReducedMotion();
   const reveal = useSharedValue(0);
+  const lastMode = useRef(mode);
   useEffect(() => {
+    const from = lastMode.current;
+    lastMode.current = mode;
     if (plotW <= 0) return;
-    if (reduced) reveal.set(plotW);
-    else if (active) {
+    if (reduced || mode === 'peek' || (mode === 'active' && from === 'peek')) reveal.set(plotW);
+    else if (mode === 'active') {
       reveal.set(0);
       reveal.set(withTiming(plotW, { duration: 700, easing: easeOut }));
     } else reveal.set(resetAfterLeave());
-  }, [active, dataKey, plotW, reduced, reveal]);
+  }, [mode, dataKey, plotW, reduced, reveal]);
   return useAnimatedStyle(() => ({ width: reveal.get() }));
 }
 
@@ -459,14 +453,14 @@ export function Heatmap({ grid }: { grid: HeatGrid }) {
 
 /** Thanh ngang mọc dần (ease-out) tới `share` (0–1); quay lại màn thì mọc lại. */
 export function Meter({ share, color, index = 0, height = 6 }: { share: number; color: string; index?: number; height?: number }) {
-  const active = useScreenActive();
+  const mode = useScreenMode();
   const reduced = useReducedMotion();
   const p = useSharedValue(reduced ? share : 0);
   useEffect(() => {
-    if (reduced) p.set(share);
-    else if (active) p.set(withDelay(Math.min(index, 10) * 30, withTiming(share, { duration: 520, easing: easeOut })));
+    if (reduced || mode === 'peek') p.set(share);
+    else if (mode === 'active') p.set(withDelay(Math.min(index, 10) * 30, withTiming(share, { duration: 520, easing: easeOut })));
     else p.set(resetAfterLeave());
-  }, [active, share, index, p, reduced]);
+  }, [mode, share, index, p, reduced]);
   const fill = useAnimatedStyle(() => ({ width: `${Math.max(0, Math.min(1, p.get())) * 100}%` }));
   return (
     <View style={[styles.track, { height, borderRadius: height / 2 }]}>

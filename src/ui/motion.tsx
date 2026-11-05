@@ -109,17 +109,22 @@ export function gentleEntering(index = 0) {
 }
 
 /**
- * Màn đang được xem hay đã rời đi (vd chuyển sang tab khác). Mặc định là
- * đang xem; mỗi tab bọc nội dung bằng `MotionScope` để hiệu ứng chạy lại
- * mỗi lần quay về tab.
+ * Màn đang được xem (`active`), đã rời đi (`idle`, vd chuyển sang tab khác),
+ * hay đang hiện sẵn bên dưới lúc vuốt về (`peek`: hiện nguyên như lúc rời đi,
+ * không chạy hiệu ứng). Mặc định là đang xem; mỗi tab bọc nội dung bằng
+ * `MotionScope` để hiệu ứng chạy lại mỗi lần quay về tab bằng thanh tab.
  */
-const ScreenActive = createContext(true);
+export type ScreenMode = 'active' | 'peek' | 'idle';
 
-export function MotionScope({ active, children }: { active: boolean; children?: ReactNode }) {
-  return <ScreenActive value={active}>{children}</ScreenActive>;
+const ScreenModeContext = createContext<ScreenMode>('active');
+
+export function MotionScope({ active, peek = false, children }: { active: boolean; peek?: boolean; children?: ReactNode }) {
+  return <ScreenModeContext value={peek ? 'peek' : active ? 'active' : 'idle'}>{children}</ScreenModeContext>;
 }
 
-export const useScreenActive = () => useContext(ScreenActive);
+export const useScreenMode = () => useContext(ScreenModeContext);
+
+export const useScreenActive = () => useContext(ScreenModeContext) === 'active';
 
 /** Rời màn: đợi màn trượt ra hết rồi mới đưa về trạng thái ẩn (người dùng không thấy). */
 export const LEAVE_RESET_MS = 320;
@@ -138,14 +143,14 @@ export function Appear({
   children?: ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
-  const active = useScreenActive();
+  const mode = useScreenMode();
   const reduced = useReducedMotion();
   const p = useSharedValue(reduced ? 1 : 0);
   useEffect(() => {
-    if (reduced) p.set(1);
-    else if (active) p.set(withDelay(Math.min(index, 6) * 60, withTiming(1, { duration: 340, easing: easeOut })));
+    if (reduced || mode === 'peek') p.set(1);
+    else if (mode === 'active') p.set(withDelay(Math.min(index, 6) * 60, withTiming(1, { duration: 340, easing: easeOut })));
     else p.set(resetAfterLeave());
-  }, [active, index, p, reduced]);
+  }, [mode, index, p, reduced]);
   const animated = useAnimatedStyle(() => ({
     opacity: p.get(),
     transform: [{ translateY: (1 - p.get()) * 12 }],
@@ -256,15 +261,15 @@ export function TabPanel<T extends string>({
  */
 export function useCountUp(value: number | undefined, duration = 650): number | undefined {
   const reduced = useReducedMotion();
-  const active = useScreenActive();
+  const mode = useScreenMode();
   // Lần đầu có số liệu: chạy từ 0 lên. Sau đó: chạy từ số đang hiện sang số mới.
-  // Rời màn thì về 0 để lần quay lại số chạy lên lại.
+  // Rời màn thì về 0 để lần quay lại số chạy lên lại. Hiện sẵn lúc vuốt về: hiện ngay số cuối.
   const [shown, setShown] = useState(0);
   const currentRef = useRef(0);
 
   useEffect(() => {
     if (value === undefined || reduced) return;
-    if (!active) {
+    if (mode === 'idle') {
       const timer = setTimeout(() => {
         currentRef.current = 0;
         setShown(0);
@@ -273,9 +278,10 @@ export function useCountUp(value: number | undefined, duration = 650): number | 
     }
     const from = currentRef.current;
     const start = Date.now();
+    const span = mode === 'peek' ? 0 : duration;
     let frame = 0;
     const tick = () => {
-      const t = Math.min(1, (Date.now() - start) / duration);
+      const t = span > 0 ? Math.min(1, (Date.now() - start) / span) : 1;
       const eased = 1 - Math.pow(1 - t, 3);
       const next = t < 1 ? from + (value - from) * eased : value;
       currentRef.current = next;
@@ -284,7 +290,7 @@ export function useCountUp(value: number | undefined, duration = 650): number | 
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [value, duration, reduced, active]);
+  }, [value, duration, reduced, mode]);
 
   if (value === undefined) return undefined;
   return reduced ? value : shown;

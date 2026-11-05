@@ -1,0 +1,12 @@
+diff --git a/node_modules/expo-router/build/react-navigation/bottom-tabs/views/BottomTabView.js b/node_modules/expo-router/build/react-navigation/bottom-tabs/views/BottomTabView.js
+--- a/node_modules/expo-router/build/react-navigation/bottom-tabs/views/BottomTabView.js
++++ b/node_modules/expo-router/build/react-navigation/bottom-tabs/views/BottomTabView.js
+@@ -261,7 +261,7 @@
+                     const activityState = isFocused ? STATE_ON_TOP // the screen is on top after the transition
+                      : animationEnabled && isAnimatingRoute // if animation is not enabled, immediately move to inactive state
+                      ? STATE_TRANSITIONING_OR_BELOW_TOP // screen visible during transition
+-                     : STATE_INACTIVE;
++                     : detachInactiveScreens ? STATE_INACTIVE : STATE_TRANSITIONING_OR_BELOW_TOP; // keep inactive tabs displayed (hidden by sceneStyle) when detachInactiveScreens is false
+                     return /*#__PURE__*/ (0, _jsxruntime().jsx)(_ScreenFallback.MaybeScreen, {
+                         style: [
+                             _reactnative().StyleSheet.absoluteFill,

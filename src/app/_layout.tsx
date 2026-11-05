@@ -9,6 +9,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { queryClient } from '@/core/query';
 import { bootstrap, reloadProfileIfStale, useSession } from '@/core/session';
@@ -53,63 +54,66 @@ export default function RootLayout() {
   if (!ready || status === 'booting') return null;
 
   return (
-    <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider value={theme}>
-          <StatusBar style="dark" />
-          {status === 'offline' ? (
-            <Page scroll={false}>
-              <EmptyState
-                icon="wifi-off"
-                color="slate"
-                title="Không kết nối được máy chủ"
-                message="Kiểm tra mạng của iPhone rồi thử lại."
-                action={
-                  <Button
-                    title="Thử lại"
-                    variant="outline"
-                    size="medium"
-                    onPress={() => {
-                      useSession.setState({ status: 'booting' });
-                      void bootstrap();
+    // Cần cho cử chỉ vuốt tự làm (vd vuốt mép trái để về tab trước).
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider value={theme}>
+            <StatusBar style="dark" />
+            {status === 'offline' ? (
+              <Page scroll={false}>
+                <EmptyState
+                  icon="wifi-off"
+                  color="slate"
+                  title="Không kết nối được máy chủ"
+                  message="Kiểm tra mạng của iPhone rồi thử lại."
+                  action={
+                    <Button
+                      title="Thử lại"
+                      variant="outline"
+                      size="medium"
+                      onPress={() => {
+                        useSession.setState({ status: 'booting' });
+                        void bootstrap();
+                      }}
+                    />
+                  }
+                />
+              </Page>
+            ) : (
+              <Stack
+                // Đăng nhập ↔ vào app: chuyển mờ dần thay vì trượt.
+                screenOptions={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: C.bg } }}>
+                <Stack.Protected guard={status === 'signedIn'}>
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="(tabs)" />
+                  {/* Mục mở từ Tổng quan / tab Thêm: trượt vào như trang con. */}
+                  <Stack.Screen name="hang-hoa" options={{ animation: 'default' }} />
+                  <Stack.Screen
+                    name="chi-nhanh"
+                    options={{
+                      presentation: 'formSheet',
+                      sheetAllowedDetents: [0.55, 1],
+                      sheetGrabberVisible: true,
+                      sheetCornerRadius: 24,
+                      contentStyle: { backgroundColor: C.bg },
                     }}
                   />
-                }
-              />
-            </Page>
-          ) : (
-            <Stack
-              // Đăng nhập ↔ vào app: chuyển mờ dần thay vì trượt.
-              screenOptions={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: C.bg } }}>
-              <Stack.Protected guard={status === 'signedIn'}>
-                <Stack.Screen name="index" />
-                <Stack.Screen name="(tabs)" />
-                {/* Mục mở từ Tổng quan / tab Thêm: trượt vào như trang con. */}
-                <Stack.Screen name="hang-hoa" options={{ animation: 'default' }} />
-                <Stack.Screen
-                  name="chi-nhanh"
-                  options={{
-                    presentation: 'formSheet',
-                    sheetAllowedDetents: [0.55, 1],
-                    sheetGrabberVisible: true,
-                    sheetCornerRadius: 24,
-                    contentStyle: { backgroundColor: C.bg },
-                  }}
-                />
-              </Stack.Protected>
-              <Stack.Protected guard={status === 'signedOut'}>
-                <Stack.Screen name="dang-nhap" />
-                <Stack.Screen name="tao-mat-khau" options={{ animation: 'default' }} />
-              </Stack.Protected>
-              <Stack.Screen name="auth/lark" />
-              <Stack.Screen name="xem-truoc" />
-            </Stack>
-          )}
-          <ToastHost />
-          <PrivacyCover />
-          <UpdateWatcher />
-        </ThemeProvider>
-      </QueryClientProvider>
-    </SafeAreaProvider>
+                </Stack.Protected>
+                <Stack.Protected guard={status === 'signedOut'}>
+                  <Stack.Screen name="dang-nhap" />
+                  <Stack.Screen name="tao-mat-khau" options={{ animation: 'default' }} />
+                </Stack.Protected>
+                <Stack.Screen name="auth/lark" />
+                <Stack.Screen name="xem-truoc" />
+              </Stack>
+            )}
+            <ToastHost />
+            <PrivacyCover />
+            <UpdateWatcher />
+          </ThemeProvider>
+        </QueryClientProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
