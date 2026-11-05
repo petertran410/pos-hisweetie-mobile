@@ -2,7 +2,7 @@ import { canDo, type PermissionHolder } from '@/core/can';
 import { useSession } from '@/core/session';
 import type { IconName } from '@/ui/icons';
 
-export type TabKey = 'tong-quan' | 'ban-hang' | 'don-hang' | 'khach-hang' | 'bao-don';
+export type TabKey = 'tong-quan' | 'ban-hang' | 'don-hang' | 'khach-hang' | 'bao-don' | 'phieu-kho';
 
 export interface TabDef {
   key: TabKey;
@@ -48,6 +48,13 @@ export const TAB_DEFS: TabDef[] = [
       'packing_hangs:create',
       'packing_loadings:create',
     ],
+  },
+  {
+    // Quyền tài chính theo chi nhánh: trang Phiếu kho tự kiểm tra lại từng kho.
+    key: 'phieu-kho',
+    label: 'Phiếu kho',
+    icon: 'warehouse',
+    permissions: ['warehouse_cash:create', 'warehouse_expense:create', 'vehicles:create'],
   },
 ];
 

@@ -1,10 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
-import * as DocumentPicker from 'expo-document-picker';
-import * as ImagePicker from 'expo-image-picker';
 import { router, usePreventRemove } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { money } from '@/core/format';
 import { errorMessage } from '@/core/http';
@@ -31,6 +29,7 @@ import { useStaff } from '../customers/api';
 import { FormCard, Note, NumRow, SwitchRow, TextRow } from '../products/formParts';
 import { createPacking, refreshAfterPacking, updatePacking } from './api';
 import { AttachmentTile, CashWarningNote, DocRow, FileLine } from './components';
+import { pickDocuments, pickPhotos, takePhoto } from './pick';
 import {
   clearPackDraft,
   enqueueAttachments,
@@ -41,7 +40,6 @@ import {
   startPackDraft,
   usePackDraft,
   waitForUploads,
-  type PickedFile,
 } from './draft';
 import {
   applyDocPay,
@@ -75,43 +73,6 @@ const PAY_METHODS = [
   { value: 'transfer' as const, label: 'Chuyển khoản' },
   { value: 'cash' as const, label: 'Tiền mặt' },
 ];
-
-/** Chụp ảnh bằng camera (hỏi quyền trước; đã từ chối thì chỉ đường mở Cài đặt). */
-async function takePhoto(): Promise<PickedFile[]> {
-  const perm = await ImagePicker.requestCameraPermissionsAsync();
-  if (!perm.granted) {
-    Alert.alert('Chưa có quyền camera', 'Bật quyền camera cho app trong Cài đặt để chụp ảnh báo đơn.', [
-      { text: 'Để sau', style: 'cancel' },
-      { text: 'Mở Cài đặt', onPress: () => void Linking.openSettings() },
-    ]);
-    return [];
-  }
-  const res = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.9, exif: false });
-  if (res.canceled) return [];
-  return res.assets.map((a) => ({ uri: a.uri, name: a.fileName ?? 'Ảnh chụp', type: a.mimeType ?? 'image/jpeg', size: a.fileSize ?? null, width: a.width, height: a.height }));
-}
-
-async function pickPhotos(limit: number): Promise<PickedFile[]> {
-  if (limit <= 0) return [];
-  const res = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ['images'],
-    allowsMultipleSelection: true,
-    selectionLimit: limit,
-    orderedSelection: true,
-    quality: 0.9,
-    exif: false,
-  });
-  if (res.canceled) return [];
-  return res.assets
-    .slice(0, limit)
-    .map((a) => ({ uri: a.uri, name: a.fileName ?? 'Ảnh', type: a.mimeType ?? 'image/jpeg', size: a.fileSize ?? null, width: a.width, height: a.height }));
-}
-
-async function pickDocuments(): Promise<PickedFile[]> {
-  const res = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true, type: '*/*' });
-  if (res.canceled) return [];
-  return res.assets.map((a) => ({ uri: a.uri, name: a.name, type: a.mimeType ?? null, size: a.size ?? null }));
-}
 
 /** Bấm ảnh / tệp tải lỗi: nói rõ lý do rồi cho thử lại hoặc bỏ. */
 function askRetry(list: 'images' | 'files', a: Attachment) {
@@ -501,7 +462,7 @@ export default function PackingFormScreen() {
         toast.info(`Mỗi phiếu tối đa ${MAX_PHOTOS} ảnh`);
         return;
       }
-      const picked = from === 'camera' ? await takePhoto() : await pickPhotos(left);
+      const picked = from === 'camera' ? await takePhoto('chụp ảnh báo đơn') : await pickPhotos(left);
       enqueueAttachments('images', picked.slice(0, left));
     } catch (e) {
       toast.error(errorMessage(e));
@@ -510,7 +471,7 @@ export default function PackingFormScreen() {
 
   const addExpense = async (from: 'camera' | 'file') => {
     try {
-      enqueueAttachments('files', from === 'camera' ? await takePhoto() : await pickDocuments());
+      enqueueAttachments('files', from === 'camera' ? await takePhoto('chụp ảnh báo đơn') : await pickDocuments());
     } catch (e) {
       toast.error(errorMessage(e));
     }

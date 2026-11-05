@@ -8,6 +8,7 @@ import Boxes from 'lucide-react-native/icons/boxes';
 import Building from 'lucide-react-native/icons/building';
 import CalendarRange from 'lucide-react-native/icons/calendar-range';
 import Camera from 'lucide-react-native/icons/camera';
+import CarFront from 'lucide-react-native/icons/car-front';
 import ChartColumn from 'lucide-react-native/icons/chart-column';
 import ChartPie from 'lucide-react-native/icons/chart-pie';
 import Check from 'lucide-react-native/icons/check';
@@ -32,6 +33,7 @@ import Ellipsis from 'lucide-react-native/icons/ellipsis';
 import Eye from 'lucide-react-native/icons/eye';
 import EyeOff from 'lucide-react-native/icons/eye-off';
 import Factory from 'lucide-react-native/icons/factory';
+import Fuel from 'lucide-react-native/icons/fuel';
 import FileText from 'lucide-react-native/icons/file-text';
 import Flashlight from 'lucide-react-native/icons/flashlight';
 import Gift from 'lucide-react-native/icons/gift';
@@ -99,6 +101,7 @@ const ICONS = {
   building: Building,
   'calendar-range': CalendarRange,
   camera: Camera,
+  'car-front': CarFront,
   'chart-column': ChartColumn,
   'chart-pie': ChartPie,
   check: Check,
@@ -123,6 +126,7 @@ const ICONS = {
   eye: Eye,
   'eye-off': EyeOff,
   factory: Factory,
+  fuel: Fuel,
   'file-text': FileText,
   flashlight: Flashlight,
   gift: Gift,

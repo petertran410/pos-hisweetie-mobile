@@ -105,6 +105,9 @@ import {
 } from '@/features/packing/model';
 import { PickList } from '@/features/customers/PickerScreens';
 import { ActionCard, Page, TitleHeader, toast } from '@/ui';
+import { KhoFormView } from '@/features/warehouse/KhoFormScreen';
+import { KhoHomeView } from '@/features/warehouse/KhoHomeScreen';
+import { newKhoForm, type KhoCreated, type KhoForm, type KhoType } from '@/features/warehouse/model';
 
 const SCREENS = [
   { key: 'dang-nhap', title: 'Đăng nhập' },
@@ -154,7 +157,40 @@ const SCREENS = [
   { key: 'ct-bao-don', title: 'Chi tiết phiếu giao hàng' },
   { key: 'tao-giao-hang', title: 'Tạo phiếu giao hàng' },
   { key: 'tao-loading', title: 'Tạo phiếu loading' },
+  { key: 'phieu-kho', title: 'Phiếu kho' },
+  { key: 'pk-tien-mat', title: 'Phiếu tiền mặt kho' },
+  { key: 'pk-chi-khac', title: 'Khoản chi khác' },
+  { key: 'pk-xang-dau', title: 'Phiếu xăng dầu' },
+  { key: 'pk-cham-soc-xe', title: 'Phiếu chăm sóc xe' },
 ] as const;
+
+const PREVIEW_NOW = Date.now();
+const KHO_RECENT_SAMPLE: KhoCreated[] = [
+  { id: 12, code: 'PCK000112', type: 'xang-dau', amount: 500_000, branchName: 'Kho mẫu Hà Nội', createdAt: new Date(PREVIEW_NOW - 20 * 60_000).toISOString() },
+  { id: 11, code: 'TMK000045', type: 'tien-mat', amount: 850_000, branchName: 'Kho mẫu Hà Nội', createdAt: new Date(PREVIEW_NOW - 95 * 60_000).toISOString() },
+];
+
+/** Phiếu kho mẫu cho từng loại (xem trước). */
+function sampleKhoForm(type: KhoType): KhoForm {
+  const base = newKhoForm(type, 6, { id: 3, name: 'Trần Văn Nam' });
+  const img = (key: string, kind: string, state: 'done' | 'uploading' = 'done') => ({
+    key,
+    kind,
+    uri: `https://example.com/uploads/bao-don/chi-phi/${key}.jpg`,
+    url: state === 'done' ? `/uploads/bao-don/chi-phi/${key}.jpg` : null,
+    state,
+    name: `${key}.jpg`,
+    type: 'image/jpeg',
+    size: 182_000,
+  });
+  if (type === 'tien-mat')
+    return { ...base, amount: 850_000, customers: [{ id: 1, name: 'Quán mẫu Trà Mây', code: 'KH000123' }], description: 'Thu tiền HD000301', files: [img('tm-1', 'EVIDENCE')] };
+  if (type === 'chi-khac')
+    return { ...base, expenseItem: 'Mua bao bì, CCDC phục vụ đóng gói hàng hóa: carton, xốp, băng keo...', quantity: 4, unitPrice: 15_000, description: 'Mua 4 cuộn băng keo đóng hàng', files: [img('ck-1', 'EVIDENCE')] };
+  if (type === 'xang-dau')
+    return { ...base, vehicleId: 1, amount: 500_000, unitPrice: 20_500, odo: 120_350, location: 'Cây xăng mẫu Cầu Giấy', files: [img('xd-1', 'PUMP_METER'), img('xd-2', 'INVOICE', 'uploading')] };
+  return { ...base, vehicleId: 1, amount: 250_000, serviceTypes: ['Rửa xe', 'Thay nhớt'], dueAt: '2027-01-31', files: [img('cs-1', 'PHOTO')] };
+}
 
 /** Form mẫu theo màn xem trước. */
 function sampleForm(key: string): ProductForm | null {
@@ -256,6 +292,7 @@ export default function PreviewScreen() {
   const packPermsAll = packPerms(sampleUser);
   const [packFilters, setPackFilters] = useState<PackFilters>(DEFAULT_PACK_FILTERS);
   const [packForm, setPackForm] = useState<{ key: string; form: PackForm } | null>(null);
+  const [khoForm, setKhoForm] = useState<{ key: string; form: KhoForm } | null>(null);
 
   useEffect(() => {
     if (man && ['gio-hang', 'sua-hang', 'giao-hang', 'giam-gia'].includes(man)) seedCart();
@@ -302,7 +339,7 @@ export default function PreviewScreen() {
           user={sampleUser}
           branchName={sampleBranches[0].name}
           canSwitchBranch
-          hiddenTabKeys={['bao-don']}
+          hiddenTabKeys={['bao-don', 'phieu-kho']}
           onOpenBranch={() => router.setParams({ man: 'chi-nhanh' })}
           onOpen={noop}
           onSignOut={noop}
@@ -808,6 +845,42 @@ export default function PreviewScreen() {
         onRemoveDoc={(id) => patch({ docs: form.docs.filter((d) => d.id !== id) })}
         onAddPhotos={noop}
         onAddExpense={noop}
+        onSave={noop}
+      />
+    );
+  }
+  if (man === 'phieu-kho')
+    return (
+      <KhoHomeView
+        types={['chi-khac', 'tien-mat', 'xang-dau', 'cham-soc-xe']}
+        recent={KHO_RECENT_SAMPLE}
+        onCreate={(t) => router.setParams({ man: `pk-${t}` })}
+      />
+    );
+  if (man?.startsWith('pk-')) {
+    const key = man;
+    const type = key.slice(3) as KhoType;
+    const form = khoForm && khoForm.key === key ? khoForm.form : sampleKhoForm(type);
+    return (
+      <KhoFormView
+        form={form}
+        branches={[
+          { id: 6, name: 'Kho mẫu Hà Nội' },
+          { id: 1, name: 'Kho mẫu Sài Gòn' },
+        ]}
+        staff={[
+          { id: 3, name: 'Trần Văn Nam' },
+          { id: 4, name: 'Nguyễn Thị Lan' },
+        ]}
+        vehicles={[
+          { id: 1, label: 'Xe tải mẫu 29C-123.45', driverId: 3, driverName: 'Trần Văn Nam' },
+          { id: 2, label: 'Xe máy mẫu 29B1-678.90', driverId: null, driverName: null },
+        ]}
+        onChange={(p) => setKhoForm({ key, form: { ...form, ...p } })}
+        onPickCustomers={noop}
+        onAddFiles={noop}
+        onRetryFile={noop}
+        onRemoveFile={(a) => setKhoForm({ key, form: { ...form, files: form.files.filter((x) => x.key !== a.key) } })}
         onSave={noop}
       />
     );

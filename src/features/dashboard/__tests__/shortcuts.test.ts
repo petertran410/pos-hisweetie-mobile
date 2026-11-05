@@ -5,7 +5,7 @@ const keys = (user: Parameters<typeof allowedShortcuts>[0]) => allowedShortcuts(
 
 describe('shortcuts by permission', () => {
   it('Super Admin sees every shortcut', () => {
-    expect(keys({ roles: ['Super Admin'], permissions: [] })).toHaveLength(10);
+    expect(keys({ roles: ['Super Admin'], permissions: [] })).toHaveLength(11);
   });
 
   it('salesperson only sees what they can use', () => {
@@ -18,6 +18,13 @@ describe('shortcuts by permission', () => {
 
   it('any report permission shows Báo cáo', () => {
     expect(keys({ roles: [], permissions: ['reports:sale_time'] })).toEqual(['bao-cao']);
+  });
+
+  it('driver with warehouse finance rights sees Báo đơn and Phiếu kho', () => {
+    expect(keys({ roles: ['Lái xe'], permissions: ['packing_slips:create', 'vehicles:create', 'warehouse_cash:create'] })).toEqual([
+      'bao-don',
+      'phieu-kho',
+    ]);
   });
 
   it('no user → nothing', () => {

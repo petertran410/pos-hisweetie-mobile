@@ -11,7 +11,10 @@ import { applyAppUpdate, checkForAppUpdate, useAppUpdate } from './appUpdate';
 import { useTabs } from './tabs';
 
 /** Chức năng xem ở tab Thêm (những gì không có trên thanh tab). */
-const MORE_KEYS = ['hang-hoa', 'so-quy', 'bien-dong', 'bao-cao', 'quan-tri', 'bao-don'] as const;
+const MORE_KEYS = ['hang-hoa', 'so-quy', 'bien-dong', 'bao-cao', 'quan-tri', 'bao-don', 'phieu-kho'] as const;
+
+/** Chức năng có tab riêng: chỉ hiện ở đây khi tab bị dồn khỏi thanh tab. */
+const TAB_KEYS = ['bao-don', 'phieu-kho'];
 
 const DESCRIPTIONS: Record<string, string> = {
   'hang-hoa': 'Giá, tồn kho theo chi nhánh',
@@ -20,6 +23,7 @@ const DESCRIPTIONS: Record<string, string> = {
   'bao-cao': 'Bán hàng, hàng hóa, khách hàng, tài chính',
   'quan-tri': 'Người dùng, vai trò, chi nhánh',
   'bao-don': 'Giao hàng, đóng hàng, loading',
+  'phieu-kho': 'Tiền mặt kho, xăng dầu, chăm sóc xe, chi khác',
 };
 
 export interface MoreViewProps {
@@ -43,7 +47,7 @@ export interface MoreViewProps {
 
 export function MoreView({ user, branchName, canSwitchBranch, hiddenTabKeys, onOpenBranch, onOpen, onSignOut, update }: MoreViewProps) {
   const items = allowedShortcuts(user).filter(
-    (s) => (MORE_KEYS as readonly string[]).includes(s.key) && (s.key !== 'bao-don' || hiddenTabKeys.includes('bao-don')),
+    (s) => (MORE_KEYS as readonly string[]).includes(s.key) && (!TAB_KEYS.includes(s.key) || hiddenTabKeys.includes(s.key)),
   );
 
   return (
