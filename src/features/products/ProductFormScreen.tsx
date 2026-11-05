@@ -12,6 +12,7 @@ import { Button, C, Divider, EmptyState, fonts, Icon, Page, pickFromSheet, Press
 import { createProduct, updateProduct, uploadProductImage } from './api';
 import { ComboEditor, FormulaEditor } from './ComponentsEditor';
 import { CostScopeModal } from './CostScopeModal';
+import { ProductLocked } from './components';
 import { patchDraft, useProductDraft } from './draft';
 import {
   buildProductCreate,
@@ -384,6 +385,16 @@ export default function ProductFormScreen() {
   useEffect(() => {
     if (exit) exit.go();
   }, [exit]);
+
+  // Thêm cần quyền thêm, sửa cần quyền sửa (giống nút "+" và "Sửa").
+  if (editing ? !perms.update : !perms.create) {
+    return (
+      <ProductLocked
+        title={editing ? 'Chưa có quyền sửa hàng hóa' : 'Chưa có quyền thêm hàng hóa'}
+        message={`Nhờ quản trị viên cấp quyền ${editing ? 'sửa' : 'thêm'} sản phẩm.`}
+      />
+    );
+  }
 
   if (!valid || !form || !baseline) {
     return (

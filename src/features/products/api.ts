@@ -48,10 +48,10 @@ export function useProductList(search: string, filters: ProductFilters, canViewC
 // ---------- Chi tiết ----------
 
 /** Dữ liệu gốc (đổi sang dạng hiển thị theo chi nhánh ở màn chi tiết / form sửa). */
-export function useProductDetail(id: number) {
+export function useProductDetail(id: number, enabled = true) {
   return useQuery({
     queryKey: ['product', id],
-    enabled: Number.isFinite(id) && id > 0,
+    enabled: enabled && Number.isFinite(id) && id > 0,
     queryFn: async () => {
       const raw = await http.get<RawProduct | null>(`/products/${id}`);
       if (!raw) throw new Error('Không tìm thấy hàng hóa');

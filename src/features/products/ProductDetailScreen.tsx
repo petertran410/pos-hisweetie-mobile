@@ -30,7 +30,7 @@ import {
 } from '@/ui';
 import { Thumb } from '../sales/components';
 import { setProductActive, useConditionLogs, useConditionSummary, useProductDetail, useStockCard } from './api';
-import { KV, StatCell, stockText } from './components';
+import { KV, ProductLocked, StatCell, stockText } from './components';
 import { EDIT_PRODUCT_PATH, startDraft } from './draft';
 import { toEditForm } from './form';
 import {
@@ -537,15 +537,18 @@ export default function ProductDetailScreen() {
   const branches = useSession((s) => s.branches);
   const perms = productPerms(user);
   const qc = useQueryClient();
-  const detail = useProductDetail(id);
+  // Không có quyền xem thì không gọi API nào (mở thẳng bằng link).
+  const detail = useProductDetail(id, perms.view);
   const [tab, setTab] = useState<DetailTab>('info');
   const [logBranch, setLogBranch] = useState<number | null>(branchId);
   const [bucket, setBucket] = useState<ConditionBucket>('DAMAGED');
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const card = useStockCard(id, logBranch, tab === 'card');
-  const summary = useConditionSummary(id, logBranch, tab === 'condition');
-  const condLogs = useConditionLogs(id, bucket, logBranch, tab === 'condition');
+  const card = useStockCard(id, logBranch, perms.view && tab === 'card');
+  const summary = useConditionSummary(id, logBranch, perms.view && tab === 'condition');
+  const condLogs = useConditionLogs(id, bucket, logBranch, perms.view && tab === 'condition');
+
+  if (!perms.view) return <ProductLocked />;
 
   if (detail.isLoading || !detail.data) {
     return (

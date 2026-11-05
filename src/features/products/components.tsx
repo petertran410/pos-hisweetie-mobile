@@ -1,10 +1,28 @@
 import { StyleSheet, View } from 'react-native';
 import { money, qty } from '@/core/format';
-import { C, Pill, PressableScale, toneColors, Txt } from '@/ui';
+import { C, EmptyState, Page, Pill, PressableScale, SubHeader, toneColors, Txt } from '@/ui';
 import { Thumb } from '../sales/components';
 import { typeLabel, type ProductRow } from './model';
 
 /** Dòng "nhãn … giá trị" trong thẻ thông tin. */
+/**
+ * Màn "Chưa có quyền" của mục Hàng hóa: chặn ngay trên app khi mở thẳng bằng
+ * link (backend vẫn kiểm quyền), thay vì gọi API rồi hiện lỗi.
+ */
+export function ProductLocked({
+  title = 'Chưa có quyền xem hàng hóa',
+  message = 'Nhờ quản trị viên cấp quyền “Xem sản phẩm”.',
+}: {
+  title?: string;
+  message?: string;
+}) {
+  return (
+    <Page scroll={false} header={<SubHeader title="Hàng hóa" />}>
+      <EmptyState icon="lock" color="slate" title={title} message={message} />
+    </Page>
+  );
+}
+
 export function KV({ label, value, tone }: { label: string; value: string; tone?: 'danger' | 'success' | 'muted' }) {
   const color = tone === 'danger' ? toneColors.danger.fg : tone === 'success' ? toneColors.success.fg : tone === 'muted' ? C.muted : C.text;
   return (
