@@ -166,9 +166,6 @@ export default function WaitingScreen() {
                       </Txt>
                     </View>
                   </View>
-                  <Txt variant="label" weight="semibold" numeric>
-                    {money(item.total)}
-                  </Txt>
                 </PressableScale>
               </View>
             );
