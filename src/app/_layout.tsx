@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { queryClient } from '@/core/query';
-import { bootstrap, useSession } from '@/core/session';
+import { bootstrap, reloadProfileIfStale, useSession } from '@/core/session';
 import { refreshIfStale } from '@/core/tokens';
 import { UpdateWatcher } from '@/features/shell/appUpdate';
 import { PrivacyCover } from '@/features/shell/PrivacyCover';
@@ -38,7 +38,10 @@ export default function RootLayout() {
   useEffect(() => {
     void bootstrap().finally(() => setBooted(true));
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') refreshIfStale();
+      if (state === 'active') {
+        refreshIfStale();
+        reloadProfileIfStale();
+      }
     });
     return () => sub.remove();
   }, []);

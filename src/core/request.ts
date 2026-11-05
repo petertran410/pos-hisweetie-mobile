@@ -40,6 +40,11 @@ export interface RequestOptions {
   /** Gửi multipart (upload ảnh). */
   form?: FormData;
   token?: string | null;
+  /**
+   * Chi nhánh gửi trong X-Branch-Id (mặc định: chi nhánh đang chọn). Backend
+   * kiểm quyền theo chi nhánh này, nên thao tác trên chi nhánh khác phải gửi đúng.
+   */
+  branchId?: number | null;
   timeoutMs?: number;
   signal?: AbortSignal;
 }
@@ -105,7 +110,8 @@ export async function rawRequest<T>(path: string, opts: RequestOptions = {}): Pr
   if (!opts.form) headers['Content-Type'] = 'application/json';
   if (opts.token) headers.Authorization = `Bearer ${opts.token}`;
   if (requestContext.deviceId) headers['X-Device-Id'] = requestContext.deviceId;
-  if (requestContext.branchId) headers['X-Branch-Id'] = String(requestContext.branchId);
+  const branchId = opts.branchId ?? requestContext.branchId;
+  if (branchId) headers['X-Branch-Id'] = String(branchId);
 
   const url = buildUrl(path, opts.query);
   const timeoutMs = opts.timeoutMs ?? 30_000;

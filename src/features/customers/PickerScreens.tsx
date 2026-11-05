@@ -261,7 +261,8 @@ export function OldWardPickerScreen() {
 
 export function GroupPickerScreen() {
   const initial = useCustomerDraft((s) => s.form?.groups);
-  const groups = useCustomerGroups(true);
+  // Chỉ tải khi đang có phiếu nhập (form đã kiểm quyền), không tải khi mở thẳng bằng link.
+  const groups = useCustomerGroups(!!initial);
   const [picked, setPicked] = useState<Named[]>(initial ?? []);
   const [search, setSearch] = useState('');
   if (!initial) return <Missing title="Nhóm khách hàng" />;
@@ -328,7 +329,8 @@ export function ParentPickerScreen() {
 
 export function SalePicPickerScreen() {
   const current = useCustomerDraft((s) => s.form?.salePic?.id ?? null);
-  const staff = useStaff(true);
+  const hasForm = useCustomerDraft((s) => !!s.form);
+  const staff = useStaff(hasForm);
   const [search, setSearch] = useState('');
   const key = fold(search);
   const items = (staff.data ?? []).filter((u) => !key || fold(u.name).includes(key));

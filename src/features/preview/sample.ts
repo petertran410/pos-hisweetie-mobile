@@ -26,47 +26,149 @@ export const sampleBranches: Branch[] = [
 
 const hours = ['08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19'];
 const revenue = [1.2, 2.4, 3.1, 1.8, 0.9, 1.5, 2.8, 3.6, 2.2, 1.4, 0.8, 0.5];
+// Khung giờ mẫu: đông lúc 9–11h và 14–16h, cuối tuần đông hơn; 12h, 21h vắng.
+const heatCells = [0, 1, 2, 3, 4, 5, 6].flatMap((dow) =>
+  Array.from({ length: 15 }, (_, i) => {
+    const hour = 7 + i;
+    const wave = Math.max(0, Math.sin(((hour - 7) / 14) * Math.PI * 2.2)) + (hour === 12 || hour >= 21 ? 0 : 0.25);
+    const weekend = dow === 0 || dow === 6 ? 1.4 : 1;
+    const revenue = Math.round(wave * weekend * 2_400_000 * (1 + ((dow * 7 + hour) % 5) / 10));
+    return { dow, hour, revenue, count: Math.round(revenue / 600_000) };
+  }),
+);
+
+const profitRate = [0.24, 0.22, 0.26, 0.2, 0.18, 0.23, 0.25, 0.27, 0.21, 0.19, 0.2, 0.22];
 
 export const sampleDashboard: DashboardData = {
   stats: {
-    currentRevenue: 22_200_000,
-    lastRevenue: 19_760_000,
-    revenueChange: 12.3,
-    invoiceCount: 24,
-    invoiceChange: 8,
-    aov: 925_000,
-    aovChange: -2.1,
-    profit: 5_120_000,
-    profitChange: 15.4,
-    marginAvg: 23.1,
-    totalCustomerDebt: 48_350_000,
-    totalSupplierDebt: 120_400_000,
-    unpaidInvoices: 35,
-    unpaidAmount: 31_200_000,
-    codAmount: 4_650_000,
-    codCount: 4,
-    lowStockProducts: 9,
-    outOfStockProducts: 2,
-    negativeStock: 0,
+    data: {
+      currentRevenue: 22_200_000,
+      lastRevenue: 19_760_000,
+      revenueChange: 12.3,
+      invoiceCount: 24,
+      invoiceChange: 8,
+      aov: 925_000,
+      aovChange: -2.1,
+      profit: 5_120_000,
+      profitChange: 15.4,
+      marginAvg: 0.231,
+      totalCustomerDebt: 48_350_000,
+      totalSupplierDebt: 120_400_000,
+      unpaidInvoices: 35,
+      unpaidAmount: 31_200_000,
+      codAmount: 4_650_000,
+      codCount: 4,
+      lowStockProducts: 9,
+      outOfStockProducts: 2,
+      negativeStock: 0,
+    },
   },
-  trend: hours.map((label, i) => ({ label, revenue: revenue[i] * 1_000_000, profit: revenue[i] * 230_000 })),
-  counts: { orders: 12, debt: 35, cod: 4, stock: 9 },
-  products: [
-    { productId: 1, code: 'SP001', name: 'Trà đen 1kg', totalQuantity: 42, totalRevenue: 7_770_000 },
-    { productId: 2, code: 'SP002', name: 'Siro đào 2,5L', totalQuantity: 30, totalRevenue: 2_880_000 },
-    { productId: 3, code: 'SP003', name: 'Trân châu đen 3kg', totalQuantity: 28, totalRevenue: 2_184_000 },
-    { productId: 4, code: 'SP004', name: 'Bột sữa béo 1kg', totalQuantity: 25, totalRevenue: 1_625_000 },
-    { productId: 5, code: 'SP005', name: 'Thạch dừa 2,5kg', totalQuantity: 18, totalRevenue: 990_000 },
-  ],
-  buyers: [
-    { id: 1, code: 'KH001', name: 'Quán mẫu Trà Mây', totalRevenue: 6_400_000, invoiceCount: 5 },
-    { id: 2, code: 'KH002', name: 'Quán mẫu Gió Chiều', totalRevenue: 4_100_000, invoiceCount: 3 },
-    { id: 3, code: 'KH003', name: 'Tiệm mẫu Lối Nhỏ', totalRevenue: 2_950_000, invoiceCount: 2 },
-  ],
-  recent: [
-    { id: 1, code: 'DH000101', customerName: 'Quán mẫu Trà Mây', grandTotal: 3_400_000, createdAt: new Date().toISOString() },
-    { id: 2, code: 'DH000100', customerName: 'Tiệm mẫu Lối Nhỏ', grandTotal: 1_650_000, createdAt: new Date(Date.now() - 3_600_000).toISOString() },
-  ],
+  trend: {
+    data: hours.map((label, i) => ({ label, revenue: revenue[i] * 1_000_000, profit: revenue[i] * profitRate[i] * 1_000_000 })),
+  },
+  category: {
+    data: [
+      { name: 'Trà mẫu', revenue: 8_400_000, percent: 37.8 },
+      { name: 'Siro mẫu', revenue: 5_100_000, percent: 23 },
+      { name: 'Topping mẫu', revenue: 3_900_000, percent: 17.6 },
+      { name: 'Bột mẫu', revenue: 2_600_000, percent: 11.7 },
+      { name: 'Ly, ống hút mẫu', revenue: 1_400_000, percent: 6.3 },
+      { name: 'Khác', revenue: 800_000, percent: 3.6 },
+    ],
+  },
+  products: {
+    data: [
+      { productId: 1, code: 'SP001', name: 'Trà đen mẫu 1kg', totalQuantity: 42, totalRevenue: 7_770_000, totalProfit: 1_890_000 },
+      { productId: 2, code: 'SP002', name: 'Siro đào mẫu 2,5L', totalQuantity: 30, totalRevenue: 2_880_000, totalProfit: 640_000 },
+      { productId: 3, code: 'SP003', name: 'Trân châu đen mẫu 3kg', totalQuantity: 28, totalRevenue: 2_184_000, totalProfit: 520_000 },
+      { productId: 4, code: 'SP004', name: 'Bột sữa béo mẫu 1kg', totalQuantity: 25, totalRevenue: 1_625_000, totalProfit: 410_000 },
+      { productId: 5, code: 'SP005', name: 'Thạch dừa mẫu 2,2kg', totalQuantity: 18, totalRevenue: 990_000, totalProfit: 190_000 },
+    ],
+  },
+  buyers: {
+    data: [
+      { id: 1, code: 'KH001', name: 'Quán mẫu Trà Mây', totalRevenue: 6_400_000, invoiceCount: 5 },
+      { id: 2, code: 'KH002', name: 'Quán mẫu Gió Chiều', totalRevenue: 4_100_000, invoiceCount: 3 },
+      { id: 3, code: 'KH003', name: 'Tiệm mẫu Lối Nhỏ', totalRevenue: 2_950_000, invoiceCount: 2 },
+    ],
+  },
+  branchCmp: {
+    data: {
+      labels: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'],
+      branches: [
+        { id: 1, name: 'Chi nhánh mẫu A', data: [], total: 86_500_000 },
+        { id: 2, name: 'Chi nhánh mẫu B', data: [], total: 54_200_000 },
+        { id: 3, name: 'Kho mẫu C', data: [], total: 21_700_000 },
+      ],
+    },
+  },
+  finance: {
+    data: {
+      debt: 48_350_000,
+      overdue: 19_800_000,
+      unpaidCount: 35,
+      codAmount: 4_650_000,
+      codCount: 4,
+      aging: { inTerm: 28_550_000, d1to30: 14_300_000, over30: 5_500_000 },
+    },
+  },
+  counts: { data: { orders: 12, debt: 35, cod: 4, stock: 9 } },
+  cashflow: {
+    data: {
+      receipt: 26_400_000,
+      payment: 9_850_000,
+      net: 16_550_000,
+      count: 31,
+      series: hours.map((label, i) => ({
+        label,
+        receipt: revenue[i] * 1_100_000,
+        payment: i % 3 === 0 ? 2_100_000 : i % 4 === 1 ? 950_000 : 0,
+      })),
+      topPayments: [
+        { name: 'Tiền xăng xe mẫu', amount: 3_200_000 },
+        { name: 'Chi phí giao hàng mẫu', amount: 2_750_000 },
+        { name: 'Văn phòng phẩm mẫu', amount: 1_900_000 },
+        { name: 'Khác', amount: 2_000_000 },
+      ],
+    },
+  },
+  sellers: {
+    data: [
+      { id: 11, name: 'Nhân viên mẫu An', revenue: 9_800_000, invoiceCount: 9 },
+      { id: 12, name: 'Nhân viên mẫu Bình', revenue: 7_150_000, invoiceCount: 8 },
+      { id: 13, name: 'Nhân viên mẫu Chi', revenue: 4_100_000, invoiceCount: 5 },
+      { id: null, name: 'Chưa gán nhân viên', revenue: 1_150_000, invoiceCount: 2 },
+    ],
+  },
+  channels: {
+    data: [
+      { id: null, name: 'Bán trực tiếp', revenue: 12_300_000, invoiceCount: 13, percent: 55.4 },
+      { id: 1, name: 'Zalo mẫu', revenue: 5_600_000, invoiceCount: 6, percent: 25.2 },
+      { id: 2, name: 'Facebook mẫu', revenue: 3_100_000, invoiceCount: 4, percent: 14 },
+      { id: 3, name: 'Sàn TMĐT mẫu', revenue: 1_200_000, invoiceCount: 1, percent: 5.4 },
+    ],
+  },
+  heatmap: { data: { cells: heatCells } },
+  returns: {
+    data: {
+      count: 4,
+      amount: 720_000,
+      revenue: 22_200_000,
+      rate: 3.2,
+      pendingCount: 2,
+      topProducts: [
+        { productId: 2, code: 'SP002', name: 'Siro đào mẫu 2,5L', quantity: 3, amount: 288_000 },
+        { productId: 5, code: 'SP005', name: 'Thạch dừa mẫu 2,2kg', quantity: 4, amount: 216_000 },
+        { productId: 3, code: 'SP003', name: 'Trân châu đen mẫu 3kg', quantity: 2, amount: 156_000 },
+      ],
+    },
+  },
+  recent: {
+    data: [
+      { id: 1, code: 'DH000101', customerName: 'Quán mẫu Trà Mây', grandTotal: 3_400_000, createdAt: new Date().toISOString() },
+      { id: 2, code: 'DH000100', customerName: 'Tiệm mẫu Lối Nhỏ', grandTotal: 1_650_000, createdAt: new Date(Date.now() - 3_600_000).toISOString() },
+    ],
+  },
 };
 
 export const sampleTasks: TaskRow[] = [
@@ -165,6 +267,7 @@ export const sampleDocDetail: DocDetail = {
   branchName: 'Chi nhánh mẫu A',
   sellerName: 'Trần Văn Nam',
   creatorName: 'Nguyễn Thị Lan',
+  createdBy: 1,
   priceBookName: null,
   customer: { name: 'Tiệm mẫu Gió Chiều', code: 'KH0012', phone: '0900 000 333' },
   delivery: { receiver: 'Chị Gió', phone: '0900 000 333', address: '9 Đường Thử, Phường Thử, TP. Mẫu', note: 'Gọi trước khi giao' },

@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { splitTabs } from '../tabs';
+import { canEnterArea, splitTabs } from '../tabs';
 
 // babel-jest đưa jest.mock lên trước các import.
 jest.mock('@/core/session', () => ({ useSession: jest.fn() }));
@@ -38,5 +38,25 @@ describe('tabs by permission', () => {
 
   it('no permission → no tabs (only Thêm)', () => {
     expect(splitTabs(null).visible).toEqual([]);
+  });
+});
+
+describe('area guard (link mở thẳng vào mục bị ẩn)', () => {
+  const driver = { roles: ['Lái xe'], permissions: ['packing_loadings:create', 'vehicles:create'] };
+
+  it('chặn mục không có quyền, kể cả Hàng hóa (không phải tab)', () => {
+    expect(canEnterArea(driver, 'bao-don')).toBe(true);
+    expect(canEnterArea(driver, 'phieu-kho')).toBe(true);
+    expect(canEnterArea(driver, 'khach-hang')).toBe(false);
+    expect(canEnterArea(driver, 'don-hang')).toBe(false);
+    expect(canEnterArea(driver, 'ban-hang')).toBe(false);
+    expect(canEnterArea(driver, 'tong-quan')).toBe(false);
+    expect(canEnterArea(driver, 'hang-hoa')).toBe(false);
+    expect(canEnterArea({ roles: [], permissions: ['products:view'] }, 'hang-hoa')).toBe(true);
+  });
+
+  it('chưa đăng nhập: không vào được mục nào; Super Admin vào hết', () => {
+    expect(canEnterArea(null, 'tong-quan')).toBe(false);
+    expect(canEnterArea({ roles: ['Super Admin'], permissions: [] }, 'hang-hoa')).toBe(true);
   });
 });

@@ -10,3 +10,8 @@ export function canDo(user: PermissionHolder | null | undefined, permission: str
   if (user.roles?.includes('Super Admin')) return true;
   return user.permissions?.includes(permission) ?? false;
 }
+
+/** Admin hoặc Super Admin (giống `isAdminOrSuperAdmin` của web). */
+export function isAdminRole(user: PermissionHolder | null | undefined): boolean {
+  return !!user?.roles?.some((r) => r === 'Super Admin' || r === 'Admin');
+}

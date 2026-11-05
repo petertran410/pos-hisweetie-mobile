@@ -1,5 +1,5 @@
 import { keepPreviousData, useInfiniteQuery, useQuery, type QueryClient } from '@tanstack/react-query';
-import { http, type Query } from '@/core/http';
+import { api, http, type Query } from '@/core/http';
 import { isoDate } from '@/core/format';
 import { resolvePeriod, type PeriodChoice } from '@/core/period';
 import { useSession } from '@/core/session';
@@ -69,11 +69,18 @@ export const fetchPackingDetail = async (type: PackType, id: number) =>
 
 // ---------- Ghi ----------
 
+/** Kiểm quyền theo chi nhánh của phiếu (có thể khác chi nhánh đang chọn). */
+const bodyBranch = (body: Record<string, unknown>) => Number(body.branchId) || undefined;
+
 export const createPacking = (type: PackType, body: Record<string, unknown>) =>
-  http.post<{ id?: number; code?: string }>(PACK_TYPES[type].path, body);
+  api<{ id?: number; code?: string }>(PACK_TYPES[type].path, { method: 'POST', body, branchId: bodyBranch(body) });
 
 export const updatePacking = (type: PackType, id: number, body: Record<string, unknown>) =>
-  http.put<{ id?: number; code?: string; financeLocked?: { code?: string; reason?: string }[] }>(`${PACK_TYPES[type].path}/${id}`, body);
+  api<{ id?: number; code?: string; financeLocked?: { code?: string; reason?: string }[] }>(`${PACK_TYPES[type].path}/${id}`, {
+    method: 'PUT',
+    body,
+    branchId: bodyBranch(body),
+  });
 
 /** Trước khi hủy phiếu giao hàng: có phiếu thu tiền mặt đi kèm hay đang bị khóa không. */
 export const packingCancelCheck = (id: number) =>
@@ -98,14 +105,14 @@ export function useDocCandidates(type: PackType, mode: DocMode, branchId: number
     queryFn: async (): Promise<DocItem[]> => {
       const q: Query = { branchId: branchId ?? undefined, pageSize: 100, search: search || undefined };
       if (mode === 'consignment') {
-        const res = await http.get<{ data?: RawDocCandidate[] }>('/consignments/for-packing', q);
+        const res = await api<{ data?: RawDocCandidate[] }>('/consignments/for-packing', { query: q, branchId });
         return (res.data ?? []).map((r) => toCandidate(r, 'consignment'));
       }
       // Đóng hàng / loading không nhận hóa đơn đã giao.
-      const res = await http.get<{ data?: RawDocCandidate[] }>('/invoices/for-packing', {
-        ...q,
-        packingType: type,
-        excludeDelivered: type === 'giao-hang' ? undefined : 'true',
+      // Chi nhánh trong X-Branch-Id = chi nhánh của phiếu: backend kiểm quyền đúng chi nhánh.
+      const res = await api<{ data?: RawDocCandidate[] }>('/invoices/for-packing', {
+        query: { ...q, packingType: type, excludeDelivered: type === 'giao-hang' ? undefined : 'true' },
+        branchId,
       });
       return (res.data ?? []).map((r) => toCandidate(r, 'invoice'));
     },

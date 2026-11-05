@@ -58,6 +58,22 @@ export const TAB_DEFS: TabDef[] = [
   },
 ];
 
+/** Mục mở được trong app: các tab + Hàng hóa (mở từ Tổng quan / Thêm). */
+export type AreaKey = TabKey | 'hang-hoa';
+
+const AREA_EXTRA: Record<Exclude<AreaKey, TabKey>, { label: string; permissions: string[] }> = {
+  'hang-hoa': { label: 'Hàng hóa', permissions: ['products:view'] },
+};
+
+export function areaDef(area: AreaKey): { label: string; permissions: string[] } {
+  return TAB_DEFS.find((t) => t.key === area) ?? AREA_EXTRA[area as Exclude<AreaKey, TabKey>];
+}
+
+/** Được vào mục này không (cần 1 trong các quyền, giống thanh tab). */
+export function canEnterArea(user: PermissionHolder | null | undefined, area: AreaKey): boolean {
+  return areaDef(area).permissions.some((p) => canDo(user, p));
+}
+
 /** iPhone hiện tối đa 5 tab: 4 tab theo quyền + "Thêm". */
 const MAX_TABS = 4;
 

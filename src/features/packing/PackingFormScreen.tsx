@@ -525,17 +525,19 @@ export default function PackingFormScreen() {
       } else {
         const created = await createPacking(latest.type, body);
         void refreshAfterPacking(qc);
-        const openCreated = () =>
+        const leave = (open: boolean) =>
           setExit({
             go: () => {
               clearPackDraft();
-              if (created?.id) router.replace({ pathname: '/bao-don/[type]/[id]', params: { type: latest.type, id: String(created.id) } } as never);
+              if (open && created?.id) router.replace({ pathname: '/bao-don/[type]/[id]', params: { type: latest.type, id: String(created.id) } } as never);
               else router.back();
             },
           });
+        // Chỉ có quyền tạo (không có quyền xem loại phiếu này) thì không mở phiếu vừa tạo.
+        const canOpen = !!created?.id && perms.view(latest.type);
         // Giống web: tạo xong có thể làm tiếp phiếu khác ngay (giữ chi nhánh, loại chứng từ, cách thanh toán).
-        Alert.alert(created?.code ? `Đã tạo ${created.code}` : `Đã tạo phiếu ${label}`, 'Làm tiếp phiếu khác hay xem phiếu vừa tạo?', [
-          { text: 'Xem phiếu', onPress: openCreated },
+        Alert.alert(created?.code ? `Đã tạo ${created.code}` : `Đã tạo phiếu ${label}`, canOpen ? 'Làm tiếp phiếu khác hay xem phiếu vừa tạo?' : 'Làm tiếp phiếu khác?', [
+          canOpen ? { text: 'Xem phiếu', onPress: () => leave(true) } : { text: 'Xong', onPress: () => leave(false) },
           {
             text: 'Tạo phiếu tiếp',
             style: 'default',

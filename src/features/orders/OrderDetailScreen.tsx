@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActionSheetIOS, Alert, Platform, StyleSheet, View } from 'react-native';
-import { canDo } from '@/core/can';
+import { canDo, isAdminRole } from '@/core/can';
 import { dateTimeVN, money, qty, shortWhen } from '@/core/format';
 import { errorMessage } from '@/core/http';
 import { useSession } from '@/core/session';
@@ -12,6 +12,7 @@ import {
   C,
   Card,
   Divider,
+  EmptyState,
   ErrorState,
   Icon,
   IconButton,
@@ -41,6 +42,7 @@ import {
 } from './api';
 import { toInvoiceEdit, toOrderEdit } from './editOrder';
 import { confirmReplaceEdit, startOrderEdit, useDocRoutes } from './editScope';
+import { canPrintDoc } from '../print/perms';
 import {
   INVOICE_STATUS,
   INVOICE_STEPS,
@@ -52,6 +54,7 @@ import {
   orderActions,
   statusOf,
   type DocKind,
+  ownsDoc,
 } from './model';
 
 function Row({ label, value, strong, tone }: { label: string; value: string; strong?: boolean; tone?: 'danger' | 'success' }) {
@@ -125,8 +128,10 @@ export interface OrderDetailViewProps {
   doc: DocDetail;
   canPrint: boolean;
   onPrint: () => void;
-  onOpenOrder: (id: number) => void;
-  onOpenInvoice: (id: number) => void;
+  /** Không có = không có quyền xem đơn đặt hàng: không hiện link. */
+  onOpenOrder?: (id: number) => void;
+  /** Không có = không có quyền xem hóa đơn: không hiện link. */
+  onOpenInvoice?: (id: number) => void;
   /** Thao tác đổi trạng thái / kết thúc / hủy. */
   actions?: {
     /** "Xử lý đơn hàng" / "Xử lý hóa đơn": mở màn sửa. */
@@ -287,12 +292,12 @@ export function OrderDetailView({ doc, canPrint, onPrint, onOpenOrder, onOpenInv
         ) : null}
       </Section>
 
-      {doc.sourceOrderId || doc.invoices.length ? (
+      {(doc.sourceOrderId && onOpenOrder) || doc.invoices.length ? (
         <Section index={4} title={doc.kind === 'invoice' ? 'Đơn đặt hàng gốc' : 'Hóa đơn đã ra'}>
           <Card>
-            {doc.sourceOrderId ? (
+            {doc.sourceOrderId && onOpenOrder ? (
               <PressableScale
-                onPress={() => onOpenOrder(doc.sourceOrderId as number)}
+                onPress={() => onOpenOrder?.(doc.sourceOrderId as number)}
                 accessibilityLabel="Xem đơn đặt hàng gốc"
                 style={styles.link}>
                 <Icon name="receipt-text" size={18} color={C.brand} />
@@ -307,13 +312,17 @@ export function OrderDetailView({ doc, canPrint, onPrint, onOpenOrder, onOpenInv
               return (
                 <View key={inv.id}>
                   {i > 0 ? <Divider inset={14} /> : null}
-                  <PressableScale onPress={() => onOpenInvoice(inv.id)} accessibilityLabel={`Xem hóa đơn ${inv.code}`} style={styles.link}>
+                  <PressableScale
+                    onPress={onOpenInvoice ? () => onOpenInvoice(inv.id) : undefined}
+                    disabled={!onOpenInvoice}
+                    accessibilityLabel={onOpenInvoice ? `Xem hóa đơn ${inv.code}` : `Hóa đơn ${inv.code}`}
+                    style={styles.link}>
                     <Icon name="receipt" size={18} color={C.brand} />
                     <Txt variant="body" weight="semibold" style={{ flex: 1 }} numeric>
                       {inv.code}
                     </Txt>
                     <Pill label={s.label} tone={s.tone} />
-                    <Icon name="chevron-right" size={16} color={C.faint} />
+                    {onOpenInvoice ? <Icon name="chevron-right" size={16} color={C.faint} /> : null}
                   </PressableScale>
                 </View>
               );
@@ -386,6 +395,15 @@ function confirmCancel(noun: string, code: string, paymentCount: number, cancel:
   ]);
 }
 
+/** Không có quyền xem chứng từ này (thiếu quyền, hoặc chứng từ của nhân viên khác). */
+function DocLocked({ title, message }: { title: string; message: string }) {
+  return (
+    <Page stickyHeader scroll={false} header={<SubHeader title={title} />}>
+      <EmptyState icon="lock" color="slate" title="Chưa có quyền xem" message={message} />
+    </Page>
+  );
+}
+
 export default function OrderDetailScreen() {
   const params = useLocalSearchParams<{ kind: string; id: string }>();
   const kind = kindFromSlug(params.kind);
@@ -393,10 +411,12 @@ export default function OrderDetailScreen() {
   const user = useSession((s) => s.user);
   const branchId = useSession((s) => s.branchId);
   const qc = useQueryClient();
-  const doc = useDocDetail(kind, id);
+  // Mở thẳng bằng link / từ mục khác: kiểm lại quyền xem loại chứng từ trước khi tải.
+  const canView = canDo(user, kind === 'invoice' ? 'invoices:view' : 'orders:view');
+  const doc = useDocDetail(kind, id, canView);
   const routes = useDocRoutes();
   const [busy, setBusy] = useState(false);
-  const isAdmin = !!user?.roles?.some((r) => r === 'Super Admin' || r === 'Admin');
+  const isAdmin = isAdminRole(user);
   const invoicePerms = {
     update: canDo(user, 'invoices:update'),
     cancel: canDo(user, 'invoices:cancel'),
@@ -404,17 +424,23 @@ export default function OrderDetailScreen() {
   };
   // Chỉ cần kiểm tra phiếu đóng hàng khi người dùng có thể thao tác hóa đơn.
   const cashLocked = useCashPackingLock(id, kind === 'invoice' && !isAdmin && (invoicePerms.update || invoicePerms.cancel));
-  const canPrint = canDo(user, kind === 'invoice' ? 'invoices:print' : 'orders:print') && canDo(user, 'print_templates:view');
+  const canPrint = canPrintDoc(user, kind);
+  const title = kind === 'invoice' ? 'Hóa đơn' : 'Đơn đặt hàng';
+
+  if (!canView) return <DocLocked title={title} message={`Cần quyền xem ${kind === 'invoice' ? 'hóa đơn' : 'đơn đặt hàng'}. Liên hệ quản lý để được cấp quyền.`} />;
 
   if (doc.isLoading || !doc.data) {
     return (
-      <Page stickyHeader scroll={false} header={<SubHeader title={kind === 'invoice' ? 'Hóa đơn' : 'Đơn đặt hàng'} />}>
+      <Page stickyHeader scroll={false} header={<SubHeader title={title} />}>
         {doc.isError ? <ErrorState error={doc.error} onRetry={() => void doc.refetch()} /> : <LoadingState />}
       </Page>
     );
   }
 
   const data = doc.data;
+  if (!ownsDoc(user, data.createdBy)) {
+    return <DocLocked title={title} message="Tài khoản chỉ được xem chứng từ do mình tạo. Liên hệ quản lý nếu cần xem chứng từ của nhân viên khác." />;
+  }
   const open = (k: DocKind, docId: number) =>
     router.push({ pathname: routes.detail, params: { kind: KIND_SLUG[k], id: String(docId) } } as never);
 
@@ -608,8 +634,8 @@ export default function OrderDetailScreen() {
       doc={data}
       canPrint={canPrint}
       onPrint={() => router.push({ pathname: routes.print, params: { kind, id: String(data.id), code: data.code } } as never)}
-      onOpenOrder={(orderId) => open('order', orderId)}
-      onOpenInvoice={(invoiceId) => open('invoice', invoiceId)}
+      onOpenOrder={canDo(user, 'orders:view') ? (orderId) => open('order', orderId) : undefined}
+      onOpenInvoice={canDo(user, 'invoices:view') ? (invoiceId) => open('invoice', invoiceId) : undefined}
       actions={actions}
     />
   );

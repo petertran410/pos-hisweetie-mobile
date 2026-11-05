@@ -1,4 +1,4 @@
-import { canDo } from './can';
+import { canDo, isAdminRole } from './can';
 import { useSession } from './session';
 
 export { canDo } from './can';
@@ -16,5 +16,5 @@ export function useCanAny(permissions: string[]): boolean {
 
 export function useIsAdmin(): boolean {
   const user = useSession((s) => s.user);
-  return !!user?.roles?.some((r) => r === 'Super Admin' || r === 'Admin');
+  return isAdminRole(user);
 }

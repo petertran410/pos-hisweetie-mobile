@@ -161,18 +161,27 @@ export function PeriodField<K extends string>({
   value,
   onChange,
   initialRange,
+  variant = 'row',
 }: {
   label: string;
   options: PeriodOption<K>[];
   value: K | DateRange;
   onChange: (v: K | DateRange) => void;
   initialRange?: DateRange | null;
+  /** `row`: dòng trong thẻ form. `pill`: nút gọn ở đầu thẻ (vd bộ lọc của từng khối báo cáo). */
+  variant?: 'row' | 'pill';
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       {/* "Toàn thời gian" (không lọc) hiện chữ nhạt như ô chưa chọn. */}
-      <SelectTrigger label={label} text={periodText(options, value)} empty={value === 'all'} variant="row" onPress={() => setOpen(true)} />
+      <SelectTrigger
+        label={label}
+        text={periodText(options, value)}
+        empty={value === 'all'}
+        variant={variant}
+        onPress={() => setOpen(true)}
+      />
       <PeriodModal
         visible={open}
         title={label}

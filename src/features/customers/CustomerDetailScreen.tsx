@@ -319,7 +319,8 @@ export function CustomerDetailView(p: CustomerDetailViewProps) {
     ...(d.children.length ? [{ value: 'children' as const, label: `Khách con (${d.children.length})` }] : []),
   ];
   const tab = tabs.some((t) => t.value === p.tab) ? p.tab : 'info';
-  const openInvoice = p.onOpenDoc ? (id: number) => p.onOpenDoc?.('invoice', id) : undefined;
+  // Dòng hóa đơn trong công nợ chỉ mở được khi có quyền xem hóa đơn (màn hóa đơn còn kiểm người tạo).
+  const openInvoice = p.onOpenDoc && perms.viewInvoices ? (id: number) => p.onOpenDoc?.('invoice', id) : undefined;
 
   return (
     <Page

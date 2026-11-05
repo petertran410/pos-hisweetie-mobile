@@ -55,6 +55,21 @@ afterEach(() => {
   requestContext.branchId = null;
 });
 
+describe('chi nhánh kiểm quyền (X-Branch-Id)', () => {
+  it('mặc định gửi chi nhánh đang chọn; thao tác trên chi nhánh khác gửi chi nhánh đó', async () => {
+    const calls: Record<string, string>[] = [];
+    globalThis.fetch = jest.fn(async (_url: unknown, init?: { headers?: Record<string, string> }) => {
+      calls.push(init?.headers ?? {});
+      return new Response('{}', { status: 200 });
+    }) as unknown as typeof fetch;
+    requestContext.branchId = 6;
+    await rawRequest('/invoices/for-packing');
+    await rawRequest('/invoices/for-packing', { branchId: 1 });
+    expect(calls[0]['X-Branch-Id']).toBe('6');
+    expect(calls[1]['X-Branch-Id']).toBe('1');
+  });
+});
+
 describe('gửi ảnh / tệp (multipart)', () => {
   it('gửi bằng XMLHttpRequest, kèm token và chi nhánh, không tự đặt Content-Type, không dùng fetch', async () => {
     globalThis.XMLHttpRequest = FakeXhr as unknown as typeof XMLHttpRequest;

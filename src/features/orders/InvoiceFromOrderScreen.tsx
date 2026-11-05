@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
+import { canDo } from '@/core/can';
 import { money, qty, vnd } from '@/core/format';
 import { ApiError, errorMessage } from '@/core/http';
 import { useSession } from '@/core/session';
@@ -44,7 +45,7 @@ import {
   type InvoiceDraft,
   type PayKind,
 } from './fromOrder';
-import { KIND_SLUG } from './model';
+import { KIND_SLUG, ownsDoc } from './model';
 
 const PAY_ORDER: PayKind[] = ['transfer', 'cash'];
 
@@ -193,7 +194,7 @@ export function InvoiceFromOrderView({ draft, perms, submitting, onSubmit }: Inv
           <SumRow label="Phí giao hàng" value={money(t.shipping)} />
           <Divider />
           <SumRow label="Khách cần trả" value={`${money(t.total)} ₫`} strong />
-          {draft.paidOnOrder > 0 ? <SumRow label="Đã cọc / đã trả trên đơn" value={money(draft.paidOnOrder)} tone="success" /> : null}
+          {perms.viewPayment && draft.paidOnOrder > 0 ? <SumRow label="Đã cọc / đã trả trên đơn" value={money(draft.paidOnOrder)} tone="success" /> : null}
         </Card>
 
         <Card style={styles.pay}>
@@ -239,7 +240,7 @@ export function InvoiceFromOrderView({ draft, perms, submitting, onSubmit }: Inv
               Chọn khách trả bằng chuyển khoản hay tiền mặt.
             </Txt>
           )}
-          {draft.paidOnOrder > 0 || paid > 0 ? (
+          {perms.viewPayment && (draft.paidOnOrder > 0 || paid > 0) ? (
             <>
               <Divider />
               <SumRow
@@ -275,13 +276,30 @@ export default function InvoiceFromOrderScreen() {
   const params = useLocalSearchParams<{ orderId: string }>();
   const orderId = Number(params.orderId);
   const perms = useSalePerms();
+  const user = useSession((s) => s.user);
   const branchId = useSession((s) => s.branchId);
   const qc = useQueryClient();
-  const draft = useInvoiceDraft(orderId);
+  // Mở thẳng bằng link: cần quyền tạo hóa đơn và xem đơn đặt hàng.
+  const allowed = perms.invoice && canDo(user, 'orders:view');
+  const draft = useInvoiceDraft(orderId, allowed);
   const routes = useDocRoutes();
   const busyRef = useRef(false);
   const [busy, setBusy] = useState(false);
 
+  if (!allowed) {
+    return (
+      <Page stickyHeader scroll={false} header={<SubHeader title="Tạo hóa đơn" />}>
+        <EmptyState icon="lock" color="slate" title="Chưa có quyền tạo hóa đơn" message="Cần quyền tạo hóa đơn và xem đơn đặt hàng. Liên hệ quản lý để được cấp quyền." />
+      </Page>
+    );
+  }
+  if (draft.data && !ownsDoc(user, draft.data.createdBy)) {
+    return (
+      <Page stickyHeader scroll={false} header={<SubHeader title="Tạo hóa đơn" />}>
+        <EmptyState icon="lock" color="slate" title="Chưa có quyền xem" message="Tài khoản chỉ được xem đơn do mình tạo." />
+      </Page>
+    );
+  }
   if (draft.isLoading || !draft.data) {
     return (
       <Page stickyHeader scroll={false} header={<SubHeader title="Tạo hóa đơn" />}>

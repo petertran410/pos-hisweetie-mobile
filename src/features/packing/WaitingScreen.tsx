@@ -114,6 +114,15 @@ export default function WaitingScreen() {
     </View>
   );
 
+  if (!perms.list) {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <SubHeader title="Đơn chờ giao" />
+        <EmptyState icon="lock" color="slate" title="Chưa có quyền xem báo đơn" message="Cần quyền xem danh sách báo đơn. Liên hệ quản lý để được cấp quyền." />
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <SubHeader title="Đơn chờ giao">

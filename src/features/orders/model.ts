@@ -3,6 +3,17 @@ import type { Tone } from '@/ui';
 
 /** Loại chứng từ; trên đường dẫn dùng tên tiếng Việt cho dễ đọc. */
 export type DocKind = 'invoice' | 'order';
+/**
+ * Tài khoản "chỉ xem dữ liệu của mình" (cờ canViewOtherStaffData tắt): backend
+ * chỉ lọc danh sách theo người tạo, nên app tự chặn khi mở chứng từ theo id
+ * (link, thẻ kho, công nợ, báo đơn) mà người khác tạo.
+ */
+export function ownsDoc(user: { id?: number; canViewOtherStaffData?: boolean } | null | undefined, createdBy: number | null): boolean {
+  if (!user) return false;
+  if (user.canViewOtherStaffData !== false) return true;
+  return createdBy !== null && createdBy === user.id;
+}
+
 export const KIND_SLUG: Record<DocKind, string> = { invoice: 'hoa-don', order: 'dat-hang' };
 export const kindFromSlug = (slug: string | undefined): DocKind => (slug === 'hoa-don' ? 'invoice' : 'order');
 export const KIND_LABEL: Record<DocKind, string> = { invoice: 'Hóa đơn', order: 'Đặt hàng' };

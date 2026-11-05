@@ -38,6 +38,7 @@ export interface RawOrderForInvoice {
   code: string;
   status?: number;
   branchId?: number | null;
+  createdBy?: number | null;
   discount?: string | number;
   discountRatio?: string | number;
   shippingFee?: string | number;
@@ -75,6 +76,8 @@ export interface InvoiceDraft {
   orderCode: string;
   orderStatus: number;
   branchId: number | null;
+  /** Người tạo đơn (tài khoản chỉ xem dữ liệu của mình chỉ xuất hóa đơn đơn mình tạo). */
+  createdBy: number | null;
   customerName: string;
   customerCode: string | null;
   lines: DraftLine[];
@@ -134,6 +137,7 @@ export function toInvoiceDraft(r: RawOrderForInvoice): InvoiceDraft {
     orderCode: r.code,
     orderStatus: num(r.status),
     branchId: r.branchId ?? null,
+    createdBy: r.createdBy ?? null,
     customerName: r.customer?.name || 'Khách vãng lai',
     customerCode: r.customer?.code ?? null,
     lines,

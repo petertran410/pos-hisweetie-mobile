@@ -344,8 +344,10 @@ export default function PaymentScreen() {
   const detail = useCustomerDetail(id);
   const d = detail.data ? toCustomerDetail(detail.data) : null;
   const ids = d ? [d.id, ...d.children.map((c) => c.id)] : [];
-  const unpaid = useUnpaidInvoices(ids, !!d && perms.collect);
-  const accounts = useBankAccounts(perms.collect);
+  // Thu nợ hiện số nợ: cần cả quyền thu tiền và xem công nợ (mở thẳng bằng link cũng vậy).
+  const allowed = perms.collect && perms.viewDebt;
+  const unpaid = useUnpaidInvoices(ids, !!d && allowed);
+  const accounts = useBankAccounts(allowed);
   const debt = d ? d.totalDebt + d.childrenDebt : 0;
   // Tiền thu để trống cho người dùng tự nhập (có nút "Thu hết").
   const [amount, setAmount] = useState(0);
@@ -359,11 +361,16 @@ export default function PaymentScreen() {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
 
-  if (!perms.collect) {
+  if (!allowed) {
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <SheetHeader title="Thu nợ" />
-        <EmptyState icon="lock" color="slate" title="Chưa có quyền thu tiền" message="Nhờ quản trị viên cấp quyền “Tạo phiếu thu chi”." />
+        <EmptyState
+          icon="lock"
+          color="slate"
+          title="Chưa có quyền thu nợ"
+          message="Cần quyền “Tạo phiếu thu chi” và “Xem công nợ khách hàng”. Nhờ quản trị viên cấp quyền."
+        />
       </View>
     );
   }

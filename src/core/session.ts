@@ -72,8 +72,13 @@ function setBranch(branchId: number | null) {
   useSession.setState({ branchId });
 }
 
+/** Lần tải quyền gần nhất (để tải lại khi quay lại app). */
+let profileLoadedAt = 0;
+
 async function loadProfile(branchId: number | null): Promise<Profile> {
-  return http.get<Profile>('/auth/profile', { branchId: branchId ?? undefined });
+  const profile = await http.get<Profile>('/auth/profile', { branchId: branchId ?? undefined });
+  profileLoadedAt = Date.now();
+  return profile;
 }
 
 /** Chọn chi nhánh: đã chọn lần trước (nếu còn quyền) → mặc định → chi nhánh đầu. */
@@ -266,18 +271,31 @@ setSessionExpiredHandler((message) => {
 export async function switchBranch(branchId: number) {
   const { user } = useSession.getState();
   if (!user) return;
-  setBranch(branchId);
-  await AsyncStorage.setItem(branchKey(user.id), String(branchId));
+  // Tải quyền của chi nhánh mới trước: lỗi thì giữ nguyên chi nhánh cũ, không
+  // dùng quyền của chi nhánh cũ cho chi nhánh mới.
   const fresh = await loadProfile(branchId);
-  useSession.setState({ user: fresh });
+  // Đổi chi nhánh và quyền cùng lúc (không có lúc chi nhánh mới đi với quyền cũ).
+  requestContext.branchId = branchId;
+  useSession.setState({ branchId, user: fresh });
+  await AsyncStorage.setItem(branchKey(user.id), String(branchId));
   await queryClient.invalidateQueries();
 }
 
 export async function reloadProfile() {
-  const { branchId } = useSession.getState();
-  if (!getAccessToken()) return;
+  const { branchId, status } = useSession.getState();
+  if (status !== 'signedIn' || !getAccessToken()) return;
   const fresh = await loadProfile(branchId);
-  useSession.setState({ user: fresh });
+  // Đăng xuất / đổi chi nhánh trong lúc chờ: bỏ kết quả cũ.
+  const now = useSession.getState();
+  if (now.status === 'signedIn' && now.branchId === branchId) useSession.setState({ user: fresh });
+}
+
+/** Quyền bị quản lý thu hồi / cấp thêm: tải lại khi mở lại app (tối đa 1 lần / 2 phút). */
+const PROFILE_STALE_MS = 2 * 60_000;
+
+export function reloadProfileIfStale() {
+  if (Date.now() - profileLoadedAt < PROFILE_STALE_MS) return;
+  reloadProfile().catch(() => {});
 }
 
 export function currentBranch(): Branch | undefined {

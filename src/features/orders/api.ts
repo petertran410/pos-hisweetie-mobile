@@ -192,6 +192,8 @@ export interface DocDetail {
   branchName: string | null;
   sellerName: string | null;
   creatorName: string | null;
+  /** Id người tạo: tài khoản chỉ xem dữ liệu của mình chỉ mở được chứng từ mình tạo. */
+  createdBy: number | null;
   priceBookName: string | null;
   customer: { name: string; code: string | null; phone: string | null } | null;
   delivery: { receiver: string; phone: string; address: string; note: string | null } | null;
@@ -248,6 +250,7 @@ interface RawDetail {
   branch?: { name?: string | null } | null;
   soldBy?: { name?: string | null } | null;
   creator?: { name?: string | null } | null;
+  createdBy?: number | null;
   customer?: { name?: string | null; code?: string | null; contactNumber?: string | null; phone?: string | null } | null;
   delivery?: {
     receiver?: string | null;
@@ -291,6 +294,7 @@ export function toDocDetail(kind: DocKind, r: RawDetail): DocDetail {
     branchName: r.branch?.name ?? null,
     sellerName: r.soldBy?.name ?? null,
     creatorName: r.creator?.name ?? null,
+    createdBy: r.createdBy ?? null,
     priceBookName: r.priceBookName || null,
     customer: r.customer
       ? {
@@ -338,10 +342,10 @@ export function toDocDetail(kind: DocKind, r: RawDetail): DocDetail {
   };
 }
 
-export function useDocDetail(kind: DocKind, id: number) {
+export function useDocDetail(kind: DocKind, id: number, enabled = true) {
   return useQuery({
     queryKey: ['doc', kind, id],
-    enabled: Number.isFinite(id) && id > 0,
+    enabled: enabled && Number.isFinite(id) && id > 0,
     queryFn: async () => {
       const raw = await http.get<RawDetail | null>(`/${kind === 'invoice' ? 'invoices' : 'orders'}/${id}`);
       if (!raw) throw new Error(kind === 'invoice' ? 'Không tìm thấy hóa đơn' : 'Không tìm thấy đơn đặt hàng');
@@ -406,10 +410,10 @@ export function useCashPackingLock(invoiceId: number, enabled: boolean): boolean
 // ---------- Tạo hóa đơn từ đơn đặt hàng ----------
 
 /** Đơn đặt hàng mới nhất để tạo hóa đơn (luôn tải lại khi mở). */
-export function useInvoiceDraft(orderId: number) {
+export function useInvoiceDraft(orderId: number, enabled = true) {
   return useQuery({
     queryKey: ['invoice-draft', orderId],
-    enabled: Number.isFinite(orderId) && orderId > 0,
+    enabled: enabled && Number.isFinite(orderId) && orderId > 0,
     queryFn: async () => {
       const raw = await http.get<RawOrderForInvoice | null>(`/orders/${orderId}`);
       if (!raw) throw new Error('Không tìm thấy đơn đặt hàng');

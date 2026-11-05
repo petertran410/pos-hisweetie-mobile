@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 import { WebView } from 'react-native-webview';
 import { errorMessage } from '@/core/http';
-import { Button, C, ErrorState, SheetHeader, toast, Txt } from '@/ui';
+import { useSession } from '@/core/session';
+import { Button, C, EmptyState, ErrorState, SheetHeader, toast, Txt } from '@/ui';
 import {
   choosePrinter,
   loadPrinter,
@@ -21,6 +22,9 @@ import {
   type RenderedPrint,
   type SavedPrinter,
 } from './print';
+import { useDocDetail } from '../orders/api';
+import { ownsDoc } from '../orders/model';
+import { canPrintDoc } from './perms';
 
 const TITLE: Record<PrintKind, string> = { invoice: 'Hóa đơn', order: 'Phiếu đặt hàng' };
 
@@ -207,6 +211,14 @@ export default function PrintPreviewScreen() {
   const kind: PrintKind = params.kind === 'invoice' ? 'invoice' : 'order';
   const id = Number(params.id);
   const code = params.code || `${kind}-${id}`;
+  // Mở thẳng bằng link cũng phải có quyền in (không chỉ ẩn nút In).
+  const user = useSession((s) => s.user);
+  const canPrint = canPrintDoc(user, kind);
+  // Tài khoản chỉ xem dữ liệu của mình: kiểm người tạo trước khi dựng phiếu in.
+  const ownOnly = user?.canViewOtherStaffData === false;
+  const owner = useDocDetail(kind, id, canPrint && ownOnly);
+  const notOwner = ownOnly && !!owner.data && !ownsDoc(user, owner.data.createdBy);
+  const allowed = canPrint && (!ownOnly || (!!owner.data && !notOwner));
   const [printer, setPrinter] = useState<SavedPrinter | null>(null);
   const [printing, setPrinting] = useState(false);
   const [sending, setSending] = useState(false);
@@ -218,7 +230,7 @@ export default function PrintPreviewScreen() {
 
   const doc = useQuery({
     queryKey: ['print-preview', kind, id],
-    enabled: Number.isFinite(id) && id > 0,
+    enabled: allowed && Number.isFinite(id) && id > 0,
     queryFn: async () => {
       const rendered = await renderPrint(kind, id);
       return { rendered, html: printDocument(rendered, { screen: true }) };
@@ -275,6 +287,29 @@ export default function PrintPreviewScreen() {
     if (!(await Sharing.isAvailableAsync())) throw new Error('Máy này không hỗ trợ chia sẻ file');
     await Sharing.shareAsync(uri, { mimeType, UTI, dialogTitle: code });
   };
+
+  if (!canPrint || notOwner) {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <SheetHeader title={TITLE[kind]} cancelLabel="Đóng" />
+        <EmptyState
+          icon="lock"
+          color="slate"
+          title="Chưa có quyền in phiếu"
+          message={notOwner ? 'Tài khoản chỉ được in chứng từ do mình tạo.' : 'Cần quyền in chứng từ và xem mẫu in. Liên hệ quản lý để được cấp quyền.'}
+        />
+      </View>
+    );
+  }
+  if (!allowed) {
+    // Đang kiểm người tạo (hoặc lỗi khi kiểm).
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <SheetHeader title={TITLE[kind]} cancelLabel="Đóng" />
+        {owner.isError ? <ErrorState error={owner.error} onRetry={() => void owner.refetch()} /> : <ActivityIndicator color={C.brand} style={{ marginTop: 40 }} />}
+      </View>
+    );
+  }
 
   return (
     <PrintPreviewView

@@ -148,8 +148,11 @@ interface FieldProps {
   /** Chữ hiện khi chưa chọn gì. */
   placeholder?: string;
   disabled?: boolean;
-  /** `row`: dòng trong thẻ form (nhãn trái, giá trị phải). `field`: ô có viền, nhãn phía trên. */
-  variant?: 'row' | 'field';
+  /**
+   * `row`: dòng trong thẻ form (nhãn trái, giá trị phải). `field`: ô có viền, nhãn phía trên.
+   * `pill`: nút gọn chỉ hiện giá trị (bộ lọc nhỏ ở đầu thẻ, vd "Tháng này ⌄").
+   */
+  variant?: 'row' | 'field' | 'pill';
 }
 
 export function SelectTrigger({
@@ -165,10 +168,27 @@ export function SelectTrigger({
   text: string;
   sub?: string | null;
   empty: boolean;
-  variant: 'row' | 'field';
+  variant: 'row' | 'field' | 'pill';
   disabled?: boolean;
   onPress: () => void;
 }) {
+  if (variant === 'pill') {
+    return (
+      <PressableScale
+        onPress={onPress}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={`${label}: ${text}. Bấm để đổi`}
+        scaleTo={0.95}
+        hitSlop={6}
+        style={[styles.pill, disabled ? { opacity: 0.6 } : null]}>
+        <Txt variant="label" weight="semibold" color={C.brand} numberOfLines={1} numeric style={{ flexShrink: 1 }}>
+          {text}
+        </Txt>
+        <Icon name="chevron-down" size={14} color={C.brand} />
+      </PressableScale>
+    );
+  }
   if (variant === 'field') {
     return (
       <View style={{ gap: 6 }}>
@@ -358,4 +378,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingVertical: 6 },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    maxWidth: 200,
+    minHeight: 32,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
+    backgroundColor: C.brandSoft,
+  },
 });

@@ -377,22 +377,13 @@ function MoveList({
   );
 }
 
-function BranchChips({
-  branches,
-  value,
-  onChange,
-}: {
-  branches: { id: number; name: string }[];
-  value: number | null;
-  onChange: (id: number) => void;
-}) {
-  if (branches.length < 2) return null;
+/** Thẻ kho / loại tồn chỉ xem ở chi nhánh đang chọn (giống web): quyền tính theo chi nhánh. */
+function LogBranchNote({ name }: { name?: string }) {
+  if (!name) return null;
   return (
-    <ChipGroup
-      options={branches.map((b) => ({ value: String(b.id), label: b.name }))}
-      value={value ? String(value) : null}
-      onChange={(v) => onChange(Number(v))}
-    />
+    <Txt variant="caption" color={C.muted}>
+      Chi nhánh {name}. Đổi chi nhánh ở tab Thêm.
+    </Txt>
   );
 }
 
@@ -402,9 +393,8 @@ export interface ProductDetailViewProps {
   branchId: number | null;
   tab: DetailTab;
   onTab: (t: DetailTab) => void;
-  branches: { id: number; name: string }[];
-  logBranchId: number | null;
-  onLogBranch: (id: number) => void;
+  /** Tên chi nhánh đang chọn (thẻ kho, loại tồn). */
+  logBranchName?: string;
   card: LogData;
   condition: { summary?: ConditionSummary; bucket: ConditionBucket; onBucket: (b: ConditionBucket) => void; logs: LogData };
   onOpenInvoice?: (id: number) => void;
@@ -470,12 +460,12 @@ export function ProductDetailView(p: ProductDetailViewProps) {
             <StockTab d={d} perms={perms} branchId={p.branchId} />
           ) : tab === 'card' ? (
             <View style={{ gap: 12 }}>
-              <BranchChips branches={p.branches} value={p.logBranchId} onChange={p.onLogBranch} />
+              <LogBranchNote name={p.logBranchName} />
               <MoveList data={p.card} empty="Chưa có dữ liệu thẻ kho" showCost={perms.viewCost} onOpenInvoice={p.onOpenInvoice} />
             </View>
           ) : tab === 'condition' ? (
             <View style={{ gap: 12 }}>
-              <BranchChips branches={p.branches} value={p.logBranchId} onChange={p.onLogBranch} />
+              <LogBranchNote name={p.logBranchName} />
               <Card style={[styles.block, styles.grid]}>
                 <StatCell label="Tồn kho" value={s ? qty(s.onHand) : '…'} />
                 <StatCell label="Hàng tốt" value={s ? qty(s.good) : '…'} tone="success" />
@@ -540,13 +530,13 @@ export default function ProductDetailScreen() {
   // Không có quyền xem thì không gọi API nào (mở thẳng bằng link).
   const detail = useProductDetail(id, perms.view);
   const [tab, setTab] = useState<DetailTab>('info');
-  const [logBranch, setLogBranch] = useState<number | null>(branchId);
   const [bucket, setBucket] = useState<ConditionBucket>('DAMAGED');
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const card = useStockCard(id, logBranch, perms.view && tab === 'card');
-  const summary = useConditionSummary(id, logBranch, perms.view && tab === 'condition');
-  const condLogs = useConditionLogs(id, bucket, logBranch, perms.view && tab === 'condition');
+  // Chỉ chi nhánh đang chọn: backend kiểm quyền theo chi nhánh trong header X-Branch-Id.
+  const card = useStockCard(id, branchId, perms.view && tab === 'card');
+  const summary = useConditionSummary(id, branchId, perms.view && tab === 'condition');
+  const condLogs = useConditionLogs(id, bucket, branchId, perms.view && tab === 'condition');
 
   if (!perms.view) return <ProductLocked />;
 
@@ -605,9 +595,7 @@ export default function ProductDetailScreen() {
       branchId={branchId}
       tab={tab}
       onTab={setTab}
-      branches={branches}
-      logBranchId={logBranch}
-      onLogBranch={setLogBranch}
+      logBranchName={branches.find((b) => b.id === branchId)?.name}
       card={logData(card)}
       condition={{ summary: summary.data, bucket, onBucket: setBucket, logs: logData(condLogs) }}
       onOpenInvoice={

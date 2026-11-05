@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { BranchPickerView } from '@/features/shell/BranchPickerScreen';
 import { DashboardView } from '@/features/dashboard/DashboardView';
-import type { DashRange, TaskType } from '@/features/dashboard/api';
+import type { DashBranch, TaskType } from '@/features/dashboard/api';
+import { DEFAULT_DASH_FILTERS, type DashFilters } from '@/features/dashboard/model';
 import { TaskListView } from '@/features/dashboard/TaskListScreen';
 import {
   sampleBanks,
@@ -112,6 +113,8 @@ import { newKhoForm, type KhoCreated, type KhoForm, type KhoType } from '@/featu
 const SCREENS = [
   { key: 'dang-nhap', title: 'Đăng nhập' },
   { key: 'tong-quan', title: 'Tổng quan' },
+  { key: 'tong-quan-nv', title: 'Tổng quan (nhân viên, không xem lợi nhuận)' },
+  { key: 'tong-quan-khoa', title: 'Tổng quan (chưa có quyền xem số liệu)' },
   { key: 'viec', title: 'Việc cần xử lý' },
   { key: 'them', title: 'Thêm' },
   { key: 'chi-nhanh', title: 'Chọn chi nhánh' },
@@ -254,7 +257,8 @@ function FakeTabBar({ active }: { active: string }) {
  */
 export default function PreviewScreen() {
   const { man } = useLocalSearchParams<{ man?: string }>();
-  const [range, setRange] = useState<DashRange>('today');
+  const [dashFilters, setDashFilters] = useState<DashFilters>(DEFAULT_DASH_FILTERS);
+  const [dashBranch, setDashBranch] = useState<DashBranch>(sampleBranches[0].id);
   const [task, setTask] = useState<TaskType>('orders');
   const [search, setSearch] = useState('');
   const [docKind, setDocKind] = useState<DocKind>('order');
@@ -295,6 +299,8 @@ export default function PreviewScreen() {
   const [khoForm, setKhoForm] = useState<{ key: string; form: KhoForm } | null>(null);
 
   useEffect(() => {
+    // Bản phát hành: link hisweetiepos://xem-truoc không được nạp dữ liệu mẫu vào giỏ / đơn đang sửa.
+    if (!__DEV__) return;
     if (man && ['gio-hang', 'sua-hang', 'giao-hang', 'giam-gia'].includes(man)) seedCart();
     if (man === 'xu-ly') startOrderEdit(sampleOrderEdit.cart, sampleOrderEdit.meta);
     if (man === 'xu-ly-km') startOrderEdit(sampleOrderEditPromo.cart, sampleOrderEditPromo.meta);
@@ -306,30 +312,40 @@ export default function PreviewScreen() {
   const toView = (key: string) => () => router.setParams({ man: key });
 
   if (man === 'dang-nhap') return <LoginScreen />;
-  if (man === 'tong-quan')
+  if (man === 'tong-quan' || man === 'tong-quan-nv' || man === 'tong-quan-khoa') {
+    // Nhân viên: có quyền xem tổng quan nhưng không phải Admin → ẩn lợi nhuận, nợ nhà cung cấp.
+    const dashUser =
+      man === 'tong-quan'
+        ? sampleUser
+        : {
+            ...sampleUser,
+            roles: ['Nhân viên bán hàng'],
+            permissions: man === 'tong-quan-nv' ? ['dashboard:view', 'invoices:create', 'invoices:view', 'customers:view'] : ['invoices:create'],
+          };
     return (
       <View style={{ flex: 1 }}>
         <DashboardView
-          user={sampleUser}
-          branchName={sampleBranches[0].name}
-          range={range}
-          onRangeChange={setRange}
+          user={dashUser}
+          branches={sampleBranches}
+          branch={dashBranch}
+          onBranchChange={setDashBranch}
+          filters={dashFilters}
+          onFilters={(patch) => setDashFilters((cur) => ({ ...cur, ...patch }))}
           data={sampleDashboard}
-          onOpenBranch={() => router.setParams({ man: 'chi-nhanh' })}
           onOpenAccount={() => router.setParams({ man: 'them' })}
           onOpenTask={() => router.setParams({ man: 'viec' })}
-          onShortcut={noop}
         />
         <FakeTabBar active="tong-quan" />
       </View>
     );
+  }
   if (man === 'viec')
     return (
       <TaskListView
         type={task}
         onTypeChange={setTask}
         rows={task === 'orders' ? sampleTasks : []}
-        counts={sampleDashboard.counts}
+        counts={sampleDashboard.counts.data}
       />
     );
   if (man === 'them')
@@ -578,9 +594,7 @@ export default function PreviewScreen() {
         branchId={1}
         tab={detailTab}
         onTab={setDetailTab}
-        branches={sampleBranches}
-        logBranchId={1}
-        onLogBranch={noop}
+        logBranchName={sampleBranches[0].name}
         card={sampleLogs()}
         condition={{
           summary: { onHand: 42, good: 35, damaged: 2, nearExpiry: 5, promo: 0 },

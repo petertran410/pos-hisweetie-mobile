@@ -2,6 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { dateVN, money, qty } from '@/core/format';
+import { useSession } from '@/core/session';
 import { usePullRefresh } from '@/core/usePullRefresh';
 import {
   C,
@@ -18,7 +19,7 @@ import {
   Txt,
 } from '@/ui';
 import { useTaskCounts, useTasks, type TaskRow, type TaskType } from './api';
-import { isValidTaskType, TASK_ORDER, TASKS, taskStatusLabel } from './model';
+import { isValidTaskType, parseBranchParam, TASK_ORDER, TASKS, taskStatusLabel } from './model';
 
 function TaskCard({ row, type }: { row: TaskRow; type: TaskType }) {
   const status = taskStatusLabel(type, row.status);
@@ -128,11 +129,14 @@ export function TaskListView({
 }
 
 export default function TaskListScreen() {
-  const { type: raw } = useLocalSearchParams<{ type: string }>();
+  const { type: raw, branch: rawBranch } = useLocalSearchParams<{ type: string; branch?: string }>();
   const type: TaskType = isValidTaskType(raw) ? raw : 'orders';
-  const tasks = useTasks(type);
+  // Cùng chi nhánh đang xem trên Tổng quan; mở thẳng bằng link thì theo chi nhánh làm việc.
+  const sessionBranch = useSession((s) => s.branchId);
+  const branch = parseBranchParam(rawBranch) ?? sessionBranch ?? 'all';
+  const tasks = useTasks(type, branch);
   const pull = usePullRefresh(tasks.refetch);
-  const counts = useTaskCounts();
+  const counts = useTaskCounts(branch);
   return (
     <TaskListView
       type={type}
