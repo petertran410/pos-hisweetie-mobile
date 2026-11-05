@@ -124,6 +124,7 @@ export interface RawPackDocLink {
     purchaseDate?: string | null;
     branchId?: number | null;
     customer?: RawParty | null;
+    paymentNote?: RawPayNote | null;
   } | null;
   consignment?: {
     id: number;
@@ -169,6 +170,7 @@ export interface RawPacking {
   hasColdItems?: boolean | null;
   coldItemCount?: number | null;
   coldItems?: { invoiceCode?: string | null; productCode?: string | null; productName?: string | null }[] | null;
+  cashWarning?: RawCashWarning | null;
 }
 
 /** Chứng từ (hóa đơn hoặc phiếu ký gửi) gắn với phiếu. */
@@ -229,9 +231,57 @@ export function toDocItem(link: RawPackDocLink): DocItem | null {
       date: i.purchaseDate ?? null,
       branchId: i.branchId ?? null,
       coldCount: 0,
+      payNote: toPayNote(i.paymentNote),
     };
   }
   return null;
+}
+
+// ---------- Cảnh báo thu tiền mặt (phiếu giao hàng) ----------
+
+/**
+ * Phiếu giao hàng lệch với ghi chú thanh toán của hóa đơn:
+ * - `transfer`: hóa đơn ghi thu tiền mặt nhưng phiếu chọn chuyển khoản;
+ * - `amount`: tiền mặt cần thu trên phiếu khác tổng tiền mặt ghi trên các hóa đơn.
+ */
+export interface CashWarning {
+  kind: 'transfer' | 'amount';
+  /** Tổng tiền mặt các hóa đơn ghi thu. */
+  invoiceCash: number;
+  /** Tiền mặt cần thu ghi trên phiếu (0 khi chuyển khoản). */
+  slipCash: number;
+  /** Mã các hóa đơn ghi thu tiền mặt. */
+  codes: string[];
+}
+
+interface RawCashWarning {
+  kind?: string | null;
+  invoiceCash?: string | number | null;
+  slipCash?: string | number | null;
+  codes?: (string | null)[] | null;
+}
+
+export const toCashWarning = (r?: RawCashWarning | null): CashWarning | null =>
+  r && (r.kind === 'transfer' || r.kind === 'amount')
+    ? { kind: r.kind, invoiceCash: num(r.invoiceCash), slipCash: num(r.slipCash), codes: (r.codes ?? []).filter((c): c is string => !!c) }
+    : null;
+
+/** Lệch dưới mức này (đồng) coi như khớp, giống backend. */
+const CASH_EPSILON = 0.5;
+
+/**
+ * Tính cảnh báo ngay trên form, cùng quy tắc với backend (`packingCashWarning`):
+ * chưa hóa đơn nào có ghi chú thanh toán thì không cảnh báo.
+ */
+export function cashWarningOf(payMethod: 'cash' | 'transfer', cashAmount: number, docs: DocItem[]): CashWarning | null {
+  const noted = docs.filter((d) => d.kind === 'invoice' && d.payNote);
+  if (!noted.length) return null;
+  const cashDocs = noted.filter((d) => d.payNote?.cash);
+  const invoiceCash = cashDocs.reduce((s, d) => s + (d.payNote?.amount ?? 0), 0);
+  const codes = cashDocs.map((d) => d.code);
+  if (payMethod !== 'cash') return cashDocs.length ? { kind: 'transfer', invoiceCash, slipCash: 0, codes } : null;
+  const slipCash = Number(cashAmount) || 0;
+  return Math.abs(slipCash - invoiceCash) > CASH_EPSILON ? { kind: 'amount', invoiceCash, slipCash, codes } : null;
 }
 
 /** Hóa đơn / phiếu ký gửi trả về từ ô chọn chứng từ (`/…/for-packing`) hoặc quét QR. */
@@ -281,6 +331,8 @@ export interface PackRow {
   /** Giao hàng: tiền mặt cần thu; null khi chuyển khoản / loại khác. */
   cash: number | null;
   transfer: boolean;
+  /** Giao hàng lệch tiền mặt so với hóa đơn (backend tính). */
+  cashWarning: CashWarning | null;
 }
 
 function whoOf(docs: DocItem[], branchName: string | null): string {
@@ -309,6 +361,7 @@ export function toPackRow(r: RawPacking): PackRow | null {
     coldCount: r.hasColdItems ? num(r.coldItemCount) : 0,
     cash: isCash ? num(r.cashAmount) : null,
     transfer: type === 'giao-hang' && !isCash,
+    cashWarning: type === 'giao-hang' ? toCashWarning(r.cashWarning) : null,
   };
 }
 
@@ -332,6 +385,8 @@ export interface PackFilters {
   pay: PayFilter;
   /** Lọc nhiều chi nhánh; rỗng = chi nhánh đang chọn (giống web). */
   branchIds: number[];
+  /** Chỉ phiếu giao hàng lệch tiền mặt so với hóa đơn. */
+  cashWarning: boolean;
 }
 
 export const DEFAULT_PACK_FILTERS: PackFilters = {
@@ -343,11 +398,12 @@ export const DEFAULT_PACK_FILTERS: PackFilters = {
   customerSearch: '',
   pay: 'all',
   branchIds: [],
+  cashWarning: false,
 };
 
 /** Số bộ lọc trong sheet lọc (không tính ô tìm, loại, thời gian). */
 export const packFilterCount = (f: PackFilters) =>
-  [f.invoiceSearch.trim(), f.customerSearch.trim(), f.pay !== 'all', f.branchIds.length > 0].filter(Boolean).length;
+  [f.invoiceSearch.trim(), f.customerSearch.trim(), f.pay !== 'all', f.branchIds.length > 0, f.cashWarning].filter(Boolean).length;
 
 export const PACK_PAGE_SIZE = 20;
 
@@ -363,6 +419,8 @@ export function packListQuery(f: PackFilters, branchId: number | null, page: num
   };
   // Lọc thanh toán chỉ có ở phiếu giao hàng (backend tự bỏ 2 loại kia).
   if (f.pay !== 'all') q.paymentMethod = f.pay;
+  // Chỉ phiếu giao hàng lệch tiền mặt (backend cũng chỉ trả phiếu giao hàng).
+  if (f.cashWarning) q.cashWarning = true;
   if (f.type !== 'all') q.type = f.type;
   const range = resolvePeriod(f.period, now);
   if (range) {
@@ -420,6 +478,7 @@ export interface PackDetail {
   loadingBy: { id: number; name: string } | null;
   payMethod: 'cash' | 'transfer';
   cashAmount: number;
+  cashWarning: CashWarning | null;
   fees: Fees;
   payer: { id: number; name: string } | null;
   files: PackFile[];
@@ -449,6 +508,7 @@ export function toPackDetail(type: PackType, r: RawPacking): PackDetail {
     loadingBy: r.loadingBy?.id ? { id: r.loadingBy.id, name: r.loadingBy.name ?? '' } : null,
     payMethod: r.paymentMethod === 'cash' ? 'cash' : 'transfer',
     cashAmount: num(r.cashAmount),
+    cashWarning: type === 'giao-hang' && !r.cancelledAt ? toCashWarning(r.cashWarning) : null,
     fees,
     payer: r.expensePayer?.id ? { id: r.expensePayer.id, name: r.expensePayer.name ?? '' } : null,
     files: (r.expenseFiles ?? [])

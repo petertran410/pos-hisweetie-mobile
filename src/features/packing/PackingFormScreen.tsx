@@ -24,12 +24,13 @@ import {
   Select,
   SubHeader,
   toast,
+  toneColors,
   Txt,
 } from '@/ui';
 import { useStaff } from '../customers/api';
 import { FormCard, Note, NumRow, SwitchRow, TextRow } from '../products/formParts';
 import { createPacking, refreshAfterPacking, updatePacking } from './api';
-import { AttachmentTile, DocRow, FileLine } from './components';
+import { AttachmentTile, CashWarningNote, DocRow, FileLine } from './components';
 import {
   clearPackDraft,
   enqueueAttachments,
@@ -45,6 +46,7 @@ import {
 import {
   applyDocPay,
   buildPackPayload,
+  cashWarningOf,
   docPay,
   FEES,
   isImageFile,
@@ -205,6 +207,8 @@ export function PackingFormView(p: PackingFormViewProps) {
   const invoicePay = f.type === 'giao-hang' ? docPay(f.docs) : null;
   const payDiffers =
     !!invoicePay && (f.payMethod !== (invoicePay.cash ? 'cash' : 'transfer') || (invoicePay.cash && f.cashAmount !== invoicePay.amount));
+  // Lệch với hóa đơn thì báo trước: lưu xong phiếu sẽ bị gắn cảnh báo trong danh sách.
+  const payWarn = f.type === 'giao-hang' ? cashWarningOf(f.payMethod, f.cashAmount, f.docs) : null;
   const expenseImages = f.files.filter((a) => isImageFile(a));
   const expenseDocs = f.files.filter((a) => !isImageFile(a));
   const view = (list: Attachment[], uri: string) => {
@@ -282,14 +286,22 @@ export function PackingFormView(p: PackingFormViewProps) {
               </Txt>
               <ChipGroup fill options={PAY_METHODS} value={f.payMethod} onChange={(payMethod) => p.onChange({ payMethod, payAuto: false })} />
               {f.payMethod === 'cash' ? (
-                <MoneyField label="Tiền mặt cần thu" value={f.cashAmount} onChange={(cashAmount) => p.onChange({ cashAmount, payAuto: false })} />
+                <MoneyField label="Tiền mặt cần thu" bold value={f.cashAmount} onChange={(cashAmount) => p.onChange({ cashAmount, payAuto: false })} />
               ) : null}
               {invoicePay ? (
                 <View style={styles.payHint}>
                   <Txt variant="caption" color={C.muted} style={{ flex: 1 }} numeric>
-                    {invoicePay.cash
-                      ? `Theo hóa đơn: thu tiền mặt ${money(invoicePay.amount)} ₫ (${invoicePay.codes.join(', ')})`
-                      : 'Theo hóa đơn: khách chuyển khoản'}
+                    {invoicePay.cash ? (
+                      <>
+                        Theo hóa đơn:{' '}
+                        <Txt variant="caption" weight="bold" color={toneColors.warning.fg}>
+                          thu tiền mặt {money(invoicePay.amount)} ₫
+                        </Txt>{' '}
+                        ({invoicePay.codes.join(', ')})
+                      </>
+                    ) : (
+                      'Theo hóa đơn: khách chuyển khoản'
+                    )}
                   </Txt>
                   {payDiffers ? (
                     <PressableScale
@@ -307,6 +319,7 @@ export function PackingFormView(p: PackingFormViewProps) {
                   ) : null}
                 </View>
               ) : null}
+              {payWarn ? <CashWarningNote warning={payWarn} title="Khác hóa đơn: phiếu sẽ bị cảnh báo" /> : null}
             </View>
 
             <FormCard title="Chi phí giao hàng" hint="Bật khoản đã chi khi giao; có chi phí thì cần chọn người chi.">

@@ -499,8 +499,16 @@ export const sampleUnpaid: UnpaidInvoice[] = [
 
 // ---------- Báo đơn ----------
 
-const packInv = (id: number, code: string, customer: string, total: number) => ({
-  invoice: { id, code, grandTotal: total, purchaseDate: ago(0, 8), branchId: 1, customer: { id, name: customer } },
+const packInv = (id: number, code: string, customer: string, total: number, cash?: number) => ({
+  invoice: {
+    id,
+    code,
+    grandTotal: total,
+    purchaseDate: ago(0, 8),
+    branchId: 1,
+    customer: { id, name: customer },
+    paymentNote: cash ? { paymentType: 'cash', amount: cash } : null,
+  },
 });
 
 export const sampleRawPackings: RawPacking[] = [
@@ -517,7 +525,9 @@ export const sampleRawPackings: RawPacking[] = [
     imageCount: 3,
     hasColdItems: true,
     coldItemCount: 2,
-    invoices: [packInv(1, 'HD000301', 'Quán mẫu Trà Mây', 850000), packInv(2, 'HD000302', 'Tiệm mẫu Gió Chiều', 400000)],
+    invoices: [packInv(1, 'HD000301', 'Quán mẫu Trà Mây', 850000, 850000), packInv(2, 'HD000302', 'Tiệm mẫu Gió Chiều', 450000, 450000)],
+    // Backend tính: phiếu thu 1.250.000 nhưng 2 hóa đơn ghi tổng 1.300.000.
+    cashWarning: { kind: 'amount', invoiceCash: 1300000, slipCash: 1250000, codes: ['HD000301', 'HD000302'] },
   },
   {
     id: 12,
@@ -549,7 +559,8 @@ export const sampleRawPackings: RawPacking[] = [
     createdAt: ago(1, 14, 20),
     creator: { name: 'Trần Văn Nam' },
     imageCount: 1,
-    invoices: [packInv(5, 'HD000285', 'Tiệm mẫu Gió Chiều', 320000)],
+    invoices: [packInv(5, 'HD000285', 'Tiệm mẫu Gió Chiều', 320000, 320000)],
+    cashWarning: { kind: 'transfer', invoiceCash: 320000, slipCash: 0, codes: ['HD000285'] },
   },
 ];
 

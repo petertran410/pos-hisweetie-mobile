@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession, type Branch } from '@/core/session';
 import { Button, C, Divider, MultiSelect, Select, SheetHeader } from '@/ui';
-import { FormCard, TextRow } from '../products/formParts';
+import { FormCard, SwitchRow, TextRow } from '../products/formParts';
 import { setPackFilters, usePackFilters } from './filters';
 import { packFilterCount, type PackFilters, type PayFilter } from './model';
 
@@ -28,7 +28,7 @@ export interface PackFilterViewProps {
   onCancel?: () => void;
 }
 
-/** Sheet lọc báo đơn: chi nhánh, mã hóa đơn, tên khách, hình thức thanh toán (phiếu giao hàng). */
+/** Sheet lọc báo đơn: chi nhánh, mã hóa đơn, tên khách, thanh toán và cảnh báo tiền mặt (phiếu giao hàng). */
 export function PackFilterView({ draft, branches, branchId, onChange, onApply, onReset, onCancel }: PackFilterViewProps) {
   const insets = useSafeAreaInsets();
   const count = packFilterCount(draft);
@@ -66,6 +66,14 @@ export function PackFilterView({ draft, branches, branchId, onChange, onApply, o
             clearLabel="Tất cả"
           />
         </FormCard>
+        <FormCard title="Cảnh báo">
+          <SwitchRow
+            label="Chỉ phiếu lệch tiền mặt"
+            sub="Phiếu giao hàng có tiền mặt cần thu khác hóa đơn"
+            value={draft.cashWarning}
+            onChange={(cashWarning) => onChange({ cashWarning })}
+          />
+        </FormCard>
         {count > 0 ? <Button title={`Xóa ${count} bộ lọc`} icon="x" variant="outline" size="medium" onPress={onReset} /> : null}
       </ScrollView>
     </View>
@@ -82,9 +90,15 @@ export default function PackFilterScreen() {
       branches={branches}
       branchId={branchId}
       onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
-      onReset={() => setDraft((d) => ({ ...d, invoiceSearch: '', customerSearch: '', pay: 'all', branchIds: [] }))}
+      onReset={() => setDraft((d) => ({ ...d, invoiceSearch: '', customerSearch: '', pay: 'all', branchIds: [], cashWarning: false }))}
       onApply={() => {
-        setPackFilters({ invoiceSearch: draft.invoiceSearch, customerSearch: draft.customerSearch, pay: draft.pay, branchIds: draft.branchIds });
+        setPackFilters({
+          invoiceSearch: draft.invoiceSearch,
+          customerSearch: draft.customerSearch,
+          pay: draft.pay,
+          branchIds: draft.branchIds,
+          cashWarning: draft.cashWarning,
+        });
         router.back();
       }}
     />

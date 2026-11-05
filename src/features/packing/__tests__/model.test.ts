@@ -12,6 +12,7 @@ import {
   addDocs,
   applyDocPay,
   buildPackPayload,
+  cashWarningOf,
   DEFAULT_PACK_FILTERS,
   newPackForm,
   packFilterCount,
@@ -210,6 +211,44 @@ describe('thanh toán theo hóa đơn (phiếu giao hàng)', () => {
     expect(addDocs(manual, [cashDoc(1, 500000)]).form).toMatchObject({ payMethod: 'transfer', cashAmount: 0 });
     expect(applyDocPay({ ...manual, payAuto: true, docs: [cashDoc(1, 500000)] })).toMatchObject({ payMethod: 'cash', cashAmount: 500000 });
     expect(newPackForm('dong-hang', 1, [cashDoc(1, 500000)])).toMatchObject({ payMethod: 'transfer', cashAmount: 0 });
+  });
+});
+
+describe('cảnh báo lệch tiền mặt (phiếu giao hàng)', () => {
+  const cashDoc = (id: number, amount: number): DocItem => ({ ...doc(id), payNote: { cash: true, amount } });
+  const transferDoc = (id: number): DocItem => ({ ...doc(id), payNote: { cash: false, amount: 0 } });
+
+  it('cùng quy tắc với backend: cộng tiền mặt các hóa đơn rồi so với phiếu', () => {
+    const two = [cashDoc(1, 500000), cashDoc(2, 800000)];
+    expect(cashWarningOf('cash', 1300000, two)).toBeNull();
+    expect(cashWarningOf('cash', 1000000, two)).toEqual({ kind: 'amount', invoiceCash: 1300000, slipCash: 1000000, codes: ['HD1', 'HD2'] });
+    expect(cashWarningOf('transfer', 0, [cashDoc(1, 500000), transferDoc(2)])).toEqual({ kind: 'transfer', invoiceCash: 500000, slipCash: 0, codes: ['HD1'] });
+    expect(cashWarningOf('cash', 500000, [transferDoc(1)])).toMatchObject({ kind: 'amount', invoiceCash: 0 });
+    expect(cashWarningOf('transfer', 0, [transferDoc(1)])).toBeNull();
+    // Chưa hóa đơn nào có ghi chú, hoặc lệch dưới 1 đồng: không cảnh báo.
+    expect(cashWarningOf('cash', 500000, [doc(1)])).toBeNull();
+    expect(cashWarningOf('cash', 850000.4, [cashDoc(1, 850000)])).toBeNull();
+  });
+
+  it('đọc cảnh báo backend trả về; phiếu đã hủy hoặc loại khác thì bỏ', () => {
+    const w = { kind: 'transfer', invoiceCash: '320000', slipCash: 0, codes: ['HD5', null] };
+    expect(toPackRow({ id: 1, type: 'giao-hang', cashWarning: w })?.cashWarning).toEqual({ kind: 'transfer', invoiceCash: 320000, slipCash: 0, codes: ['HD5'] });
+    expect(toPackRow({ id: 2, type: 'dong-hang', cashWarning: w })?.cashWarning).toBeNull();
+    expect(toPackRow({ id: 3, type: 'giao-hang', cashWarning: { kind: 'la' } })?.cashWarning).toBeNull();
+    expect(toPackDetail('giao-hang', { id: 4, cashWarning: w }).cashWarning?.kind).toBe('transfer');
+    expect(toPackDetail('giao-hang', { id: 5, cancelledAt: '2026-11-04T00:00:00Z', cashWarning: w }).cashWarning).toBeNull();
+  });
+
+  it('chi tiết phiếu đọc ghi chú thanh toán của từng hóa đơn', () => {
+    const d = toPackDetail('giao-hang', { id: 6, invoices: [{ invoice: { id: 9, code: 'HD9', paymentNote: { paymentType: 'cash', amount: '450000' } } }] });
+    expect(d.docs[0].payNote).toEqual({ cash: true, amount: 450000 });
+  });
+
+  it('bộ lọc "chỉ phiếu lệch tiền mặt" gửi cashWarning=true và tính vào số bộ lọc', () => {
+    const f = { ...DEFAULT_PACK_FILTERS, cashWarning: true };
+    expect(packListQuery(f, 1, 1, NOW).cashWarning).toBe(true);
+    expect(packListQuery(DEFAULT_PACK_FILTERS, 1, 1, NOW).cashWarning).toBeUndefined();
+    expect(packFilterCount(f)).toBe(1);
   });
 });
 

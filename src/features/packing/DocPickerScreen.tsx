@@ -25,12 +25,12 @@ export default function DocPickerScreen() {
     title: `${d.code}${d.customerName ? ` · ${d.customerName}` : ''}`,
     sub: [
       d.date ? dateVN(d.date) : null,
-      d.payNote?.cash ? `Thu TM ${money(d.payNote.amount)}` : null,
       d.coldCount ? `Hàng lạnh ${d.coldCount}` : null,
       d.packingCount ? `${done} ${d.packingCount} lần` : null,
     ]
       .filter(Boolean)
       .join(' · '),
+    note: d.payNote?.cash ? (d.payNote.amount ? `Thu tiền mặt ${money(d.payNote.amount)} ₫` : 'Thu tiền mặt') : null,
   }));
 
   const apply = () => {

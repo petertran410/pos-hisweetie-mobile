@@ -58,6 +58,7 @@ export function MoneyField({
   placeholder = '0',
   suffix = '₫',
   editable = true,
+  bold,
 }: {
   label: string;
   value: number;
@@ -66,6 +67,8 @@ export function MoneyField({
   placeholder?: string;
   suffix?: string;
   editable?: boolean;
+  /** Số tiền in đậm (khoản cần chú ý như tiền mặt cần thu). */
+  bold?: boolean;
 }) {
   return (
     <TextField
@@ -77,8 +80,9 @@ export function MoneyField({
       error={error}
       editable={editable}
       selectTextOnFocus
+      style={bold && value ? { fontFamily: fonts.bold } : undefined}
       right={
-        <Txt variant="body" color={C.muted}>
+        <Txt variant="body" weight={bold ? 'semibold' : undefined} color={C.muted}>
           {suffix}
         </Txt>
       }
