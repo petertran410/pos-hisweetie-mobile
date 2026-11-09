@@ -10,14 +10,15 @@ import { fitSize, needsCompress } from '../media';
 // eslint-disable-next-line import/first
 import {
   addDocs,
-  applyDocPay,
   buildPackPayload,
   cashWarningOf,
+  choosePayMethod,
   DEFAULT_PACK_FILTERS,
   newPackForm,
   packFilterCount,
   packListQuery,
   packPerms,
+  payFromDocs,
   pendingUploads,
   toPackDetail,
   toPackForm,
@@ -115,13 +116,14 @@ describe('chọn chứng từ', () => {
 });
 
 describe('kiểm tra và nội dung gửi', () => {
-  const ready = (over: Partial<PackForm> = {}): PackForm => ({ ...newPackForm('giao-hang', 1, [doc(1)]), packages: 1, ...over });
+  const ready = (over: Partial<PackForm> = {}): PackForm => ({ ...newPackForm('giao-hang', 1, [doc(1)]), packages: 1, payMethod: 'transfer', ...over });
 
   it('báo lỗi đầu tiên cần sửa', () => {
     expect(validatePackForm(newPackForm('dong-hang', 1))).toBe('Vui lòng chọn ít nhất 1 hóa đơn');
     // Số kiện để trống như web: phải tự nhập.
     expect(validatePackForm({ ...newPackForm('giao-hang', 1, [doc(1)]) })).toBe('Số kiện phải lớn hơn 0');
     expect(validatePackForm({ ...ready(), type: 'loading' })).toBe('Vui lòng chọn người loading');
+    expect(validatePackForm(ready({ payMethod: null }))).toBe('Vui lòng chọn hình thức thanh toán: chuyển khoản hoặc tiền mặt');
     expect(validatePackForm(ready({ payMethod: 'cash', cashAmount: 0 }))).toBe('Vui lòng nhập số tiền thanh toán');
     expect(validatePackForm(ready({ fees: { ...ready().fees, grab: { on: true, amount: 50000 } } }))).toBe('Vui lòng chọn người chi khi có chi phí');
     expect(validatePackForm(ready())).toBeNull();
@@ -196,21 +198,26 @@ describe('thanh toán theo hóa đơn (phiếu giao hàng)', () => {
     expect(toCandidate({ id: 3 }, 'invoice').payNote).toBeNull();
   });
 
-  it('chọn hóa đơn tiền mặt thì tự chọn Tiền mặt và cộng số tiền cần thu', () => {
+  it('không chọn sẵn hình thức thanh toán, kể cả khi hóa đơn ghi tiền mặt', () => {
     let f = newPackForm('giao-hang', 1, [cashDoc(1, 500000)]);
-    expect(f).toMatchObject({ payMethod: 'cash', cashAmount: 500000 });
+    expect(f).toMatchObject({ payMethod: null, cashAmount: 0 });
     f = addDocs(f, [cashDoc(2, 250000), transferDoc(3)]).form;
-    expect(f).toMatchObject({ payMethod: 'cash', cashAmount: 750000 });
-    // Bỏ hết hóa đơn tiền mặt: về chuyển khoản.
-    f = addDocs({ ...f, docs: [] }, [transferDoc(3)]).form;
-    expect(f).toMatchObject({ payMethod: 'transfer', cashAmount: 0 });
+    expect(f).toMatchObject({ payMethod: null, cashAmount: 0 });
   });
 
-  it('đã sửa tay thì không ghi đè; sửa phiếu cũ giữ số đã lưu; loại phiếu khác không đụng', () => {
-    const manual = { ...newPackForm('giao-hang', 1), payAuto: false, payMethod: 'transfer' as const };
-    expect(addDocs(manual, [cashDoc(1, 500000)]).form).toMatchObject({ payMethod: 'transfer', cashAmount: 0 });
-    expect(applyDocPay({ ...manual, payAuto: true, docs: [cashDoc(1, 500000)] })).toMatchObject({ payMethod: 'cash', cashAmount: 500000 });
-    expect(newPackForm('dong-hang', 1, [cashDoc(1, 500000)])).toMatchObject({ payMethod: 'transfer', cashAmount: 0 });
+  it('tự chọn tiền mặt khi ô trống thì điền tiền mặt theo hóa đơn; đã có số thì giữ', () => {
+    const f = newPackForm('giao-hang', 1, [cashDoc(1, 500000), cashDoc(2, 250000)]);
+    expect(choosePayMethod(f, 'cash')).toEqual({ payMethod: 'cash', cashAmount: 750000 });
+    expect(choosePayMethod({ ...f, cashAmount: 100000 }, 'cash')).toEqual({ payMethod: 'cash', cashAmount: 100000 });
+    expect(choosePayMethod(f, 'transfer')).toEqual({ payMethod: 'transfer', cashAmount: 0 });
+    // Hóa đơn không ghi tiền mặt: để trống cho người dùng nhập.
+    expect(choosePayMethod(newPackForm('giao-hang', 1, [transferDoc(3)]), 'cash')).toEqual({ payMethod: 'cash', cashAmount: 0 });
+  });
+
+  it('nút "Dùng theo hóa đơn" lấy đúng hình thức + số tiền hóa đơn ghi', () => {
+    expect(payFromDocs(newPackForm('giao-hang', 1, [cashDoc(1, 500000), transferDoc(3)]))).toEqual({ payMethod: 'cash', cashAmount: 500000 });
+    expect(payFromDocs({ ...newPackForm('giao-hang', 1, [transferDoc(3)]), cashAmount: 9 })).toEqual({ payMethod: 'transfer', cashAmount: 0 });
+    expect(payFromDocs(newPackForm('giao-hang', 1, [doc(1)]))).toBeNull();
   });
 });
 

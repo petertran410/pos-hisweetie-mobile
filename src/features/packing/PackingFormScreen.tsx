@@ -42,9 +42,9 @@ import {
   waitForUploads,
 } from './draft';
 import {
-  applyDocPay,
   buildPackPayload,
   cashWarningOf,
+  choosePayMethod,
   docPay,
   FEES,
   isImageFile,
@@ -52,6 +52,7 @@ import {
   newPackForm,
   PACK_TYPES,
   packPerms,
+  payFromDocs,
   pendingUploads,
   validatePackForm,
   type Attachment,
@@ -164,12 +165,14 @@ export function PackingFormView(p: PackingFormViewProps) {
   const docWord = f.docMode === 'consignment' ? 'phiếu ký gửi' : 'hóa đơn';
   const branchLocked = f.type !== 'giao-hang' && f.docs.length > 0;
   const hint = uploadHint(f.images);
-  // Hóa đơn ghi khách trả tiền mặt: phiếu điền sẵn tiền mặt + số tiền; đã sửa tay thì cho lấy lại theo hóa đơn.
+  // Thanh toán ghi trên hóa đơn chỉ để gợi ý; hình thức do người tạo phiếu tự chọn.
   const invoicePay = f.type === 'giao-hang' ? docPay(f.docs) : null;
   const payDiffers =
-    !!invoicePay && (f.payMethod !== (invoicePay.cash ? 'cash' : 'transfer') || (invoicePay.cash && f.cashAmount !== invoicePay.amount));
+    !!f.payMethod &&
+    !!invoicePay &&
+    (f.payMethod !== (invoicePay.cash ? 'cash' : 'transfer') || (invoicePay.cash && f.cashAmount !== invoicePay.amount));
   // Lệch với hóa đơn thì báo trước: lưu xong phiếu sẽ bị gắn cảnh báo trong danh sách.
-  const payWarn = f.type === 'giao-hang' ? cashWarningOf(f.payMethod, f.cashAmount, f.docs) : null;
+  const payWarn = f.type === 'giao-hang' && f.payMethod ? cashWarningOf(f.payMethod, f.cashAmount, f.docs) : null;
   const expenseImages = f.files.filter((a) => isImageFile(a));
   const expenseDocs = f.files.filter((a) => !isImageFile(a));
   const view = (list: Attachment[], uri: string) => {
@@ -245,9 +248,9 @@ export function PackingFormView(p: PackingFormViewProps) {
               <Txt variant="heading" style={{ marginTop: 6 }}>
                 Thanh toán
               </Txt>
-              <ChipGroup fill options={PAY_METHODS} value={f.payMethod} onChange={(payMethod) => p.onChange({ payMethod, payAuto: false })} />
+              <ChipGroup fill options={PAY_METHODS} value={f.payMethod} onChange={(payMethod) => p.onChange(choosePayMethod(f, payMethod))} />
               {f.payMethod === 'cash' ? (
-                <MoneyField label="Tiền mặt cần thu" bold value={f.cashAmount} onChange={(cashAmount) => p.onChange({ cashAmount, payAuto: false })} />
+                <MoneyField label="Tiền mặt cần thu" bold value={f.cashAmount} onChange={(cashAmount) => p.onChange({ cashAmount })} />
               ) : null}
               {invoicePay ? (
                 <View style={styles.payHint}>
@@ -267,8 +270,8 @@ export function PackingFormView(p: PackingFormViewProps) {
                   {payDiffers ? (
                     <PressableScale
                       onPress={() => {
-                        const auto = applyDocPay({ ...f, payAuto: true });
-                        p.onChange({ payAuto: true, payMethod: auto.payMethod, cashAmount: auto.cashAmount });
+                        const pay = payFromDocs(f);
+                        if (pay) p.onChange(pay);
                       }}
                       accessibilityRole="button"
                       hitSlop={8}
@@ -535,7 +538,8 @@ export default function PackingFormScreen() {
           });
         // Chỉ có quyền tạo (không có quyền xem loại phiếu này) thì không mở phiếu vừa tạo.
         const canOpen = !!created?.id && perms.view(latest.type);
-        // Giống web: tạo xong có thể làm tiếp phiếu khác ngay (giữ chi nhánh, loại chứng từ, cách thanh toán).
+        // Giống web: tạo xong có thể làm tiếp phiếu khác ngay (giữ chi nhánh, loại chứng từ;
+        // hình thức thanh toán để trống cho người dùng tự chọn lại).
         Alert.alert(created?.code ? `Đã tạo ${created.code}` : `Đã tạo phiếu ${label}`, canOpen ? 'Làm tiếp phiếu khác hay xem phiếu vừa tạo?' : 'Làm tiếp phiếu khác?', [
           canOpen ? { text: 'Xem phiếu', onPress: () => leave(true) } : { text: 'Xong', onPress: () => leave(false) },
           {
@@ -545,7 +549,6 @@ export default function PackingFormScreen() {
               startPackDraft({
                 ...newPackForm(latest.type, latest.branchId),
                 docMode: latest.docMode,
-                payMethod: latest.payMethod,
               }),
           },
         ]);

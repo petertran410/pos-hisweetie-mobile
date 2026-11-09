@@ -96,7 +96,6 @@ import { PackingFormView } from '@/features/packing/PackingFormScreen';
 import { PackFilterView } from '@/features/packing/PackFilterScreen';
 import { PackingListView } from '@/features/packing/PackingListScreen';
 import {
-  applyDocPay,
   DEFAULT_PACK_FILTERS,
   newPackForm,
   packPerms,
@@ -835,12 +834,14 @@ export default function PreviewScreen() {
   if (man === 'tao-giao-hang' || man === 'tao-loading') {
     const seed =
       man === 'tao-giao-hang'
-        ? applyDocPay({
+        ? {
             ...toPackForm(samplePackDetail),
-            payAuto: true,
+            // Phiếu mới: hình thức thanh toán để trống cho người dùng tự chọn.
+            payMethod: null,
+            cashAmount: 0,
             docs: samplePackDetail.docs.map((d, i) => ({ ...d, payNote: i === 0 ? { cash: true, amount: 850_000 } : { cash: false, amount: 0 } })),
             images: [...toPackForm(samplePackDetail).images, { key: 'up', uri: 'https://example.com/uploads/bao-don/mau-4.jpg', url: null, state: 'uploading' as const, name: 'Ảnh', type: 'image/jpeg', size: null }],
-          })
+          }
         : { ...newPackForm('loading', 1, samplePackDetail.docs.slice(0, 1)) };
     const form = packForm?.key === man ? packForm.form : seed;
     const patch = (p: Partial<PackForm>) => setPackForm({ key: man, form: { ...form, ...p } });

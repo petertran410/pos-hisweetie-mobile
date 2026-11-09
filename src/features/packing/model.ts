@@ -552,10 +552,9 @@ export interface PackForm {
   // Loading
   loadingBy: { id: number; name: string } | null;
   // Giao hàng
-  payMethod: 'cash' | 'transfer';
+  /** null = chưa chọn: người tạo phiếu tự chọn, hệ thống không chọn sẵn (giống bán hàng). */
+  payMethod: 'cash' | 'transfer' | null;
   cashAmount: number;
-  /** Thanh toán đang lấy theo hóa đơn; người dùng tự sửa thì thôi không ghi đè. */
-  payAuto: boolean;
   fees: Fees;
   payer: { id: number; name: string } | null;
   files: Attachment[];
@@ -572,7 +571,7 @@ const remote = (url: string, i: number, name?: string, type?: string | null, siz
 });
 
 export function newPackForm(type: PackType, branchId: number | null, docs: DocItem[] = []): PackForm {
-  return applyDocPay({
+  return {
     type,
     docMode: 'invoice',
     branchId,
@@ -582,32 +581,41 @@ export function newPackForm(type: PackType, branchId: number | null, docs: DocIt
     note: '',
     images: [],
     loadingBy: null,
-    payMethod: 'transfer',
+    payMethod: null,
     cashAmount: 0,
-    payAuto: true,
     fees: NO_FEES,
     payer: null,
     files: [],
-  });
+  };
 }
 
-/** Thanh toán theo các hóa đơn đã chọn: có hóa đơn ghi tiền mặt thì thu tiền mặt, cộng số tiền cần thu. */
+/** Thanh toán ghi trên các hóa đơn đã chọn (chỉ để gợi ý): có hóa đơn ghi tiền mặt thì cộng số tiền cần thu. */
 export function docPay(docs: DocItem[]): { cash: boolean; amount: number; codes: string[] } | null {
   const cashDocs = docs.filter((d) => d.payNote?.cash);
   if (!cashDocs.length) return docs.some((d) => d.payNote) ? { cash: false, amount: 0, codes: [] } : null;
   return { cash: true, amount: cashDocs.reduce((s, d) => s + (d.payNote?.amount ?? 0), 0), codes: cashDocs.map((d) => d.code) };
 }
 
-/** Phiếu giao hàng đang để tự động: điền hình thức + tiền mặt cần thu theo hóa đơn. */
-export function applyDocPay(form: PackForm): PackForm {
-  if (form.type !== 'giao-hang' || !form.payAuto) return form;
-  const pay = docPay(form.docs);
-  if (!pay?.cash) return { ...form, payMethod: 'transfer', cashAmount: 0 };
-  return { ...form, payMethod: 'cash', cashAmount: pay.amount };
+type PayPatch = Pick<PackForm, 'payMethod' | 'cashAmount'>;
+
+/**
+ * Người dùng chọn hình thức thanh toán. Chọn tiền mặt khi ô số tiền còn trống thì điền sẵn
+ * tiền mặt ghi trên hóa đơn (giống bán hàng điền "Khách cần trả"), vẫn sửa được.
+ */
+export function choosePayMethod(form: PackForm, payMethod: 'cash' | 'transfer'): PayPatch {
+  const pay = payMethod === 'cash' && !(form.cashAmount > 0) ? docPay(form.docs) : null;
+  return { payMethod, cashAmount: pay?.cash ? pay.amount : form.cashAmount };
 }
 
-/** Đổi danh sách chứng từ (thêm / bỏ) rồi điền lại thanh toán nếu đang tự động. */
-export const withDocs = (form: PackForm, docs: DocItem[]): PackForm => applyDocPay({ ...form, docs });
+/** Nút "Dùng theo hóa đơn": lấy hình thức + tiền mặt cần thu đúng như hóa đơn ghi. */
+export function payFromDocs(form: PackForm): PayPatch | null {
+  const pay = docPay(form.docs);
+  if (!pay) return null;
+  return pay.cash ? { payMethod: 'cash', cashAmount: pay.amount } : { payMethod: 'transfer', cashAmount: 0 };
+}
+
+/** Đổi danh sách chứng từ (thêm / bỏ). */
+export const withDocs = (form: PackForm, docs: DocItem[]): PackForm => ({ ...form, docs });
 
 export function toPackForm(d: PackDetail): PackForm {
   return {
@@ -621,8 +629,6 @@ export function toPackForm(d: PackDetail): PackForm {
     loadingBy: d.loadingBy,
     payMethod: d.payMethod,
     cashAmount: d.cashAmount,
-    // Sửa phiếu: giữ đúng số đã lưu, không tự đổi theo hóa đơn.
-    payAuto: false,
     fees: d.fees,
     payer: d.payer,
     files: d.files.map((f, i) => remote(f.url, i, f.name, f.type, f.size)),
@@ -665,6 +671,7 @@ export function validatePackForm(f: PackForm): string | null {
   if (!(f.packages > 0)) return 'Số kiện phải lớn hơn 0';
   if (f.type === 'loading' && !f.loadingBy) return 'Vui lòng chọn người loading';
   if (f.type === 'giao-hang') {
+    if (!f.payMethod) return 'Vui lòng chọn hình thức thanh toán: chuyển khoản hoặc tiền mặt';
     if (f.payMethod === 'cash' && !(f.cashAmount > 0)) return 'Vui lòng nhập số tiền thanh toán';
     if (anyFee(f.fees) && !f.payer) return 'Vui lòng chọn người chi khi có chi phí';
   }
