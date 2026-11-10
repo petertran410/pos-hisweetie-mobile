@@ -42,6 +42,7 @@ Cập nhật qua mạng chỉ dùng được khi chỉ đổi mã JS / giao di�
 
 - Các lệnh không có hậu tố `:android` ở bảng trên vẫn dành cho iPhone.
 - Chạy `yarn build:preview:android`, đăng nhập Expo nếu được yêu cầu; ở lần build đầu cho phép EAS tạo khóa ký Android mới nếu dự án chưa có. Giữ cùng package và khóa ký cho những APK nâng cấp sau này.
+- APK preview chỉ chứa kiến trúc `arm64-v8a`, dùng cho điện thoại Android. Không build `x86`/`x86_64` cho máy ảo.
 - Sau khi EAS build thành công, tải APK từ đường dẫn EAS và cài trên điện thoại Android. Bản này chạy độc lập, không cần Expo Go hay máy tính mở Metro.
 - EAS environment `preview` phải có `EXPO_PUBLIC_API_URL` trỏ tới backend HTTPS. Đăng nhập Lark trên Android dùng trình duyệt; module Lark native hiện chỉ hỗ trợ iOS.
 - Sau khi chỉ sửa giao diện hoặc logic JS/TS tương thích native, chạy `yarn update:preview:android -m "Mô tả thay đổi"`. Sửa code hoặc push Git chưa tự phát hành OTA.

@@ -1,12 +1,30 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-jest.mock('expo-print', () => ({}));
+jest.mock('expo-print', () => ({
+  printAsync: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  selectPrinterAsync: jest.fn<() => Promise<{ name: string; url: string }>>(),
+}));
 jest.mock('expo-file-system', () => ({ File: class {}, Paths: {} }));
-jest.mock('@react-native-async-storage/async-storage', () => ({}));
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn<() => Promise<string | null>>(),
+  setItem: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+}));
 jest.mock('@/core/http', () => ({ http: {} }));
+jest.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 
 // eslint-disable-next-line import/first
-import { pageCssWidth, pageSizePt, printDocument } from '../print';
+import { choosePrinter, loadPrinter, pageCssWidth, pageSizePt, printDocument, printToPrinter } from '../print';
+// eslint-disable-next-line import/first
+import * as Print from 'expo-print';
+// eslint-disable-next-line import/first
+import AsyncStorage from '@react-native-async-storage/async-storage';
+// eslint-disable-next-line import/first
+import { Platform } from 'react-native';
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  Platform.OS = 'ios';
+});
 
 describe('pageSizePt', () => {
   it('đổi khổ giấy (mm) sang point, có xoay ngang', () => {
@@ -43,5 +61,43 @@ describe('bản xem trên màn hình (để chụp ảnh)', () => {
   it('bản in (PDF) không kèm phần báo chiều cao', () => {
     const html = printDocument({ content: '<p>x</p>', paperSize: 'A5', landscape: false });
     expect(html).not.toContain('ReactNativeWebView');
+  });
+});
+
+describe('platform-specific printing', () => {
+  const printer = { name: 'Office printer', url: 'ipp://printer.local' };
+  const pdf = 'file:///cache/DH001.pdf';
+
+  it('opens Android system printing without passing an AirPrint URL', async () => {
+    Platform.OS = 'android';
+    await printToPrinter(pdf, printer);
+    expect(Print.printAsync).toHaveBeenCalledWith({ uri: pdf });
+    expect(Print.selectPrinterAsync).not.toHaveBeenCalled();
+  });
+
+  it('does not read or select an iOS printer on Android', async () => {
+    Platform.OS = 'android';
+    expect(await loadPrinter()).toBeNull();
+    expect(await choosePrinter()).toBeNull();
+    expect(AsyncStorage.getItem).not.toHaveBeenCalled();
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+    expect(Print.selectPrinterAsync).not.toHaveBeenCalled();
+  });
+
+  it('preserves direct AirPrint printing on iOS', async () => {
+    await printToPrinter(pdf, printer);
+    expect(Print.printAsync).toHaveBeenCalledWith({ uri: pdf, printerUrl: printer.url });
+  });
+
+  it('preserves selecting and saving the iOS printer', async () => {
+    jest.mocked(Print.selectPrinterAsync).mockResolvedValueOnce(printer);
+    expect(await choosePrinter()).toEqual(printer);
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith('hs_printer', JSON.stringify(printer));
+  });
+
+  it('keeps a rejected Android print request catchable', async () => {
+    Platform.OS = 'android';
+    jest.mocked(Print.printAsync).mockRejectedValueOnce(new Error('Print service unavailable'));
+    await expect(printToPrinter(pdf)).rejects.toThrow('Print service unavailable');
   });
 });

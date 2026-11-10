@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
+import { Platform } from 'react-native';
 import { http } from '@/core/http';
 
 export type PrintKind = 'invoice' | 'order';
@@ -185,6 +186,7 @@ export interface SavedPrinter {
 const PRINTER_KEY = 'hs_printer';
 
 export async function loadPrinter(): Promise<SavedPrinter | null> {
+  if (Platform.OS !== 'ios') return null;
   try {
     const raw = await AsyncStorage.getItem(PRINTER_KEY);
     const p = raw ? (JSON.parse(raw) as SavedPrinter) : null;
@@ -196,6 +198,7 @@ export async function loadPrinter(): Promise<SavedPrinter | null> {
 
 /** Mở danh sách máy in (AirPrint) để chọn 1 lần; app nhớ cho lần sau. */
 export async function choosePrinter(): Promise<SavedPrinter | null> {
+  if (Platform.OS !== 'ios') return null;
   try {
     const p = await Print.selectPrinterAsync();
     if (!p?.url) return null;
@@ -208,7 +211,9 @@ export async function choosePrinter(): Promise<SavedPrinter | null> {
   }
 }
 
-/** In thẳng tới máy in đã chọn (không qua màn tùy chọn của iOS). */
-export async function printToPrinter(pdfUri: string, printer: SavedPrinter): Promise<void> {
-  await Print.printAsync({ uri: pdfUri, printerUrl: printer.url });
+/** iOS dùng AirPrint đã chọn; Android mở hộp thoại in của hệ thống. */
+export async function printToPrinter(pdfUri: string, printer: SavedPrinter | null = null): Promise<void> {
+  await Print.printAsync(
+    Platform.OS === 'ios' && printer ? { uri: pdfUri, printerUrl: printer.url } : { uri: pdfUri },
+  );
 }

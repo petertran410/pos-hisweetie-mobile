@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import * as Sharing from 'expo-sharing';
 import { useLocalSearchParams } from 'expo-router';
-import { createElement, useEffect, useRef, useState, type ComponentRef } from 'react';
+import { createElement, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { ActionSheetIOS, ActivityIndicator, Alert, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
@@ -25,6 +25,7 @@ import {
 import { useDocDetail } from '../orders/api';
 import { ownsDoc } from '../orders/model';
 import { canPrintDoc } from './perms';
+import { previewWebViewProps } from './preview';
 
 const TITLE: Record<PrintKind, string> = { invoice: 'Hóa đơn', order: 'Phiếu đặt hàng' };
 
@@ -85,13 +86,16 @@ export function PrintPreviewView({
   const [area, setArea] = useState({ width: 0, height: 0 });
   const [docHeight, setDocHeight] = useState(0);
   const [capturing, setCapturing] = useState(false);
+  const [previewError, setPreviewError] = useState<Error | null>(null);
+  const [previewAttempt, setPreviewAttempt] = useState(0);
   const fitted = useRef<(() => void) | null>(null);
+  const source = useMemo(() => ({ html: html ?? '' }), [html]);
 
   // Tờ phiếu thu nhỏ vừa bề ngang màn hình; khung cao vừa khít nội dung.
   const scale = area.width && pageWidth ? area.width / pageWidth : 1;
   const contentHeight = docHeight * scale;
   const boxHeight = docHeight ? Math.min(area.height, contentHeight) : area.height;
-  const ready = !loading && !error && !!html;
+  const ready = !loading && !error && !previewError && !!html;
 
   const captureImage = async (): Promise<string | null> => {
     if (Platform.OS === 'web' || !shotRef.current || !webRef.current) {
@@ -139,10 +143,16 @@ export function PrintPreviewView({
               Đang tạo phiếu…
             </Txt>
           </View>
-        ) : error ? (
-          <ErrorState error={error} onRetry={onRetry} />
+        ) : error || previewError ? (
+          <ErrorState
+            error={error ?? previewError}
+            onRetry={error ? onRetry : () => {
+              setPreviewError(null);
+              setPreviewAttempt((attempt) => attempt + 1);
+            }}
+          />
         ) : html && area.width > 0 ? (
-          <View style={[styles.paper, { height: boxHeight }]}>
+          <View style={[styles.paper, Platform.OS === 'android' ? { flex: 1 } : { height: boxHeight }]}>
             <View ref={shotRef} collapsable={false} style={styles.shot}>
               {Platform.OS === 'web' ? (
                 createElement('iframe', {
@@ -153,19 +163,21 @@ export function PrintPreviewView({
                 })
               ) : (
                 <WebView
+                  key={previewAttempt}
+                  {...previewWebViewProps(Platform.OS)}
                   ref={webRef}
-                  source={{ html }}
-                  originWhitelist={['about:blank']}
-                  // Chỉ hiện đúng phiếu, không cho mở trang/đường dẫn nào khác.
-                  onShouldStartLoadWithRequest={(req) => req.url === 'about:blank'}
-                  dataDetectorTypes="none"
-                  allowsLinkPreview={false}
-                  javaScriptCanOpenWindowsAutomatically={false}
+                  source={source}
+                  onError={() => setPreviewError(new Error('Không tải được bản xem trước phiếu. Vui lòng thử lại.'))}
+                  onRenderProcessGone={() =>
+                    setPreviewError(new Error('Trình xem phiếu đã dừng. Vui lòng thử lại.'))
+                  }
                   onMessage={(e) => {
                     try {
                       const msg = JSON.parse(e.nativeEvent.data) as { type?: string; height?: number };
                       if (msg.type === 'fitted') fitted.current?.();
-                      else if (msg.height && msg.height > 0) setDocHeight(msg.height);
+                      else if (Platform.OS !== 'android' && typeof msg.height === 'number' && Number.isFinite(msg.height) && msg.height > 0) {
+                        setDocHeight(msg.height);
+                      }
                     } catch {
                       // bỏ qua tin nhắn lạ
                     }
@@ -194,7 +206,7 @@ export function PrintPreviewView({
             icon="printer"
             onPress={onPrint}
             onLongPress={Platform.OS === 'ios' ? onChangePrinter : undefined}
-            accessibilityHint="Giữ lâu để đổi máy in"
+            accessibilityHint={Platform.OS === 'ios' ? 'Giữ lâu để đổi máy in' : undefined}
             loading={printing}
             disabled={!ready}
             style={{ flex: 1.3 }}
@@ -255,6 +267,18 @@ export default function PrintPreviewScreen() {
 
   /** In tới máy in đã nhớ (chưa có thì chọn); lỗi thì hỏi chọn máy in khác. */
   const print = async (current: SavedPrinter | null) => {
+    if (Platform.OS !== 'ios') {
+      setPrinting(true);
+      try {
+        const pdf = await getPdf();
+        if (pdf) await printToPrinter(pdf);
+      } catch (e) {
+        toast.error(errorMessage(e));
+      } finally {
+        setPrinting(false);
+      }
+      return;
+    }
     const target = current ?? (await pick());
     if (!target) return;
     setPrinting(true);
@@ -313,6 +337,7 @@ export default function PrintPreviewScreen() {
 
   return (
     <PrintPreviewView
+      key={doc.dataUpdatedAt}
       title={TITLE[kind]}
       html={doc.data?.html}
       pageWidth={doc.data ? pageCssWidth(doc.data.rendered.paperSize, doc.data.rendered.landscape) : 559}

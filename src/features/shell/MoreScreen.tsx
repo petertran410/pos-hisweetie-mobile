@@ -8,15 +8,16 @@ import { currentBranch, signOut, useSession } from '@/core/session';
 import { ActionCard, Appear, Avatar, Button, C, Card, gradients, InfoRow, Page, Section, TitleHeader, toast, Txt } from '@/ui';
 import { allowedShortcuts } from '../dashboard/shortcuts';
 import { applyAppUpdate, checkForAppUpdate, useAppUpdate } from './appUpdate';
-import { useTabs } from './tabs';
+import { useTabNavigation } from './tabNavigation';
 
 /** Chức năng xem ở tab Thêm (những gì không có trên thanh tab). */
-const MORE_KEYS = ['hang-hoa', 'so-quy', 'bien-dong', 'bao-cao', 'quan-tri', 'bao-don', 'phieu-kho'] as const;
+const MORE_KEYS = ['khach-hang', 'hang-hoa', 'so-quy', 'bien-dong', 'bao-cao', 'quan-tri', 'bao-don', 'phieu-kho'] as const;
 
 /** Chức năng có tab riêng: chỉ hiện ở đây khi tab bị dồn khỏi thanh tab. */
-const TAB_KEYS = ['bao-don', 'phieu-kho'];
+const TAB_KEYS = ['khach-hang', 'bao-don', 'phieu-kho'];
 
 const DESCRIPTIONS: Record<string, string> = {
+  'khach-hang': 'Thông tin, công nợ và giao dịch khách hàng',
   'hang-hoa': 'Giá, tồn kho theo chi nhánh',
   'so-quy': 'Phiếu thu, phiếu chi, tồn quỹ',
   'bien-dong': 'Tiền vào tài khoản ngân hàng',
@@ -141,7 +142,7 @@ export default function MoreScreen() {
   useSession((s) => s.branchId);
   const branches = useSession((s) => s.branches);
   // Tab có quyền nhưng không còn chỗ trên thanh tab → hiện ở đây.
-  const hiddenTabKeys = useTabs().overflow.map((t) => t.key);
+  const hiddenTabKeys = useTabNavigation().overflow.map((t) => t.key);
   const app = useAppUpdate();
 
   const confirmSignOut = () =>

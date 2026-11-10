@@ -5,7 +5,8 @@ import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, Icon, shadow, Txt, type IconName } from '@/ui';
 import { easeOut, PressableScale } from '@/ui/motion';
-import { useTabs, type TabDef } from './tabs';
+import type { TabDef } from './tabs';
+import { useTabNavigation } from './tabNavigation';
 
 interface Item {
   name: string;
@@ -57,13 +58,13 @@ export function TabBar({
   tabs?: TabDef[];
 }) {
   const insets = useSafeAreaInsets();
-  const fromSession = useTabs().visible;
+  const fromSession = useTabNavigation().visible;
   const visible = tabs ?? fromSession;
   const items: Item[] = [
     ...visible.map((t) => ({ name: t.key, label: t.label, icon: t.icon })),
     { name: 'them', label: 'Thêm', icon: 'layout-grid' },
   ];
-  // Tab dồn vào "Thêm" (vd Báo đơn) đang mở thì sáng ô "Thêm".
+  // Tab dồn vào "Thêm" (vd Khách hàng) đang mở thì sáng ô "Thêm".
   const routeName = state.routes[state.index]?.name;
   const activeName = items.some((i) => i.name === routeName) ? routeName : 'them';
   const activeIndex = Math.max(0, items.findIndex((i) => i.name === activeName));

@@ -11,6 +11,14 @@ describe('Android preview release', () => {
       environment: 'preview',
       android: { buildType: 'apk', credentialsSource: 'remote' },
     });
+    expect(easConfig.build.preview.android).not.toHaveProperty('abiFilters');
+  });
+
+  it('builds the preview APK for ARM64 phones only', () => {
+    expect(appConfig.expo.plugins).toContainEqual([
+      'expo-build-properties',
+      { android: { buildArchs: ['arm64-v8a'] } },
+    ]);
   });
 
   it('verifies the app before building or publishing Android preview updates', () => {

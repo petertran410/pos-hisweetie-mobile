@@ -68,6 +68,7 @@ import { SuccessView } from '@/features/sales/SuccessScreen';
 import { MoreView } from '@/features/shell/MoreScreen';
 import { TabBar } from '@/features/shell/TabBar';
 import { TAB_DEFS } from '@/features/shell/tabs';
+import { arrangeTabNavigation } from '@/features/shell/tabNavigation';
 import LoginScreen from '@/features/auth/LoginScreen';
 import { AddressFormView } from '@/features/customers/AddressFormScreen';
 import { CustomerDetailView, type CustomerTab } from '@/features/customers/CustomerDetailScreen';
@@ -234,7 +235,7 @@ function seedCart() {
 }
 
 const noop = () => toast.info('Chỉ là bản xem trước');
-const tabs = TAB_DEFS.slice(0, 4);
+const { visible: tabs, overflow: hiddenTabs } = arrangeTabNavigation(TAB_DEFS);
 
 function FakeTabBar({ active }: { active: string }) {
   const names = [...tabs.map((t) => t.key), 'them'];
@@ -354,9 +355,9 @@ export default function PreviewScreen() {
           user={sampleUser}
           branchName={sampleBranches[0].name}
           canSwitchBranch
-          hiddenTabKeys={['bao-don', 'phieu-kho']}
+          hiddenTabKeys={hiddenTabs.map((tab) => tab.key)}
           onOpenBranch={() => router.setParams({ man: 'chi-nhanh' })}
-          onOpen={noop}
+          onOpen={(key, href) => (href ? router.setParams({ man: key }) : noop())}
           onSignOut={noop}
           update={{ pending: true, busy: false, runningSince: new Date(), onCheck: noop, onApply: noop }}
         />
