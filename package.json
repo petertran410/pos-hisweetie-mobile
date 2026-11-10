@@ -82,8 +82,10 @@
     "typecheck": "tsc --noEmit",
     "verify": "yarn typecheck && yarn lint && yarn test --silent",
     "update:preview": "yarn verify && npx eas-cli update -p ios --channel preview --environment preview --auto",
+    "update:preview:android": "yarn verify && npx eas-cli update -p android --channel preview --environment preview --auto",
     "update:prod": "yarn verify && npx eas-cli update -p ios --channel production --environment production --auto",
     "build:preview": "yarn verify && npx eas-cli build -p ios --profile preview",
+    "build:preview:android": "yarn verify && npx eas-cli build -p android --profile preview",
     "build:prod": "yarn verify && npx eas-cli build -p ios --profile production",
     "build:prod:submit": "yarn verify && npx eas-cli build -p ios --profile production --auto-submit",
     "submit": "npx eas-cli submit -p ios --profile production --latest"
