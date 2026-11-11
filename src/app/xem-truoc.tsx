@@ -120,6 +120,7 @@ const SCREENS = [
   { key: 'chi-nhanh', title: 'Chọn chi nhánh' },
   { key: 'ban-hang', title: 'Bán hàng' },
   { key: 'gio-hang', title: 'Giỏ hàng' },
+  { key: 'gio-hang-trong', title: 'Giỏ hàng trống' },
   { key: 'khach', title: 'Chọn khách hàng' },
   { key: 'sua-hang', title: 'Sửa hàng trong giỏ' },
   { key: 'giao-hang', title: 'Giao hàng' },
@@ -389,7 +390,7 @@ export default function PreviewScreen() {
       </View>
     );
   }
-  if (man === 'gio-hang')
+  if (man === 'gio-hang' || man === 'gio-hang-trong')
     return (
       <View style={{ flex: 1 }}>
         <CheckoutView
@@ -398,6 +399,7 @@ export default function PreviewScreen() {
           promotions={[{ promotionId: 1, name: 'Mua 10 tặng 1 (mẫu)', autoApply: true }]}
           onSubmit={toView('xong')}
           onOpenCustomer={toView('khach')}
+          onCreateCustomer={toView('them-kh')}
           onOpenLine={toView('sua-hang')}
           onOpenDelivery={toView('giao-hang')}
           onOpenDiscount={toView('giam-gia')}
@@ -417,7 +419,7 @@ export default function PreviewScreen() {
         showDebt
         onPick={(c) => {
           useCart.getState().setCustomer(c);
-          toView('gio-hang')();
+          toView(lines.length ? 'gio-hang' : 'gio-hang-trong')();
         }}
       />
     );
@@ -484,6 +486,10 @@ export default function PreviewScreen() {
           rows={docStatus === 'all' ? sampleDocRows : sampleDocRows.filter((r) => r.status === 5)}
           total={docStatus === 'all' ? 24 : 5}
           counts={sampleDocCounts}
+          onCreate={() => {
+            useCart.getState().reset();
+            toView('gio-hang-trong')();
+          }}
           onOpen={toView('chi-tiet-don')}
         />
         <FakeTabBar active="don-hang" />
@@ -736,6 +742,7 @@ export default function PreviewScreen() {
         onAddress={toView('dia-chi-kh')}
         onLookupTax={noop}
         onSave={noop}
+        onBack={man === 'them-kh' ? toView('gio-hang-trong') : undefined}
       />
     );
   }

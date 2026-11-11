@@ -29,6 +29,9 @@ import {
   toast,
   Txt,
 } from '@/ui';
+import { startCustomerDraft } from '../customers/draft';
+import { newCustomerForm } from '../customers/form';
+import { customerPerms } from '../customers/model';
 import {
   addOrderPayment,
   addPaymentNote,
@@ -78,6 +81,7 @@ export interface CheckoutViewProps {
   submitting?: boolean;
   onSubmit: () => void;
   onOpenCustomer: () => void;
+  onCreateCustomer?: () => void;
   onOpenLine: (rowId: string) => void;
   onOpenDelivery: () => void;
   onOpenDiscount: () => void;
@@ -293,20 +297,26 @@ export function CheckoutView(p: CheckoutViewProps) {
       footer={footer}
       automaticallyAdjustKeyboardInsets
       contentStyle={{ paddingBottom: 32 }}>
+      <Section
+        index={0}
+        title="Khách hàng"
+        actionLabel={p.onCreateCustomer ? 'Tạo khách' : undefined}
+        onAction={p.onCreateCustomer}>
+        <CustomerCard perms={p.perms} onPress={p.onOpenCustomer} />
+      </Section>
+
       {cart.lines.length === 0 ? (
-        <EmptyState
-          icon="shopping-cart"
-          color="teal"
-          title="Giỏ hàng trống"
-          message="Chọn hàng ở màn Bán hàng để bắt đầu."
-          action={<Button title="Chọn hàng" variant="outline" size="medium" onPress={p.onAddMore} />}
-        />
+        <Section index={1} title="Hàng hóa">
+          <EmptyState
+            icon="shopping-cart"
+            color="teal"
+            title="Chưa có hàng hóa"
+            message="Bạn có thể chọn khách hàng trước hoặc thêm hàng để bắt đầu."
+            action={<Button title="Chọn hàng" variant="outline" size="medium" onPress={p.onAddMore} />}
+          />
+        </Section>
       ) : (
         <>
-          <Section index={0} title="Khách hàng">
-            <CustomerCard perms={p.perms} onPress={p.onOpenCustomer} />
-          </Section>
-
           <Section index={1} title={`Hàng hóa · ${cart.lines.length}`} actionLabel="Thêm hàng" onAction={p.onAddMore}>
             <Card>
               {cart.lines.map((l, i) => (
@@ -384,6 +394,7 @@ export default function CheckoutScreen() {
   const paidAmount = useCart((s) => s.paidAmount);
   const busyRef = useRef(false);
   const [busy, setBusy] = useState(false);
+  const canCreateCustomer = perms.customers && customerPerms(user).create;
 
   const banks = useBankAccounts(perms.viewPayment && payKind === 'transfer' && paidAmount > 0);
   const promos = usePromotionCheck(
@@ -480,10 +491,18 @@ export default function CheckoutScreen() {
       submitting={busy}
       onSubmit={() => void submit()}
       onOpenCustomer={() => router.push('/ban-hang/khach-hang')}
+      onCreateCustomer={
+        canCreateCustomer
+          ? () => {
+              startCustomerDraft(newCustomerForm(), null, 'sale');
+              router.push('/khach-hang/them' as never);
+            }
+          : undefined
+      }
       onOpenLine={(rowId) => router.push({ pathname: '/ban-hang/dong/[rowId]', params: { rowId } })}
       onOpenDelivery={() => router.push('/ban-hang/giao-hang')}
       onOpenDiscount={() => router.push('/ban-hang/giam-gia')}
-      onAddMore={() => router.back()}
+      onAddMore={() => router.dismissTo('/ban-hang')}
       onClear={() =>
         Alert.alert('Xóa giỏ hàng?', 'Toàn bộ hàng, khách và thanh toán trong giỏ sẽ bị xóa.', [
           { text: 'Hủy', style: 'cancel' },

@@ -69,6 +69,10 @@ export interface RawCustomer {
   branch?: { id?: number; name?: string | null } | null;
   parentId?: number | null;
   parent?: { id: number; code?: string | null; name?: string | null } | null;
+  debtPolicy?: {
+    isActive?: boolean | null;
+    requireFullPaymentForInvoice?: boolean | null;
+  } | null;
   children?: {
     id: number;
     code?: string | null;

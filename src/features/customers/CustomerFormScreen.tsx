@@ -7,6 +7,8 @@ import { errorMessage } from '@/core/http';
 import { useSession } from '@/core/session';
 import { Button, C, ChipGroup, Divider, EmptyState, Icon, Page, Pill, PressableScale, SubHeader, toast, toneColors, Txt } from '@/ui';
 import { FormCard, Note, PickRow, TextRow } from '../products/formParts';
+import { useCart } from '../sales/cart';
+import { toSaleCustomer } from '../sales/mappers';
 import { createCustomer, lookupTaxCode, updateCustomer, useSalePicId, useStaff } from './api';
 import { ADDRESS_PATH, patchCustomerDraft, setLoadedSalePic, startAddressDraft, useCustomerDraft } from './draft';
 import {
@@ -74,6 +76,7 @@ export interface CustomerFormViewProps {
   salePicLoading?: boolean;
   onSave: () => void;
   busy?: boolean;
+  onBack?: () => void;
 }
 
 /** Form thêm / sửa khách hàng (giống form của web, gọn cho điện thoại). */
@@ -89,7 +92,7 @@ export function CustomerFormView(p: CustomerFormViewProps) {
     <Page
       stickyHeader
       automaticallyAdjustKeyboardInsets
-      header={<SubHeader title={p.editing ? `Sửa ${p.code ?? 'khách hàng'}` : 'Thêm khách hàng'} />}
+      header={<SubHeader title={p.editing ? `Sửa ${p.code ?? 'khách hàng'}` : 'Thêm khách hàng'} onBack={p.onBack} />}
       footer={
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
           <Button title={p.editing ? 'Lưu thay đổi' : 'Lưu khách hàng'} icon="check" onPress={p.onSave} loading={p.busy} />
@@ -269,11 +272,12 @@ export function CustomerFormView(p: CustomerFormViewProps) {
 }
 
 export default function CustomerFormScreen() {
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; selectForSale?: string }>();
   const editId = params.id ? Number(params.id) : null;
   const form = useCustomerDraft((s) => s.form);
   const baseline = useCustomerDraft((s) => s.baseline);
   const customerId = useCustomerDraft((s) => s.customerId);
+  const origin = useCustomerDraft((s) => s.origin);
   const user = useSession((s) => s.user);
   const branchId = useSession((s) => s.branchId);
   const perms = customerPerms(user);
@@ -287,6 +291,8 @@ export default function CustomerFormScreen() {
   const busyRef = useRef(false);
 
   const editing = editId !== null;
+  const selectForSale = !editing && (origin === 'sale' || params.selectForSale === '1');
+  const leaveToCart = selectForSale ? () => router.replace('/ban-hang/gio-hang') : undefined;
   const valid = !!form && !!baseline && customerId === editId;
   const dirty = valid ? isFormDirty(form, baseline) : false;
   const hasChildren = editing ? !!qc.getQueryData<{ children?: unknown[] }>(['customer', editId])?.children?.length : false;
@@ -324,7 +330,7 @@ export default function CustomerFormScreen() {
 
   if (!valid || !form || !baseline) {
     return (
-      <Page scroll={false} header={<SubHeader title="Khách hàng" />}>
+      <Page scroll={false} header={<SubHeader title="Khách hàng" onBack={leaveToCart} />}>
         <EmptyState
           icon="users"
           color="slate"
@@ -375,13 +381,21 @@ export default function CustomerFormScreen() {
       } else {
         const created = await createCustomer(buildCustomerCreate(form, { branchId, assignSalePic: perms.assignSalePic }));
         toast.success(created?.code ? `Đã thêm ${created.code}` : 'Đã thêm khách hàng');
-        void qc.invalidateQueries({ queryKey: ['customers'] });
-        setExit({
-          go: () =>
-            created?.id
-              ? router.replace({ pathname: '/khach-hang/[id]', params: { id: String(created.id) } } as never)
-              : router.back(),
-        });
+        void Promise.all([
+          qc.invalidateQueries({ queryKey: ['customers'] }),
+          qc.invalidateQueries({ queryKey: ['sales', 'customers'] }),
+        ]);
+        if (selectForSale) {
+          useCart.getState().setCustomer(toSaleCustomer(created));
+          setExit({ go: () => router.replace('/ban-hang/gio-hang') });
+        } else {
+          setExit({
+            go: () =>
+              created?.id
+                ? router.replace({ pathname: '/khach-hang/[id]', params: { id: String(created.id) } } as never)
+                : router.back(),
+          });
+        }
       }
     } catch (e) {
       toast.error(errorMessage(e));
@@ -409,6 +423,7 @@ export default function CustomerFormScreen() {
       salePicLoading={salePicLoading}
       onSave={() => void save()}
       busy={busy}
+      onBack={leaveToCart}
     />
   );
 }

@@ -49,26 +49,33 @@ export function toSaleProduct(p: RawProduct, branchId: number | null): SaleProdu
 
 export interface RawCustomer {
   id: number;
-  code: string;
-  name: string;
+  code?: string | null;
+  name?: string | null;
   contactNumber?: string | null;
   phone?: string | null;
   totalDebt?: string | number | null;
   debtPolicy?: { isActive?: boolean | null; requireFullPaymentForInvoice?: boolean | null } | null;
   parent?: { code?: string | null; name?: string | null } | null;
-  addresses?: CustomerAddress[];
+  addresses?: (Omit<CustomerAddress, 'id' | 'isDefault'> & {
+    id?: number | null;
+    isDefault?: boolean | null;
+  })[] | null;
 }
 
 export function toSaleCustomer(c: RawCustomer): SaleCustomer {
   return {
     id: c.id,
-    code: c.code,
-    name: c.name,
+    code: c.code ?? '',
+    name: c.name?.trim() || 'Không tên',
     phone: c.phone ?? null,
     contactNumber: c.contactNumber ?? null,
     totalDebt: num(c.totalDebt),
     parentName: c.parent?.name ?? null,
     requireFullPayment: c.debtPolicy?.isActive !== false && c.debtPolicy?.requireFullPaymentForInvoice === true,
-    addresses: c.addresses ?? [],
+    addresses: (c.addresses ?? []).map(({ isDefault, ...a }, index) => ({
+      ...a,
+      id: a.id ?? -(index + 1),
+      isDefault: isDefault ?? undefined,
+    })),
   };
 }

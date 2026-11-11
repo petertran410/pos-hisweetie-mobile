@@ -11,12 +11,23 @@ interface DraftState {
   baseline: CustomerForm | null;
   /** Khách đang sửa; null = thêm mới. */
   customerId: number | null;
+  /** Nơi mở form, để lưu xong hoặc quay lại đúng luồng. */
+  origin: 'customers' | 'sale';
 }
 
-export const useCustomerDraft = create<DraftState>(() => ({ form: null, baseline: null, customerId: null }));
+export const useCustomerDraft = create<DraftState>(() => ({
+  form: null,
+  baseline: null,
+  customerId: null,
+  origin: 'customers',
+}));
 
-export function startCustomerDraft(form: CustomerForm, customerId: number | null = null) {
-  useCustomerDraft.setState({ form, baseline: form, customerId });
+export function startCustomerDraft(
+  form: CustomerForm,
+  customerId: number | null = null,
+  origin: DraftState['origin'] = 'customers',
+) {
+  useCustomerDraft.setState({ form, baseline: form, customerId, origin });
 }
 
 export function patchCustomerDraft(patch: Partial<CustomerForm> | ((f: CustomerForm) => Partial<CustomerForm>)) {

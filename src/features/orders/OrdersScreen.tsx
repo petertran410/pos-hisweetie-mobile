@@ -14,6 +14,7 @@ import {
   EmptyState,
   ErrorState,
   Icon,
+  IconButton,
   PageBackground,
   PeriodModal,
   periodText,
@@ -124,6 +125,7 @@ export interface OrdersViewProps {
   onRefresh?: () => void;
   loadingMore?: boolean;
   onEndReached?: () => void;
+  onCreate?: () => void;
   onOpen: (row: DocRow) => void;
   now?: Date;
 }
@@ -139,7 +141,13 @@ export function OrdersView(p: OrdersViewProps) {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <PageBackground />
-      <TitleHeader title="Đơn hàng">
+      <TitleHeader
+        title="Đơn hàng"
+        right={
+          p.onCreate ? (
+            <IconButton icon="plus" label="Tạo đơn hàng hoặc hóa đơn" onPress={p.onCreate} tint={C.brand} />
+          ) : undefined
+        }>
         <SearchField value={p.filters.search} onChangeText={p.onSearch} placeholder="Tìm mã đơn, khách hàng" />
         {p.kinds.length > 1 ? (
           <ChipGroup
@@ -258,6 +266,7 @@ export default function OrdersScreen() {
   const filters: DocFilters = { search: term, status: status[active], period };
   const list = useDocList(active, filters, kinds.length > 0);
   const pull = usePullRefresh(list.refetch);
+  const canCreate = canDo(user, 'orders:create') || canDo(user, 'invoices:create');
 
   if (!kinds.length) {
     return (
@@ -296,6 +305,7 @@ export default function OrdersScreen() {
       onEndReached={() => {
         if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
       }}
+      onCreate={canCreate ? () => router.push('/ban-hang/gio-hang') : undefined}
       onOpen={(row) =>
         router.push({ pathname: '/don-hang/[kind]/[id]', params: { kind: KIND_SLUG[active], id: String(row.id) } })
       }
