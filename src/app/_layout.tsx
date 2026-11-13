@@ -16,7 +16,7 @@ import { bootstrap, reloadProfileIfStale, useSession } from '@/core/session';
 import { refreshIfStale } from '@/core/tokens';
 import { UpdateWatcher } from '@/features/shell/appUpdate';
 import { PrivacyCover } from '@/features/shell/PrivacyCover';
-import { Button, C, EmptyState, Page, ToastHost } from '@/ui';
+import { Button, C, EmptyState, KeyboardResize, Page, ToastHost } from '@/ui';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -60,54 +60,57 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <ThemeProvider value={theme}>
             <StatusBar style="dark" />
-            {status === 'offline' ? (
-              <Page scroll={false}>
-                <EmptyState
-                  icon="wifi-off"
-                  color="slate"
-                  title="Không kết nối được máy chủ"
-                  message="Kiểm tra mạng của iPhone rồi thử lại."
-                  action={
-                    <Button
-                      title="Thử lại"
-                      variant="outline"
-                      size="medium"
-                      onPress={() => {
-                        useSession.setState({ status: 'booting' });
-                        void bootstrap();
+            {/* Android: bàn phím mở thì thu app lên phía trên bàn phím. */}
+            <KeyboardResize>
+              {status === 'offline' ? (
+                <Page scroll={false}>
+                  <EmptyState
+                    icon="wifi-off"
+                    color="slate"
+                    title="Không kết nối được máy chủ"
+                    message="Kiểm tra mạng của iPhone rồi thử lại."
+                    action={
+                      <Button
+                        title="Thử lại"
+                        variant="outline"
+                        size="medium"
+                        onPress={() => {
+                          useSession.setState({ status: 'booting' });
+                          void bootstrap();
+                        }}
+                      />
+                    }
+                  />
+                </Page>
+              ) : (
+                <Stack
+                  // Đăng nhập ↔ vào app: chuyển mờ dần thay vì trượt.
+                  screenOptions={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: C.bg } }}>
+                  <Stack.Protected guard={status === 'signedIn'}>
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="(tabs)" />
+                    {/* Mục mở từ Tổng quan / tab Thêm: trượt vào như trang con. */}
+                    <Stack.Screen name="hang-hoa" options={{ animation: 'default' }} />
+                    <Stack.Screen
+                      name="chi-nhanh"
+                      options={{
+                        presentation: 'formSheet',
+                        sheetAllowedDetents: [0.55, 1],
+                        sheetGrabberVisible: true,
+                        sheetCornerRadius: 24,
+                        contentStyle: { backgroundColor: C.bg },
                       }}
                     />
-                  }
-                />
-              </Page>
-            ) : (
-              <Stack
-                // Đăng nhập ↔ vào app: chuyển mờ dần thay vì trượt.
-                screenOptions={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: C.bg } }}>
-                <Stack.Protected guard={status === 'signedIn'}>
-                  <Stack.Screen name="index" />
-                  <Stack.Screen name="(tabs)" />
-                  {/* Mục mở từ Tổng quan / tab Thêm: trượt vào như trang con. */}
-                  <Stack.Screen name="hang-hoa" options={{ animation: 'default' }} />
-                  <Stack.Screen
-                    name="chi-nhanh"
-                    options={{
-                      presentation: 'formSheet',
-                      sheetAllowedDetents: [0.55, 1],
-                      sheetGrabberVisible: true,
-                      sheetCornerRadius: 24,
-                      contentStyle: { backgroundColor: C.bg },
-                    }}
-                  />
-                </Stack.Protected>
-                <Stack.Protected guard={status === 'signedOut'}>
-                  <Stack.Screen name="dang-nhap" />
-                  <Stack.Screen name="tao-mat-khau" options={{ animation: 'default' }} />
-                </Stack.Protected>
-                <Stack.Screen name="auth/lark" />
-                <Stack.Screen name="xem-truoc" />
-              </Stack>
-            )}
+                  </Stack.Protected>
+                  <Stack.Protected guard={status === 'signedOut'}>
+                    <Stack.Screen name="dang-nhap" />
+                    <Stack.Screen name="tao-mat-khau" options={{ animation: 'default' }} />
+                  </Stack.Protected>
+                  <Stack.Screen name="auth/lark" />
+                  <Stack.Screen name="xem-truoc" />
+                </Stack>
+              )}
+            </KeyboardResize>
             <ToastHost />
             <PrivacyCover />
             <UpdateWatcher />

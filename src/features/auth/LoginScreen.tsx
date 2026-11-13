@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { LinearTransition, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorMessage } from '@/core/http';
@@ -73,7 +73,8 @@ export default function LoginScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <PageBackground />
-      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+      {/* Android: KeyboardResize ở gốc app đã thu màn lên trên bàn phím. */}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 }]}
           keyboardShouldPersistTaps="handled"

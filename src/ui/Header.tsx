@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconButton } from './Button';
 import { Icon } from './icons';
@@ -97,6 +97,10 @@ export function SubHeader({
 /**
  * Đầu sheet (màn trượt từ dưới lên): "Hủy" bên trái, tiêu đề giữa, nút xác
  * nhận bên phải — theo cách của iOS.
+ *
+ * iOS mở sheet dạng thẻ nằm dưới thanh trạng thái. Android mở sheet (modal,
+ * Modal) toàn màn hình, tràn lên dưới thanh trạng thái, nên phải chừa thêm
+ * phần đó. Riêng `formSheet` thì Android đã tự đặt dưới thanh trạng thái.
  */
 export function SheetHeader({
   title,
@@ -105,6 +109,7 @@ export function SheetHeader({
   actionLabel,
   onAction,
   actionDisabled,
+  formSheet = false,
 }: {
   title: string;
   onCancel?: () => void;
@@ -112,9 +117,13 @@ export function SheetHeader({
   actionLabel?: string;
   onAction?: () => void;
   actionDisabled?: boolean;
+  /** Màn mở bằng `presentation: 'formSheet'`. */
+  formSheet?: boolean;
 }) {
+  const insets = useSafeAreaInsets();
+  const top = Platform.OS === 'android' && !formSheet ? insets.top : 0;
   return (
-    <View style={styles.sheet}>
+    <View style={[styles.sheet, top > 0 && { paddingTop: 8 + top, minHeight: 52 + top }]}>
       <View style={styles.sheetSide}>
         <PressableScale
           onPress={onCancel ?? (() => router.back())}

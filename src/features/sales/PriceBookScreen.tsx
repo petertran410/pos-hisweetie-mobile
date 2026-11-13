@@ -31,7 +31,7 @@ export function PriceBookView({
 }) {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <SheetHeader title="Bảng giá" cancelLabel="Đóng" />
+      <SheetHeader title="Bảng giá" cancelLabel="Đóng" formSheet />
       {loading ? (
         <LoadingState />
       ) : error ? (

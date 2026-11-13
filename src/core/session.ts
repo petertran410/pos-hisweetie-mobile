@@ -9,6 +9,7 @@ import { base64url, toBase64url } from './base64';
 import { http } from './http';
 import { queryClient } from './query';
 import { ApiError, buildUrl, rawRequest, requestContext } from './request';
+import { unregisterPushToken } from './push';
 import { getDeviceId, getRefreshToken } from './secure';
 import {
   applyTokens,
@@ -255,6 +256,8 @@ async function clearDrafts() {
 }
 
 export async function signOut() {
+  // Trước khi xóa token đăng nhập: máy này thôi nhận thông báo của tài khoản cũ.
+  unregisterPushToken();
   const refreshToken = await getRefreshToken();
   if (refreshToken) {
     rawRequest('/auth/mobile/logout', { method: 'POST', body: { refreshToken } }).catch(() => {});

@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState, type ComponentRef } from 'react';
-import { KeyboardAvoidingView, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
 import { errorMessage } from '@/core/http';
 import { setupPassword } from '@/core/session';
 import { Banner, Button, C, Card, IconBadge, Page, SubHeader, TextField, Txt } from '@/ui';
@@ -28,8 +28,9 @@ export default function SetupPasswordScreen() {
     }
   };
 
+  // Android: KeyboardResize ở gốc app đã thu màn lên trên bàn phím.
   return (
-    <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
       <Page stickyHeader header={<SubHeader title="Tạo mật khẩu" />}>
         <View style={styles.intro}>
           <IconBadge name="lock" color="teal" size={56} round />

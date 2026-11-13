@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, Icon, shadow, Txt, type IconName } from '@/ui';
+import { C, Icon, shadow, Txt, useAndroidKeyboardHeight, type IconName } from '@/ui';
 import { easeOut, PressableScale } from '@/ui/motion';
 import type { TabDef } from './tabs';
 import { useTabNavigation } from './tabNavigation';
@@ -76,6 +76,9 @@ export function TabBar({
     if (slot > 0) x.set(withTiming(activeIndex * slot + (slot - INDICATOR) / 2, { duration: 260, easing: easeOut }));
   }, [activeIndex, slot, x]);
   const indicatorStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }] }));
+  // Android: app thu lên trên bàn phím (KeyboardResize), ẩn thanh tab để chừa chỗ cho ô đang gõ.
+  const keyboard = useAndroidKeyboardHeight();
+  if (keyboard > 0) return null;
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]} accessibilityRole="tablist">
