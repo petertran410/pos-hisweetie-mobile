@@ -1,5 +1,7 @@
 import { Tabs } from 'expo-router/tabs';
 import { useSession } from '@/core/session';
+import { useCartPersistence } from '@/features/sales/persist';
+import { useSalePerms } from '@/features/sales/perms';
 import { usePushNotifications } from '@/features/shell/pushNotifications';
 import { TabBar } from '@/features/shell/TabBar';
 import { setActiveTab } from '@/features/shell/TabStack';
@@ -14,6 +16,8 @@ import { tabTransitionFor } from '@/features/shell/tabTransition';
 export default function TabsLayout() {
   const { visible, overflow } = useTabs();
   usePushNotifications(useSession((s) => s.user?.id));
+  // Đơn nháp bán hàng: đọc ngay khi vào app, tab Đơn hàng cũng tạo đơn nháp.
+  useCartPersistence(useSalePerms().order ? 'order' : 'invoice');
   const shown = new Set([...visible, ...overflow].map((t) => t.key));
   return (
     <Tabs

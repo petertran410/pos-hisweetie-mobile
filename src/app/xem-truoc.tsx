@@ -55,11 +55,20 @@ import {
   type ProductFilters,
 } from '@/features/products/model';
 import { PrintPreviewView } from '@/features/print/PrintPreviewScreen';
-import { addressToDelivery, cartTotals, useCart } from '@/features/sales/cart';
+import { addressToDelivery, cartSnapshot, cartTotals, EMPTY_CART, useCart } from '@/features/sales/cart';
 import { CheckoutView } from '@/features/sales/CheckoutScreen';
 import { CustomerPickerView } from '@/features/sales/CustomerPickerScreen';
 import { DeliveryView } from '@/features/sales/DeliveryScreen';
 import { DiscountView } from '@/features/sales/DiscountScreen';
+import {
+  draftLabel,
+  draftOptions,
+  DRAFTS_FULL_MESSAGE,
+  newDraft,
+  openBook,
+  switchDraft,
+  useDrafts,
+} from '@/features/sales/drafts';
 import { LineEditorView } from '@/features/sales/LineEditorScreen';
 import { PriceBookView } from '@/features/sales/PriceBookScreen';
 import { SaleScopeProvider } from '@/features/sales/scope';
@@ -235,6 +244,29 @@ function seedCart() {
   });
 }
 
+/** Đơn nháp mẫu: Đơn 1 là giỏ đang có, Đơn 2 của khách khác. */
+function seedDrafts() {
+  if (useDrafts.getState().drafts.length) return;
+  const other = sampleCustomers[1] ?? sampleCustomers[0];
+  const p = sampleProducts[2];
+  openBook({
+    activeId: 'mau-1',
+    drafts: [
+      { id: 'mau-1', no: 1, cart: cartSnapshot(useCart.getState()) },
+      {
+        id: 'mau-2',
+        no: 2,
+        cart: {
+          ...EMPTY_CART,
+          customer: other,
+          delivery: addressToDelivery(other),
+          lines: [{ rowId: 'x', product: p, quantity: 1, price: p.basePrice, discount: 0, note: '' }],
+        },
+      },
+    ],
+  });
+}
+
 const noop = () => toast.info('Chỉ là bản xem trước');
 const { visible: tabs, overflow: hiddenTabs } = arrangeTabNavigation(TAB_DEFS);
 
@@ -267,6 +299,8 @@ export default function PreviewScreen() {
   const [docPeriod, setDocPeriod] = useState<import('@/core/period').PeriodChoice>('last7');
   const lines = useCart((st) => st.lines);
   const cart = useCart();
+  const draftBook = useDrafts();
+  const activeDraft = draftBook.drafts.find((d) => d.id === draftBook.activeId);
 
   const editMeta = useOrderEditMeta((st) => st.meta);
   const [productFilters, setProductFilters] = useState<ProductFilters>(DEFAULT_FILTERS);
@@ -303,6 +337,7 @@ export default function PreviewScreen() {
     // Bản phát hành: link hisweetiepos://xem-truoc không được nạp dữ liệu mẫu vào giỏ / đơn đang sửa.
     if (!__DEV__) return;
     if (man && ['gio-hang', 'sua-hang', 'giao-hang', 'giam-gia'].includes(man)) seedCart();
+    if (man === 'ban-hang' || man === 'gio-hang') seedDrafts();
     if (man === 'xu-ly') startOrderEdit(sampleOrderEdit.cart, sampleOrderEdit.meta);
     if (man === 'xu-ly-km') startOrderEdit(sampleOrderEditPromo.cart, sampleOrderEditPromo.meta);
     if (man === 'xu-ly-hd') startOrderEdit(sampleInvoiceEdit.cart, sampleInvoiceEdit.meta);
@@ -385,6 +420,18 @@ export default function PreviewScreen() {
           cartCount={t.itemCount}
           cartTotal={t.total}
           onOpenCart={toView('gio-hang')}
+          drafts={
+            draftBook.drafts.length
+              ? {
+                  options: draftOptions(draftBook, cart),
+                  value: draftBook.activeId,
+                  onChange: switchDraft,
+                  onAdd: () => {
+                    if (newDraft() === 'full') toast.info(DRAFTS_FULL_MESSAGE);
+                  },
+                }
+              : undefined
+          }
         />
         <FakeTabBar active="ban-hang" />
       </View>
@@ -405,6 +452,8 @@ export default function PreviewScreen() {
           onOpenDiscount={toView('giam-gia')}
           onAddMore={toView('ban-hang')}
           onClear={() => useCart.getState().reset()}
+          draftName={activeDraft ? draftLabel(activeDraft) : null}
+          manyDrafts={draftBook.drafts.length > 1}
         />
         <FakeTabBar active="ban-hang" />
       </View>
@@ -487,7 +536,11 @@ export default function PreviewScreen() {
           total={docStatus === 'all' ? 24 : 5}
           counts={sampleDocCounts}
           onCreate={() => {
-            useCart.getState().reset();
+            seedDrafts();
+            if (newDraft() === 'full') {
+              toast.info(DRAFTS_FULL_MESSAGE);
+              return toView('ban-hang')();
+            }
             toView('gio-hang-trong')();
           }}
           onOpen={toView('chi-tiet-don')}

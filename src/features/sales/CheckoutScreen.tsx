@@ -45,6 +45,7 @@ import {
 } from './api';
 import { cartTotals, useCart, type PayKind, type SaleMode } from './cart';
 import { LineRow, SumRow } from './components';
+import { closeDraft, draftLabel, useDrafts } from './drafts';
 import { buildInvoicePayload, buildOrderPayload, paymentNoteOf, validateCheckout } from './payload';
 import { useSalePerms, type SalePerms } from './perms';
 import { useScopedCart } from './scope';
@@ -87,6 +88,10 @@ export interface CheckoutViewProps {
   onOpenDiscount: () => void;
   onAddMore: () => void;
   onClear: () => void;
+  /** Tên đơn nháp đang mở (vd "Đơn 2"). */
+  draftName?: string | null;
+  /** Còn đơn nháp khác: nút xóa là xóa đơn nháp này. */
+  manyDrafts?: boolean;
 }
 
 /** Khách của giỏ đang mở; không truyền `onPress` thì không cho đổi khách. */
@@ -279,8 +284,12 @@ export function CheckoutView(p: CheckoutViewProps) {
       stickyHeader
       header={
         <SubHeader
-          title="Giỏ hàng"
-          right={cart.lines.length ? <IconButton icon="trash" label="Xóa giỏ hàng" tint="#B91C1C" onPress={p.onClear} /> : undefined}>
+          title={p.draftName ? `Giỏ hàng · ${p.draftName}` : 'Giỏ hàng'}
+          right={
+            cart.lines.length ? (
+              <IconButton icon="trash" label={p.manyDrafts ? 'Xóa đơn nháp' : 'Xóa giỏ hàng'} tint="#B91C1C" onPress={p.onClear} />
+            ) : undefined
+          }>
           {canSwitch ? (
             <ChipGroup
               fill
@@ -392,6 +401,11 @@ export default function CheckoutScreen() {
   const customer = useCart((s) => s.customer);
   const payKind = useCart((s) => s.payKind);
   const paidAmount = useCart((s) => s.paidAmount);
+  const draftName = useDrafts((s) => {
+    const d = s.drafts.find((x) => x.id === s.activeId);
+    return d ? draftLabel(d) : null;
+  });
+  const manyDrafts = useDrafts((s) => s.drafts.length > 1);
   const busyRef = useRef(false);
   const [busy, setBusy] = useState(false);
   const canCreateCustomer = perms.customers && customerPerms(user).create;
@@ -409,6 +423,8 @@ export default function CheckoutScreen() {
   const submit = async () => {
     if (busyRef.current || !user) return;
     const cart = useCart.getState();
+    // Đang gửi vẫn có thể quay lại đổi đơn nháp: nhớ đơn nào để đóng đúng đơn.
+    const draftId = useDrafts.getState().activeId;
     const mode = allowedMode(perms, cart.mode);
     const state = { ...cart, mode };
     const problem = validateCheckout(state, { branchId, canPay: perms.viewPayment });
@@ -475,7 +491,7 @@ export default function CheckoutScreen() {
     sale.total = cartTotals(cart).total;
     sale.customerName = cart.customer?.name ?? '';
     useLastSale.setState({ sale });
-    useCart.getState().reset({ mode: cart.mode, priceBookId: cart.priceBookId, priceBookName: cart.priceBookName });
+    closeDraft(draftId, { mode: cart.mode, priceBookId: cart.priceBookId, priceBookName: cart.priceBookName });
     void qc.invalidateQueries({ queryKey: ['dashboard'] });
     void qc.invalidateQueries({ queryKey: ['sales', 'products'] });
     busyRef.current = false;
@@ -503,18 +519,32 @@ export default function CheckoutScreen() {
       onOpenDelivery={() => router.push('/ban-hang/giao-hang')}
       onOpenDiscount={() => router.push('/ban-hang/giam-gia')}
       onAddMore={() => router.dismissTo('/ban-hang')}
+      draftName={draftName}
+      manyDrafts={manyDrafts}
       onClear={() =>
-        Alert.alert('Xóa giỏ hàng?', 'Toàn bộ hàng, khách và thanh toán trong giỏ sẽ bị xóa.', [
-          { text: 'Hủy', style: 'cancel' },
-          {
-            text: 'Xóa giỏ',
-            style: 'destructive',
-            onPress: () => {
-              const c = useCart.getState();
-              c.reset({ mode: c.mode, priceBookId: c.priceBookId, priceBookName: c.priceBookName });
+        Alert.alert(
+          manyDrafts ? `Xóa ${draftName}?` : 'Xóa giỏ hàng?',
+          manyDrafts
+            ? 'Toàn bộ hàng, khách và thanh toán của đơn nháp này sẽ bị xóa.'
+            : 'Toàn bộ hàng, khách và thanh toán trong giỏ sẽ bị xóa.',
+          [
+            { text: 'Hủy', style: 'cancel' },
+            {
+              text: manyDrafts ? 'Xóa đơn' : 'Xóa giỏ',
+              style: 'destructive',
+              onPress: () => {
+                const c = useCart.getState();
+                closeDraft(useDrafts.getState().activeId, {
+                  mode: c.mode,
+                  priceBookId: c.priceBookId,
+                  priceBookName: c.priceBookName,
+                });
+                // Xóa đơn nháp thì về màn chọn hàng của đơn kế bên.
+                if (manyDrafts) router.dismissTo('/ban-hang');
+              },
             },
-          },
-        ])
+          ],
+        )
       }
     />
   );

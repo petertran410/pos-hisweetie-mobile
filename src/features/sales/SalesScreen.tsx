@@ -14,15 +14,19 @@ import {
   PageBackground,
   PressableScale,
   SearchField,
+  Select,
   Skeleton,
   SubHeader,
   TitleHeader,
   toast,
   Txt,
+  type IconName,
+  type SelectOption,
 } from '@/ui';
 import { priceFor, usePriceBook, useSaleProducts, type PriceBookDetail } from './api';
 import { cartTotals, useCart, type CartStore, type SaleProduct } from './cart';
 import { CartBar, ProductRow } from './components';
+import { draftOptions, DRAFTS_FULL_MESSAGE, newDraft, switchDraft, useDrafts } from './drafts';
 import { useSalePerms } from './perms';
 import { useSaleScope, useScopedCart } from './scope';
 
@@ -50,6 +54,26 @@ export interface SalesViewProps {
   onOpenCart: () => void;
   /** Mở từ đơn đang sửa: đầu trang có nút quay lại, thanh dưới để quay về đơn. */
   editing?: boolean;
+  /** Đơn nháp của tab Bán hàng (không có khi đang sửa đơn). */
+  drafts?: {
+    options: SelectOption<string>[];
+    value: string;
+    onChange: (id: string) => void;
+    onAdd: () => void;
+  };
+}
+
+/** Nút gọn ở đầu màn (bảng giá, đơn nháp). */
+function HeaderPill({ icon, text, label, onPress }: { icon: IconName; text: string; label: string; onPress: () => void }) {
+  return (
+    <PressableScale onPress={onPress} accessibilityLabel={label} scaleTo={0.96} style={styles.pill}>
+      <Icon name={icon} size={16} color={C.brand} />
+      <Txt variant="label" weight="semibold" color={C.brand} numberOfLines={1} style={{ flexShrink: 1 }}>
+        {text}
+      </Txt>
+      <Icon name="chevron-down" size={15} color={C.brand} />
+    </PressableScale>
+  );
 }
 
 function ListSkeleton() {
@@ -78,20 +102,35 @@ export function SalesView(p: SalesViewProps) {
       <PageBackground />
       <Header
         title={p.editing ? 'Thêm hàng vào đơn' : 'Bán hàng'}
-        right={p.onScan ? <IconButton icon="scan-barcode" label="Quét mã vạch" onPress={p.onScan} /> : undefined}>
+        right={
+          <View style={styles.actions}>
+            {p.drafts ? <IconButton icon="plus" label="Thêm đơn nháp" onPress={p.drafts.onAdd} /> : null}
+            {p.onScan ? <IconButton icon="scan-barcode" label="Quét mã vạch" onPress={p.onScan} /> : null}
+          </View>
+        }>
         <SearchField value={p.search} onChangeText={p.onSearch} placeholder="Tìm tên hoặc mã hàng" />
-        {p.onOpenPriceBook ? (
-          <PressableScale
-            onPress={p.onOpenPriceBook}
-            accessibilityLabel={`Bảng giá: ${p.priceBookName ?? 'Bảng giá chung'}. Bấm để đổi`}
-            scaleTo={0.96}
-            style={styles.book}>
-            <Icon name="tag" size={16} color={C.brand} />
-            <Txt variant="label" weight="semibold" color={C.brand} numberOfLines={1} style={{ flexShrink: 1 }}>
-              {p.priceBookName ?? 'Bảng giá chung'}
-            </Txt>
-            <Icon name="chevron-down" size={15} color={C.brand} />
-          </PressableScale>
+        {p.drafts || p.onOpenPriceBook ? (
+          <View style={styles.pills}>
+            {p.drafts ? (
+              <Select
+                label="Đơn nháp"
+                options={p.drafts.options}
+                value={p.drafts.value}
+                onChange={(id) => id && p.drafts?.onChange(id)}
+                trigger={({ text, open }) => (
+                  <HeaderPill icon="receipt-text" text={text} label={`Đơn nháp: ${text}. Bấm để đổi`} onPress={open} />
+                )}
+              />
+            ) : null}
+            {p.onOpenPriceBook ? (
+              <HeaderPill
+                icon="tag"
+                text={p.priceBookName ?? 'Bảng giá chung'}
+                label={`Bảng giá: ${p.priceBookName ?? 'Bảng giá chung'}. Bấm để đổi`}
+                onPress={p.onOpenPriceBook}
+              />
+            ) : null}
+          </View>
         ) : null}
       </Header>
 
@@ -181,6 +220,8 @@ export default function SalesScreen() {
   const shippingFee = useScopedCart((s) => s.shippingFee);
   const priceBookId = useScopedCart((s) => s.priceBookId);
   const priceBookName = useScopedCart((s) => s.priceBookName);
+  const customer = useScopedCart((s) => s.customer);
+  const draftBook = useDrafts();
 
   const book = usePriceBook(priceBookId, perms.priceBooks);
   const strict = !!book.data && !book.data.allowNonListedProducts;
@@ -237,15 +278,31 @@ export default function SalesScreen() {
       // Đơn đang sửa: màn chọn hàng mở từ đơn nên quay lại là về đơn.
       onOpenCart={() => (editing ? router.back() : router.push(paths.cart as never))}
       editing={editing}
+      drafts={
+        editing || !draftBook.drafts.length
+          ? undefined
+          : {
+              options: draftOptions(draftBook, { lines, customer, orderDiscount, shippingFee }),
+              value: draftBook.activeId,
+              onChange: switchDraft,
+              onAdd: () => {
+                const r = newDraft();
+                if (r === 'already') toast.info('Đơn đang mở còn trống');
+                if (r === 'full') toast.info(DRAFTS_FULL_MESSAGE);
+              },
+            }
+      }
     />
   );
 }
 
 const styles = StyleSheet.create({
-  book: {
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pills: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
+    flexShrink: 1,
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 7,
@@ -253,7 +310,6 @@ const styles = StyleSheet.create({
     backgroundColor: C.card,
     borderWidth: 1,
     borderColor: '#CFE3E6',
-    maxWidth: '100%',
   },
   skeletonRow: {
     flexDirection: 'row',

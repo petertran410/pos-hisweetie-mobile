@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ActionSheetIOS, Alert, FlatList, Modal, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState } from './Feedback';
@@ -249,25 +249,33 @@ export function Select<T>({
   placeholder = 'Chọn',
   disabled,
   variant = 'row',
+  trigger,
 }: FieldProps & {
   options: SelectOption<T>[];
   value: T | null;
   onChange: (v: T | null) => void;
   clearLabel?: string;
+  /** Tự vẽ nút mở sheet (thay cho các kiểu `variant`). */
+  trigger?: (p: { text: string; open: () => void }) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const current = value === null ? undefined : options.find((o) => o.value === value);
+  const text = current?.label ?? clearLabel ?? placeholder;
   return (
     <>
-      <SelectTrigger
-        label={label}
-        text={current?.label ?? clearLabel ?? placeholder}
-        sub={current?.sub}
-        empty={!current}
-        variant={variant}
-        disabled={disabled}
-        onPress={() => setOpen(true)}
-      />
+      {trigger ? (
+        trigger({ text, open: () => setOpen(true) })
+      ) : (
+        <SelectTrigger
+          label={label}
+          text={text}
+          sub={current?.sub}
+          empty={!current}
+          variant={variant}
+          disabled={disabled}
+          onPress={() => setOpen(true)}
+        />
+      )}
       <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
         {open ? (
           <SelectSheet
