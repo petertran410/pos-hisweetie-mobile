@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect } from 'react';
 import { DRAFT_PREFIX, useSession } from '@/core/session';
-import { cartSnapshot, EMPTY_CART, useCart, type CartState, type SaleMode } from './cart';
+import { EMPTY_CART, useCart, type SaleMode } from './cart';
+import { currentBook, openBook, readBook, serializeBook, setDraftsReady, useDrafts } from './drafts';
 
+/** Key cũ của 1 giỏ, nay chứa cả danh sách đơn nháp (`readBook` đọc được cả 2 dạng). */
 const cartKey = (userId: number, branchId: number) => `${DRAFT_PREFIX}cart_${userId}_${branchId}`;
 const bookKey = (userId: number) => `${DRAFT_PREFIX}pricebook_${userId}`;
 
@@ -21,8 +23,9 @@ export function rememberPriceBook(userId: number, id: number | null, name: strin
 }
 
 /**
- * Giỏ hàng nháp theo từng nhân viên + chi nhánh: tắt app mở lại vẫn còn,
- * đổi chi nhánh thì mở giỏ của chi nhánh đó. Xóa khi đăng xuất.
+ * Đơn nháp theo từng nhân viên + chi nhánh: tắt app mở lại vẫn còn, đổi chi
+ * nhánh thì mở bộ đơn nháp của chi nhánh đó. Xóa khi đăng xuất. Gọi ở cấp tab
+ * (không đợi mở tab Bán hàng) vì tab Đơn hàng cũng mở đơn nháp mới.
  */
 export function useCartPersistence(defaultMode: SaleMode) {
   const userId = useSession((s) => s.user?.id);
@@ -32,7 +35,7 @@ export function useCartPersistence(defaultMode: SaleMode) {
     if (!userId || !branchId) return;
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let unsubscribe: (() => void) | undefined;
+    const unsubscribe: (() => void)[] = [];
     const key = cartKey(userId, branchId);
 
     void (async () => {
@@ -41,30 +44,30 @@ export function useCartPersistence(defaultMode: SaleMode) {
         AsyncStorage.getItem(bookKey(userId)).catch(() => null),
       ]);
       if (!alive) return;
-      const saved = parse<CartState>(rawCart);
       const book = parse<{ id: number | null; name: string | null }>(rawBook);
-      if (saved && Array.isArray(saved.lines)) {
-        useCart.getState().load(saved);
-      } else {
-        useCart.getState().load({
+      openBook(
+        readBook(rawCart, {
           ...EMPTY_CART,
           mode: defaultMode,
           priceBookId: book?.id ?? null,
           priceBookName: book?.name ?? null,
-        });
-      }
-      unsubscribe = useCart.subscribe((state) => {
+        }),
+      );
+      const save = () => {
         clearTimeout(timer);
         timer = setTimeout(() => {
-          void AsyncStorage.setItem(key, JSON.stringify(cartSnapshot(state))).catch(() => {});
+          void AsyncStorage.setItem(key, serializeBook(currentBook())).catch(() => {});
         }, 400);
-      });
+      };
+      unsubscribe.push(useCart.subscribe(save), useDrafts.subscribe(save));
+      setDraftsReady(true);
     })();
 
     return () => {
       alive = false;
+      setDraftsReady(false);
       clearTimeout(timer);
-      unsubscribe?.();
+      unsubscribe.forEach((u) => u());
     };
   }, [userId, branchId, defaultMode]);
 }

@@ -6,7 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { money } from '@/core/format';
 import { Appear, Banner, Button, C, Card, Divider, EmptyState, Icon, PageBackground, PressableScale, Txt } from '@/ui';
 import { easeOut } from '@/ui/motion';
+import { useCart } from './cart';
 import { useLastSale, type LastSale } from './CheckoutScreen';
+import { draftLabel, isBlankCart, useDrafts } from './drafts';
 import { useSalePerms } from './perms';
 import { parseStockWarning } from './warnings';
 
@@ -66,11 +68,14 @@ export function SuccessView({
   canPrint,
   onPrint,
   onNew,
+  nextDraft,
 }: {
   sale: LastSale;
   canPrint: boolean;
   onPrint: () => void;
   onNew: () => void;
+  /** Đơn nháp còn hàng sẽ mở tiếp (vd "Đơn 1"); không có thì tạo đơn mới. */
+  nextDraft?: string | null;
 }) {
   const insets = useSafeAreaInsets();
   const what = sale.kind === 'invoice' ? 'hóa đơn' : 'đơn đặt hàng';
@@ -124,7 +129,11 @@ export function SuccessView({
         {canPrint ? (
           <Button title={`Xem và in ${what}`} icon="printer" variant="outline" onPress={onPrint} />
         ) : null}
-        <Button title="Tạo đơn mới" icon="plus" onPress={onNew} />
+        <Button
+          title={nextDraft ? `Tiếp tục ${nextDraft}` : 'Tạo đơn mới'}
+          icon={nextDraft ? 'arrow-right' : 'plus'}
+          onPress={onNew}
+        />
       </View>
     </View>
   );
@@ -133,6 +142,11 @@ export function SuccessView({
 export default function SuccessScreen() {
   const sale = useLastSale((s) => s.sale);
   const perms = useSalePerms();
+  const activeName = useDrafts((s) => {
+    const d = s.drafts.find((x) => x.id === s.activeId);
+    return d ? draftLabel(d) : null;
+  });
+  const activeBlank = useCart(isBlankCart);
 
   if (!sale) {
     return (
@@ -151,6 +165,7 @@ export default function SuccessScreen() {
     <SuccessView
       sale={sale}
       canPrint={sale.kind === 'invoice' ? perms.printInvoice : perms.printOrder}
+      nextDraft={activeBlank ? null : activeName}
       onPrint={() =>
         router.push({ pathname: '/ban-hang/phieu-in', params: { kind: sale.kind, id: String(sale.id), code: sale.code } })
       }

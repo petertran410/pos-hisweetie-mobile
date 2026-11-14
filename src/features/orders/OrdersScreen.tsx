@@ -24,8 +24,10 @@ import {
   Skeleton,
   TabPanel,
   TitleHeader,
+  toast,
   Txt,
 } from '@/ui';
+import { DRAFTS_FULL_MESSAGE, newDraft, whenDraftsReady } from '../sales/drafts';
 import { useDocList, type DocFilters, type DocRow, type StatusCounts } from './api';
 import { groupByDay } from './group';
 import {
@@ -242,6 +244,21 @@ export function OrdersView(p: OrdersViewProps) {
   );
 }
 
+/**
+ * Nút "+" ở Đơn hàng: như nút "+" ở Bán hàng, mở 1 đơn nháp trống rồi vào giỏ
+ * hàng. Đủ đơn nháp thì sang màn Bán hàng để chọn đơn.
+ */
+function createFromOrders() {
+  whenDraftsReady(() => {
+    if (newDraft() === 'full') {
+      toast.info(DRAFTS_FULL_MESSAGE);
+      router.push('/ban-hang');
+      return;
+    }
+    router.push('/ban-hang/gio-hang');
+  });
+}
+
 export default function OrdersScreen() {
   const user = useSession((s) => s.user);
   const kinds = KIND_ORDER.filter((k) => canDo(user, k === 'invoice' ? 'invoices:view' : 'orders:view'));
@@ -305,7 +322,7 @@ export default function OrdersScreen() {
       onEndReached={() => {
         if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
       }}
-      onCreate={canCreate ? () => router.push('/ban-hang/gio-hang') : undefined}
+      onCreate={canCreate ? createFromOrders : undefined}
       onOpen={(row) =>
         router.push({ pathname: '/don-hang/[kind]/[id]', params: { kind: KIND_SLUG[active], id: String(row.id) } })
       }
