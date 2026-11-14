@@ -14,4 +14,9 @@ module.exports = {
     SourceSkips.Easignore |
     SourceSkips.AutolinkingConfigPaths |
     SourceSkips.PackageJsonScriptsAll,
+  // File từ biến môi trường kiểu File của EAS (vd GOOGLE_SERVICES_JSON của
+  // Firebase): EAS CLI không tải các file này về máy, nên runtime version tính ở
+  // máy sẽ lệch với trên EAS và build bị dừng. Bỏ qua chúng khi tính fingerprint;
+  // đổi file Firebase thì vẫn phải build lại app.
+  ignorePaths: ['**/eas-environment-secrets/**'],
 };
