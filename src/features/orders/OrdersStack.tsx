@@ -5,13 +5,14 @@ import { C } from '@/ui';
 const sheet = { presentation: 'modal', contentStyle: { backgroundColor: C.bg } } as const;
 
 /**
- * Tab Đơn hàng: danh sách → chi tiết → xử lý đơn (sửa đơn, thêm hàng) / tạo
- * hóa đơn từ đơn. Các màn phụ khi xử lý đơn mở dạng sheet giống Bán hàng.
+ * Tab Đơn hàng: danh sách (bộ lọc mở dạng sheet) → chi tiết → xử lý đơn (sửa
+ * đơn, thêm hàng) / tạo hóa đơn từ đơn. Các màn phụ khi xử lý đơn mở dạng sheet giống Bán hàng.
  */
 export function OrdersStack() {
   return (
     <TabStack name="don-hang">
       <Stack.Screen name="index" />
+      <Stack.Screen name="loc" options={sheet} />
       <Stack.Screen name="[kind]/[id]" />
       <Stack.Screen name="tao-hoa-don" />
       <Stack.Screen name="xu-ly/index" />

@@ -19,6 +19,90 @@ export function resolvePeriod(p: PeriodChoice, now = new Date()): DateRange | nu
   return periodRange(p, now);
 }
 
+/**
+ * Các mốc có sẵn của bộ lọc thời gian trên web (`components/shared/TimeRangeFilter.tsx`),
+ * cùng nhóm, cùng tên. Tuần bắt đầu thứ Hai.
+ */
+export type RangePreset =
+  | 'today'
+  | 'yesterday'
+  | 'this_week'
+  | 'last_week'
+  | 'last_7_days'
+  | 'this_month'
+  | 'last_month'
+  | 'last_30_days'
+  | 'this_quarter'
+  | 'last_quarter'
+  | 'this_year'
+  | 'last_year';
+
+export const RANGE_PRESETS: { value: RangePreset; label: string; group: string }[] = [
+  { value: 'today', label: 'Hôm nay', group: 'Theo ngày' },
+  { value: 'yesterday', label: 'Hôm qua', group: 'Theo ngày' },
+  { value: 'this_week', label: 'Tuần này', group: 'Theo tuần' },
+  { value: 'last_week', label: 'Tuần trước', group: 'Theo tuần' },
+  { value: 'last_7_days', label: '7 ngày qua', group: 'Theo tuần' },
+  { value: 'this_month', label: 'Tháng này', group: 'Theo tháng' },
+  { value: 'last_month', label: 'Tháng trước', group: 'Theo tháng' },
+  { value: 'last_30_days', label: '30 ngày qua', group: 'Theo tháng' },
+  { value: 'this_quarter', label: 'Quý này', group: 'Theo quý' },
+  { value: 'last_quarter', label: 'Quý trước', group: 'Theo quý' },
+  { value: 'this_year', label: 'Năm nay', group: 'Theo năm' },
+  { value: 'last_year', label: 'Năm trước', group: 'Theo năm' },
+];
+
+/** Bộ lọc thời gian kiểu web: mốc có sẵn, "toàn thời gian" hoặc khoảng ngày tự chọn. */
+export type RangeChoice = RangePreset | 'all' | DateRange;
+
+/**
+ * Khoảng ngày của 1 mốc, tính như web (`getDateRangeFromPreset`): "7 ngày qua" / "30 ngày qua"
+ * tính từ 7 / 30 ngày trước đến hôm nay. Kỳ đang chạy kết thúc ở hôm nay.
+ */
+export function presetRange(p: RangePreset, now = new Date()): DateRange {
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const d = now.getDate();
+  const day = (yy: number, mm: number, dd: number) => isoDate(new Date(yy, mm, dd));
+  const today = day(y, m, d);
+  // Số ngày từ thứ Hai đầu tuần tới hôm nay.
+  const sinceMonday = (now.getDay() + 6) % 7;
+  const q = Math.floor(m / 3);
+  switch (p) {
+    case 'today':
+      return { from: today, to: today };
+    case 'yesterday':
+      return { from: day(y, m, d - 1), to: day(y, m, d - 1) };
+    case 'this_week':
+      return { from: day(y, m, d - sinceMonday), to: today };
+    case 'last_week':
+      return { from: day(y, m, d - sinceMonday - 7), to: day(y, m, d - sinceMonday - 1) };
+    case 'last_7_days':
+      return { from: day(y, m, d - 7), to: today };
+    case 'this_month':
+      return { from: day(y, m, 1), to: today };
+    case 'last_month':
+      return { from: day(y, m - 1, 1), to: day(y, m, 0) };
+    case 'last_30_days':
+      return { from: day(y, m, d - 30), to: today };
+    case 'this_quarter':
+      return { from: day(y, q * 3, 1), to: today };
+    case 'last_quarter':
+      return { from: day(y, q * 3 - 3, 1), to: day(y, q * 3, 0) };
+    case 'this_year':
+      return { from: day(y, 0, 1), to: today };
+    case 'last_year':
+      return { from: day(y - 1, 0, 1), to: day(y - 1, 11, 31) };
+  }
+}
+
+/** Khoảng ngày của bộ lọc kiểu web; null = không lọc theo thời gian. */
+export function resolveRange(c: RangeChoice, now = new Date()): DateRange | null {
+  if (c === 'all') return null;
+  if (isRange(c)) return c;
+  return presetRange(c, now);
+}
+
 /** yyyy-mm-dd (giờ máy) → ISO đầu ngày / cuối ngày (giống web gửi). */
 export function dayBoundsIso(from: string, to: string): { fromIso: string; toIso: string } {
   const [fy, fm, fd] = from.split('-').map(Number);

@@ -10,6 +10,7 @@ import { updateCustomer } from './api';
 import { patchAddressDraft, patchCustomerDraft, useAddressDraft, useCustomerDraft } from './draft';
 import { OLD_ADDRESS_CLEARED, removeAddress, toAddressPayload, upsertAddress, validateAddress, type AddressForm } from './form';
 import { useCustomerFormPaths } from './formPaths';
+import { oldWardsOf } from './locations';
 
 /** Cấp địa giới để chọn: tỉnh / xã mới (2 cấp), tỉnh / huyện / xã cũ (3 cấp). */
 export type PlaceLevel = 'newCity' | 'newWard' | 'oldCity' | 'district' | 'oldWard';
@@ -46,6 +47,8 @@ export function AddressFormView(p: AddressFormViewProps) {
   // Địa chỉ cũ: mở sẵn khi đã có, không thì thu gọn (giống web).
   const [showOld, setShowOld] = useState(() => hasOld(a));
   const oldCity = a.cityName || (a.cityCode ? '' : (a.locationName ?? ''));
+  // Huyện đảo không có phường / xã nào: không cần (và không thể) chọn.
+  const noOldWards = !!(a.cityCode && a.districtCode) && oldWardsOf(a.cityCode, a.districtCode).length === 0;
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <SheetHeader
@@ -119,8 +122,8 @@ export function AddressFormView(p: AddressFormViewProps) {
               <PickRow
                 label="Phường / xã"
                 value={a.wardName ?? ''}
-                placeholder={a.districtCode ? 'Chọn' : 'Chọn quận / huyện trước'}
-                onPress={a.cityCode && a.districtCode ? () => p.onPick('oldWard') : undefined}
+                placeholder={!a.districtCode ? 'Chọn quận / huyện trước' : noOldWards ? 'Không có' : 'Chọn'}
+                onPress={a.cityCode && a.districtCode && !noOldWards ? () => p.onPick('oldWard') : undefined}
               />
               {hasOld(a) ? <ClearLink label="Bỏ địa chỉ cũ" onPress={() => p.onChange(OLD_ADDRESS_CLEARED)} /> : null}
             </View>

@@ -16,7 +16,6 @@ import {
   buildCustomerUpdate,
   emptyAddress,
   isFormDirty,
-  isTaxCode,
   validateCustomerForm,
   type AddressForm,
   type CustomerForm,
@@ -82,7 +81,6 @@ export function CustomerFormView(p: CustomerFormViewProps) {
   const company = form.type === 1;
   // Giống web: khách con không đổi khách cha; khách cha không thể thành khách con.
   const parentEditable = !p.hasChildren && !(p.editing && form.parent);
-  const canTaxLookup = isTaxCode(form.taxCode);
 
   return (
     <Page
@@ -206,12 +204,12 @@ export function CustomerFormView(p: CustomerFormViewProps) {
             p.onLookupTax ? (
               <PressableScale
                 onPress={p.onLookupTax}
-                disabled={!canTaxLookup || p.lookingUp}
+                disabled={p.lookingUp}
                 hitSlop={6}
                 scaleTo={0.94}
                 accessibilityRole="button"
                 accessibilityLabel="Tra cứu mã số thuế"
-                style={[styles.lookup, !canTaxLookup ? { opacity: 0.45 } : null]}>
+                style={styles.lookup}>
                 {p.lookingUp ? (
                   <ActivityIndicator size="small" color={C.brand} />
                 ) : (
@@ -339,21 +337,28 @@ export default function CustomerFormScreen() {
   }
 
   const lookupTax = async () => {
+    // Giống web: nút luôn bấm được, kiểm khi bấm. Bỏ khoảng trắng (dán "0101 234 567").
+    const code = form.taxCode.replace(/\s+/g, '');
+    if (!code) {
+      toast.error('Nhập mã số thuế trước khi tra cứu');
+      return;
+    }
     setLookingUp(true);
     try {
-      const hit = await lookupTaxCode(form.taxCode);
+      const hit = await lookupTaxCode(code);
       if (!hit) {
-        toast.error('Không tìm thấy mã số thuế này');
+        toast.error('Không tìm thấy thông tin mã số thuế này');
         return;
       }
       patchCustomerDraft((f) => ({
+        taxCode: code,
         ...(f.type === 1 ? { organization: hit.name } : { invoiceBuyerName: hit.name }),
         invoiceAddress: hit.address || f.invoiceAddress,
         name: f.name.trim() ? f.name : hit.name,
       }));
       toast.success('Đã điền theo mã số thuế');
-    } catch {
-      toast.error('Chưa tra cứu được, kiểm tra mạng rồi thử lại');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Chưa tra cứu được, kiểm tra mạng rồi thử lại');
     } finally {
       setLookingUp(false);
     }

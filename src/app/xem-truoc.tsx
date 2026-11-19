@@ -37,7 +37,8 @@ import { OrderDetailView } from '@/features/orders/OrderDetailScreen';
 import { OrderEditView } from '@/features/orders/OrderEditScreen';
 import { ORDER_EDIT_SCOPE, startOrderEdit, useOrderEditMeta } from '@/features/orders/editScope';
 import { OrdersView } from '@/features/orders/OrdersScreen';
-import type { DocKind, StatusFilter } from '@/features/orders/model';
+import { DocFilterView } from '@/features/orders/DocFilterScreen';
+import { DEFAULT_DOC_FILTERS, docFilterCount, filtersFor, type DocKind, type DocListFilters, type StatusFilter } from '@/features/orders/model';
 import { printDocument } from '@/features/print/print';
 import { CostScopeView } from '@/features/products/CostScopeModal';
 import { newForm, toEditForm, type ProductForm } from '@/features/products/form';
@@ -139,6 +140,7 @@ const SCREENS = [
   { key: 'xong', title: 'Tạo đơn xong' },
   { key: 'phieu-in', title: 'Xem và in phiếu' },
   { key: 'don-hang', title: 'Đơn hàng' },
+  { key: 'loc-don', title: 'Bộ lọc đơn hàng' },
   { key: 'chi-tiet-don', title: 'Chi tiết đơn' },
   { key: 'chi-tiet-hd', title: 'Chi tiết hóa đơn' },
   { key: 'xu-ly', title: 'Xử lý đơn hàng' },
@@ -297,7 +299,7 @@ export default function PreviewScreen() {
   const [search, setSearch] = useState('');
   const [docKind, setDocKind] = useState<DocKind>('order');
   const [docStatus, setDocStatus] = useState<StatusFilter>('all');
-  const [docPeriod, setDocPeriod] = useState<import('@/core/period').PeriodChoice>('last7');
+  const [docFilters, setDocFilters] = useState<DocListFilters>(DEFAULT_DOC_FILTERS);
   const lines = useCart((st) => st.lines);
   const cart = useCart();
   const draftBook = useDrafts();
@@ -534,10 +536,12 @@ export default function PreviewScreen() {
           kinds={['order', 'invoice']}
           kind={docKind}
           onKind={setDocKind}
-          filters={{ search, status: docStatus, period: docPeriod }}
+          filters={{ ...filtersFor(docKind, docFilters), search, status: docStatus }}
           onSearch={setSearch}
           onStatus={setDocStatus}
-          onPeriod={setDocPeriod}
+          onPeriod={(period) => setDocFilters((f) => ({ ...f, period }))}
+          filterCount={docFilterCount(docKind, docFilters)}
+          onOpenFilters={toView('loc-don')}
           rows={docStatus === 'all' ? sampleDocRows : sampleDocRows.filter((r) => r.status === 5)}
           total={docStatus === 'all' ? 24 : 5}
           counts={sampleDocCounts}
@@ -553,6 +557,19 @@ export default function PreviewScreen() {
         />
         <FakeTabBar active="don-hang" />
       </View>
+    );
+  if (man === 'loc-don')
+    return (
+      <DocFilterView
+        kind={docKind}
+        draft={docFilters}
+        staff={{ items: [{ id: 1, name: 'Nguyễn Thị Lan' }, { id: 3, name: 'Trần Văn Nam' }], loading: false }}
+        ownOnly={false}
+        onChange={(patch) => setDocFilters((f) => ({ ...f, ...patch }))}
+        onApply={toView('don-hang')}
+        onReset={() => setDocFilters((f) => ({ ...DEFAULT_DOC_FILTERS, period: f.period }))}
+        onCancel={toView('don-hang')}
+      />
     );
   if (man === 'chi-tiet-don' || man === 'chi-tiet-hd')
     return (

@@ -8,7 +8,19 @@ import { hasActiveCashSlip, listQuery, toDocDetail, toDocRow } from '../api';
 // eslint-disable-next-line import/first
 import { groupByDay } from '../group';
 // eslint-disable-next-line import/first
-import { dayBoundsIso, invoiceActions, kindFromSlug, orderActions, payState, statusOf } from '../model';
+import {
+  activeAlerts,
+  alertsFor,
+  dayBoundsIso,
+  DEFAULT_DOC_FILTERS,
+  docFilterCount,
+  filtersFor,
+  invoiceActions,
+  kindFromSlug,
+  orderActions,
+  payState,
+  statusOf,
+} from '../model';
 
 const NOW = new Date(2026, 10, 1, 9, 0); // 01/11/2026 09:00 giờ máy
 
@@ -31,13 +43,59 @@ describe('listQuery', () => {
     expect(q).not.toHaveProperty('currentItem');
   });
 
-  it('đặt hàng: trạng thái dạng chữ, ngày đặt cần cả from + to, không gửi paymentStatus', () => {
-    const q = listQuery('order', { search: '', status: 'pending', period: 'last7' }, 2, 3, NOW);
+  it('đặt hàng: trạng thái dạng chữ, thời gian theo thời gian tạo như web, không gửi paymentStatus', () => {
+    const q = listQuery('order', { search: '', status: 'pending', period: 'last_7_days' }, 2, 3, NOW);
     expect(q).toMatchObject({ page: 3, branchId: 2, statuses: ['pending'], orderBy: 'orderDate' });
-    expect(q.fromDate).toBeDefined();
-    expect(q.toDate).toBeDefined();
+    // Web (OrdersSidebar) gửi fromCreatedDate/toCreatedDate; "7 ngày qua" = từ 7 ngày trước.
+    expect(q.fromCreatedDate).toBe(new Date(2026, 9, 25, 0, 0, 0, 0).toISOString());
+    expect(q.toCreatedDate).toBe(new Date(2026, 10, 1, 23, 59, 59, 999).toISOString());
+    expect(q).not.toHaveProperty('fromDate');
+    expect(q).not.toHaveProperty('toDate');
     expect(q.search).toBeUndefined();
     expect(q).not.toHaveProperty('paymentStatus');
+  });
+
+  it('người bán, người tạo, cảnh báo: cùng tên tham số với sidebar web', () => {
+    const f = {
+      search: '',
+      status: 'all',
+      period: 'all' as const,
+      sellerIds: [3, 4],
+      creatorIds: [7],
+      alerts: ['price', 'quantity', 'orphanedPacking', 'shippingFee', 'cold'] as const,
+    };
+    const inv = listQuery('invoice', { ...f, alerts: [...f.alerts] }, 2, 1, NOW);
+    expect(inv).toMatchObject({
+      soldByIds: [3, 4],
+      createdByIds: [7],
+      priceWarning: true,
+      quantityWarning: true,
+      orphanedPacking: true,
+      hasShippingFee: true,
+      hasColdItems: true,
+    });
+    // Đặt hàng chỉ có lệch giá, phí ship, hàng lạnh (DTO đặt hàng không nhận 2 cờ kia).
+    const ord = listQuery('order', { ...f, alerts: [...f.alerts] }, 2, 1, NOW);
+    expect(ord).toMatchObject({ soldByIds: [3, 4], createdByIds: [7], priceWarning: true, hasShippingFee: true, hasColdItems: true });
+    expect(ord).not.toHaveProperty('quantityWarning');
+    expect(ord).not.toHaveProperty('orphanedPacking');
+  });
+
+  it('không chọn người / cảnh báo thì không gửi', () => {
+    const q = listQuery('invoice', { search: '', status: 'all', period: 'all', sellerIds: [], creatorIds: [], alerts: [] }, 2, 1, NOW);
+    for (const k of ['soldByIds', 'createdByIds', 'priceWarning', 'quantityWarning', 'orphanedPacking', 'hasShippingFee', 'hasColdItems']) {
+      expect(q).not.toHaveProperty(k);
+    }
+  });
+
+  it('hóa đơn: thời gian mua hàng và thời gian tạo là 2 bộ lọc riêng (như trang hóa đơn web)', () => {
+    const q = listQuery('invoice', { search: '', status: 'all', period: 'all', createdPeriod: 'yesterday' }, 2, 1, NOW);
+    expect(q.fromPurchaseDate).toBeUndefined();
+    expect(q.fromCreatedDate).toBe(new Date(2026, 9, 31, 0, 0, 0, 0).toISOString());
+    expect(q.toCreatedDate).toBe(new Date(2026, 9, 31, 23, 59, 59, 999).toISOString());
+    // Đặt hàng không có "thời gian tạo" riêng.
+    const o = listQuery('order', { search: '', status: 'all', period: 'all', createdPeriod: 'yesterday' }, 2, 1, NOW);
+    expect(o.fromCreatedDate).toBeUndefined();
   });
 
   it('khoảng ngày tự chọn: gửi từ đầu ngày bắt đầu đến cuối ngày kết thúc', () => {
@@ -48,7 +106,7 @@ describe('listQuery', () => {
 
   it('toàn thời gian, tất cả trạng thái: không gửi ngày hay trạng thái', () => {
     const q = listQuery('order', { search: '', status: 'all', period: 'all' }, 2, 1, NOW);
-    expect(q.fromDate).toBeUndefined();
+    expect(q.fromCreatedDate).toBeUndefined();
     expect(q.statuses).toBeUndefined();
   });
 });
@@ -98,6 +156,61 @@ describe('toDocRow / groupByDay', () => {
     expect(items.map((i) => i.type)).toEqual(['day', 'row', 'row', 'day', 'row']);
     expect(items[0]).toMatchObject({ label: 'Hôm nay, 01/11' });
     expect(items[3]).toMatchObject({ label: 'Hôm qua, 31/10' });
+  });
+});
+
+describe('cảnh báo trên danh sách (giống web)', () => {
+  it('cùng điều kiện với InvoiceAlertIcons / InvoiceWarningIcon, cùng thứ tự icon', () => {
+    expect(activeAlerts({})).toEqual([]);
+    // Dữ liệu cũ chỉ có cờ lệch giá, chưa có chi tiết.
+    expect(activeAlerts({ hasPriceBookWarning: true })).toEqual(['price']);
+    expect(
+      activeAlerts({
+        hasColdItems: true,
+        hasShippingFee: true,
+        hasOrphanedPacking: true,
+        warnings: { price: [], quantity: [{} as never] },
+      }),
+    ).toEqual(['quantity', 'orphanedPacking', 'shippingFee', 'cold']);
+  });
+
+  it('toDocRow đọc cờ và chi tiết cảnh báo từ API', () => {
+    const row = toDocRow('invoice', {
+      id: 1,
+      code: 'HD1',
+      shippingFee: '30000',
+      hasPriceBookWarning: true,
+      hasShippingFee: true,
+      warnings: {
+        price: [{ productCode: 'SP1', productName: 'Trà', price: '170000', listPrice: '185000' }],
+        quantity: [],
+        orderCode: 'DH1',
+        previousInvoiceCodes: [],
+      },
+    });
+    expect(row.alerts).toEqual(['price', 'shippingFee']);
+    expect(row.shippingFee).toBe(30000);
+    expect(row.warnings?.price[0]).toEqual({ productCode: 'SP1', productName: 'Trà', price: 170000, listPrice: 185000 });
+    expect(toDocRow('order', { id: 2, code: 'DH2' })).toMatchObject({ alerts: [], warnings: null, shippingFee: 0 });
+  });
+
+  it('bộ lọc cảnh báo: đặt hàng 3 loại, hóa đơn 5 loại (như sidebar web)', () => {
+    expect(alertsFor('order').map((a) => a.param)).toEqual(['priceWarning', 'hasShippingFee', 'hasColdItems']);
+    expect(alertsFor('invoice').map((a) => a.param)).toEqual([
+      'priceWarning',
+      'quantityWarning',
+      'orphanedPacking',
+      'hasShippingFee',
+      'hasColdItems',
+    ]);
+  });
+
+  it('số bộ lọc đang bật chỉ tính cái áp được cho loại đang xem', () => {
+    const f = { ...DEFAULT_DOC_FILTERS, sellerIds: [1], creatorIds: [2, 3], alerts: ['cold', 'orphanedPacking'] as never[], createdPeriod: 'today' as const };
+    expect(docFilterCount('invoice', f)).toBe(5);
+    expect(docFilterCount('order', f)).toBe(3);
+    expect(filtersFor('order', f)).toMatchObject({ alerts: ['cold'], createdPeriod: 'all' });
+    expect(docFilterCount('order', DEFAULT_DOC_FILTERS)).toBe(0);
   });
 });
 

@@ -1,3 +1,4 @@
+import { oldWardsOf } from './locations';
 import { hasProvince, type RawAddress, type RawCustomer } from './model';
 
 /** 1 địa chỉ đang sửa; `key` để phân biệt khi chưa có id. */
@@ -176,8 +177,14 @@ export function toAddressPayload(a: RawAddress): Record<string, string | number 
 export function validateAddress(a: RawAddress): string | null {
   if (!hasProvince(a)) return 'Chọn tỉnh / thành phố (địa chỉ mới hoặc địa chỉ cũ).';
   if (a.newCityCode && !a.newWardCode) return 'Chọn phường / xã cho địa chỉ mới.';
-  // Chỉ có địa chỉ cũ thì cần đủ 3 cấp để giao hàng.
-  if (!a.newCityCode && a.cityCode && (!a.districtCode || !a.wardCode)) return 'Chọn đủ quận / huyện và phường / xã cho địa chỉ cũ.';
+  // Đã chọn tỉnh cũ thì phải đủ 3 cấp, kể cả khi địa chỉ mới đã đủ (giống web).
+  // Huyện không có phường nào trong dữ liệu (các huyện đảo) thì không bắt chọn phường.
+  if (a.cityCode) {
+    if (!a.districtCode) return 'Chọn quận / huyện cho địa chỉ cũ, hoặc bấm "Bỏ địa chỉ cũ".';
+    if (!a.wardCode && oldWardsOf(a.cityCode, a.districtCode).length > 0) {
+      return 'Chọn phường / xã cho địa chỉ cũ, hoặc bấm "Bỏ địa chỉ cũ".';
+    }
+  }
   if (!(a.address ?? '').trim()) return 'Nhập số nhà, tên đường.';
   return null;
 }
@@ -198,8 +205,6 @@ export const OLD_ADDRESS_CLEARED: Partial<RawAddress> = {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Số điện thoại: chỉ số và dấu + . - ( ) khoảng trắng, ít nhất 8 chữ số. */
 export const isPhoneLike = (s: string) => /^[\d\s+().-]+$/.test(s) && s.replace(/\D/g, '').length >= 8;
-/** Mã số thuế: 10 số, hoặc 13 số (chi nhánh, có thể có dấu "-"). */
-export const isTaxCode = (s: string) => /^\d{10}(-?\d{3})?$/.test(s.trim());
 
 export function validateCustomerForm(f: CustomerForm, opts: { editing: boolean; requireSalePic: boolean }): string | null {
   const t = (s: string) => s.trim();

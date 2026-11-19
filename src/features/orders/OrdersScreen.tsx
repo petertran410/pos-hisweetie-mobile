@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { canDo } from '@/core/can';
 import { money, timeVN } from '@/core/format';
-import { resolvePeriod, type PeriodChoice } from '@/core/period';
+import { resolveRange } from '@/core/period';
 import { useSession } from '@/core/session';
 import { useDebounced } from '@/core/useDebounced';
 import { usePullRefresh } from '@/core/usePullRefresh';
@@ -28,9 +28,14 @@ import {
   Txt,
 } from '@/ui';
 import { DRAFTS_FULL_MESSAGE, newDraft, whenDraftsReady } from '../sales/drafts';
+import { alertSummary, DocAlertIcons, DocAlertSheet } from './alerts';
 import { useDocList, type DocFilters, type DocRow, type StatusCounts } from './api';
+import { setDocFilters, useDocFilters } from './filters';
 import { groupByDay } from './group';
 import {
+  DOC_PERIODS,
+  docFilterCount,
+  filtersFor,
   INVOICE_FILTERS,
   INVOICE_STATUS,
   isCancelled,
@@ -40,9 +45,9 @@ import {
   kindFromSlug,
   ORDER_FILTERS,
   ORDER_STATUS,
-  PERIOD_FILTERS,
   statusOf,
   type DocKind,
+  type DocPeriod,
   type StatusFilter,
 } from './model';
 
@@ -54,19 +59,40 @@ function statusOptions(kind: DocKind, counts: StatusCounts | undefined) {
   return [all, ...ORDER_FILTERS.map((s) => ({ value: s, label: ORDER_STATUS[s].label, count: counts?.[s] }))];
 }
 
-export function DocCard({ kind, row, onPress }: { kind: DocKind; row: DocRow; onPress: () => void }) {
+export function DocCard({
+  kind,
+  row,
+  onPress,
+  onAlerts,
+}: {
+  kind: DocKind;
+  row: DocRow;
+  onPress: () => void;
+  /** Bấm dãy icon cảnh báo: mở sheet giải thích. */
+  onAlerts?: () => void;
+}) {
   const st = statusOf(kind, row.status);
   const cancelled = isCancelled(kind, row.status);
+  const alerts = row.alerts.length ? alertSummary(row) : '';
   return (
     <PressableScale
       onPress={onPress}
-      accessibilityLabel={`${row.code}, ${row.customerName}, ${money(row.grandTotal)} đồng, ${st.label}`}
+      accessibilityLabel={[`${row.code}, ${row.customerName}, ${money(row.grandTotal)} đồng, ${st.label}`, alerts && `cảnh báo: ${alerts}`]
+        .filter(Boolean)
+        .join(', ')}
+      // Nút icon lồng trong thẻ không tự nhận tiêu điểm khi đọc màn hình: thêm thao tác riêng.
+      accessibilityActions={alerts && onAlerts ? [{ name: 'alerts', label: 'Xem cảnh báo' }] : undefined}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName === 'alerts') onAlerts?.();
+      }}
       scaleTo={0.985}
       style={[styles.card, cancelled ? { opacity: 0.6 } : null]}>
       <View style={styles.cardTop}>
-        <Txt variant="body" weight="bold" numeric style={{ flex: 1 }}>
+        <Txt variant="body" weight="bold" numeric style={{ flexShrink: 1 }}>
           {row.code}
         </Txt>
+        <DocAlertIcons row={row} onPress={onAlerts} />
+        <View style={{ flex: 1 }} />
         <Pill label={st.label} tone={st.tone} />
       </View>
       <View style={styles.cardMid}>
@@ -116,7 +142,10 @@ export interface OrdersViewProps {
   filters: DocFilters;
   onSearch: (s: string) => void;
   onStatus: (s: StatusFilter) => void;
-  onPeriod: (p: PeriodChoice) => void;
+  onPeriod: (p: DocPeriod) => void;
+  /** Số bộ lọc đang bật trong sheet "Bộ lọc" (cảnh báo, người bán, người tạo…). */
+  filterCount?: number;
+  onOpenFilters?: () => void;
   rows: DocRow[];
   total?: number;
   counts?: StatusCounts;
@@ -132,13 +161,23 @@ export interface OrdersViewProps {
   now?: Date;
 }
 
-/** Danh sách hóa đơn / đơn đặt hàng: tìm, lọc trạng thái, lọc thời gian, nhóm theo ngày. */
+/**
+ * Danh sách hóa đơn / đơn đặt hàng: tìm, lọc trạng thái, lọc thời gian, bộ lọc thêm
+ * (cảnh báo, người bán, người tạo), nhóm theo ngày, icon cảnh báo trên từng thẻ.
+ */
 export function OrdersView(p: OrdersViewProps) {
   const statusOrder = ['all', ...(p.kind === 'invoice' ? INVOICE_FILTERS.map(String) : ORDER_FILTERS)];
   const [periodOpen, setPeriodOpen] = useState(false);
-  const period = periodText(PERIOD_FILTERS, p.filters.period, p.now);
+  const [alertRow, setAlertRow] = useState<DocRow | null>(null);
+  const period = periodText(DOC_PERIODS, p.filters.period, p.now);
   const items = groupByDay(p.rows, p.now);
   const what = p.kind === 'invoice' ? 'hóa đơn' : 'đơn đặt hàng';
+  const count = p.filterCount ?? 0;
+  const emptyMessage = p.filters.search
+    ? `Không có ${what} nào khớp “${p.filters.search}”.`
+    : count
+      ? `Không có ${what} nào khớp bộ lọc trong khoảng “${period.toLowerCase()}”. Thử bỏ bớt bộ lọc.`
+      : `Không có ${what} nào trong khoảng “${period.toLowerCase()}”. Thử đổi thời gian hoặc trạng thái.`;
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -150,7 +189,26 @@ export function OrdersView(p: OrdersViewProps) {
             <IconButton icon="plus" label="Tạo đơn hàng hoặc hóa đơn" onPress={p.onCreate} tint={C.brand} />
           ) : undefined
         }>
-        <SearchField value={p.filters.search} onChangeText={p.onSearch} placeholder="Tìm mã đơn, khách hàng" />
+        <View style={styles.searchRow}>
+          <SearchField value={p.filters.search} onChangeText={p.onSearch} placeholder="Tìm mã đơn, khách hàng" style={{ flex: 1 }} />
+          {p.onOpenFilters ? (
+            <PressableScale
+              onPress={p.onOpenFilters}
+              accessibilityLabel={count ? `Bộ lọc, đang bật ${count}` : 'Bộ lọc'}
+              hitSlop={4}
+              scaleTo={0.92}
+              style={[styles.filterBtn, count ? styles.filterOn : null]}>
+              <Icon name="sliders-horizontal" size={20} color={count ? C.white : C.text} />
+              {count ? (
+                <View style={styles.badge}>
+                  <Txt variant="caption" weight="bold" color={C.brand} numeric>
+                    {count}
+                  </Txt>
+                </View>
+              ) : null}
+            </PressableScale>
+          ) : null}
+        </View>
         {p.kinds.length > 1 ? (
           <ChipGroup
             fill
@@ -205,12 +263,8 @@ export function OrdersView(p: OrdersViewProps) {
                 <EmptyState
                   icon="receipt-text"
                   color="slate"
-                  title={p.filters.search ? 'Không tìm thấy đơn' : `Chưa có ${what}`}
-                  message={
-                    p.filters.search
-                      ? `Không có ${what} nào khớp “${p.filters.search}”.`
-                      : `Không có ${what} nào trong khoảng “${period.toLowerCase()}”. Thử đổi thời gian hoặc trạng thái.`
-                  }
+                  title={p.filters.search || count ? 'Không tìm thấy đơn' : `Chưa có ${what}`}
+                  message={emptyMessage}
                 />
               }
               renderItem={({ item }) =>
@@ -220,7 +274,7 @@ export function OrdersView(p: OrdersViewProps) {
                   </Txt>
                 ) : (
                   <View style={{ paddingBottom: 10 }}>
-                    <DocCard kind={p.kind} row={item.row} onPress={() => p.onOpen(item.row)} />
+                    <DocCard kind={p.kind} row={item.row} onPress={() => p.onOpen(item.row)} onAlerts={() => setAlertRow(item.row)} />
                   </View>
                 )
               }
@@ -230,16 +284,17 @@ export function OrdersView(p: OrdersViewProps) {
       </TabPanel>
       <PeriodModal
         visible={periodOpen}
-        title="Thời gian"
-        options={PERIOD_FILTERS}
+        title={p.kind === 'invoice' ? 'Thời gian mua hàng' : 'Thời gian'}
+        options={DOC_PERIODS}
         value={p.filters.period}
-        initialRange={resolvePeriod(p.filters.period, p.now)}
+        initialRange={resolveRange(p.filters.period, p.now)}
         onChange={(v) => {
           setPeriodOpen(false);
           p.onPeriod(v);
         }}
         onClose={() => setPeriodOpen(false)}
       />
+      <DocAlertSheet kind={p.kind} row={alertRow} onClose={() => setAlertRow(null)} />
     </View>
   );
 }
@@ -277,10 +332,11 @@ export default function OrdersScreen() {
   }, [params.kind]);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<Record<DocKind, StatusFilter>>({ order: 'all', invoice: 'all' });
-  const [period, setPeriod] = useState<PeriodChoice>('last7');
+  // Thời gian, cảnh báo, người bán, người tạo: dùng chung với sheet "Bộ lọc" (/don-hang/loc).
+  const docFilters = useDocFilters((s) => s.filters);
   const term = useDebounced(search.trim(), 350);
   const active = kinds.includes(kind) ? kind : (kinds[0] ?? 'order');
-  const filters: DocFilters = { search: term, status: status[active], period };
+  const filters: DocFilters = { ...filtersFor(active, docFilters), search: term, status: status[active] };
   const list = useDocList(active, filters, kinds.length > 0);
   const pull = usePullRefresh(list.refetch);
   const canCreate = canDo(user, 'orders:create') || canDo(user, 'invoices:create');
@@ -309,7 +365,9 @@ export default function OrdersScreen() {
       filters={{ ...filters, search }}
       onSearch={setSearch}
       onStatus={(s) => setStatus((prev) => ({ ...prev, [active]: s }))}
-      onPeriod={setPeriod}
+      onPeriod={(period) => setDocFilters({ period })}
+      filterCount={docFilterCount(active, docFilters)}
+      onOpenFilters={() => router.push({ pathname: '/don-hang/loc', params: { kind: KIND_SLUG[active] } } as never)}
       rows={pages.flatMap((pg) => pg.rows)}
       total={pages[0]?.total}
       counts={pages[0]?.counts}
@@ -342,6 +400,32 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   cardMid: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   strike: { textDecorationLine: 'line-through' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  filterBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.card,
+    borderWidth: 1.2,
+    borderColor: '#D5DEE6',
+  },
+  filterOn: { backgroundColor: C.brand, borderColor: C.brand },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 5,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.white,
+    borderWidth: 1.5,
+    borderColor: C.brand,
+  },
   summary: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 8 },
   period: {
     flexDirection: 'row',

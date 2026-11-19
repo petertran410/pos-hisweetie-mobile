@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState } from './Feedback';
 import { SheetHeader } from './Header';
 import { SearchField } from './Inputs';
-import { Icon } from './icons';
+import { Icon, type IconName } from './icons';
 import { PressableScale } from './motion';
 import { Txt } from './Text';
 import { C, radius, toneColors } from './theme';
@@ -14,6 +14,8 @@ export interface SelectOption<T> {
   label: string;
   /** Dòng phụ dưới tên (vd chủ tài khoản). */
   sub?: string | null;
+  /** Biểu tượng trước tên (vd icon cảnh báo, cùng icon với danh sách). */
+  icon?: { name: IconName; color: string; fill?: string };
 }
 
 /** Nhiều hơn số này thì sheet có ô tìm. */
@@ -126,6 +128,7 @@ function SelectSheet<T>({
               accessibilityLabel={[label, item?.sub].filter(Boolean).join(', ')}
               scaleTo={0.985}
               style={removable ? styles.rowMain : [styles.row, on ? styles.rowOn : null]}>
+              {item?.icon ? <Icon name={item.icon.name} size={20} color={item.icon.color} fill={item.icon.fill} /> : null}
               <View style={{ flex: 1, gap: 2 }}>
                 <Txt variant="body" weight={on ? 'semibold' : 'medium'} numberOfLines={2} numeric>
                   {label}

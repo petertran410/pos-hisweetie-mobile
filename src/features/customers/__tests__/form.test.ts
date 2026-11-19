@@ -5,6 +5,7 @@ import {
   emptyAddress,
   isFormDirty,
   newCustomerForm,
+  OLD_ADDRESS_CLEARED,
   removeAddress,
   toAddressPayload,
   toCustomerForm,
@@ -13,6 +14,7 @@ import {
   validateCustomerForm,
   type CustomerForm,
 } from '../form';
+import { oldWardsOf } from '../locations';
 
 const addr = (over: object = {}) => ({
   ...emptyAddress(true, 'Anh A', '0900000000'),
@@ -147,12 +149,42 @@ describe('địa chỉ', () => {
     expect(p).toMatchObject({ id: 1, newCityCode: '79', cityCode: null, districtCode: null, wardName: null, locationName: null });
   });
 
-  it('kiểm tra: địa chỉ mới cần phường / xã; chỉ có địa chỉ cũ thì cần đủ 3 cấp', () => {
+  it('kiểm tra: địa chỉ mới cần phường / xã; đã chọn tỉnh cũ thì cần đủ 3 cấp', () => {
+    const fullNew = { newCityCode: '79', newWardCode: '1' };
     expect(validateAddress({ address: 'A' })).toMatch(/tỉnh/);
     expect(validateAddress({ address: 'A', newCityCode: '79' })).toMatch(/địa chỉ mới/);
-    expect(validateAddress({ address: 'A', cityCode: '79', districtCode: '760' })).toMatch(/địa chỉ cũ/);
+    expect(validateAddress({ address: 'A', cityCode: '79' })).toMatch(/quận \/ huyện cho địa chỉ cũ/);
+    expect(validateAddress({ address: 'A', cityCode: '79', districtCode: '760' })).toMatch(/phường \/ xã cho địa chỉ cũ/);
     expect(validateAddress({ address: 'A', cityCode: '79', districtCode: '760', wardCode: '26734' })).toBeNull();
-    expect(validateAddress({ address: 'A', newCityCode: '79', newWardCode: '1', cityCode: '79' })).toBeNull();
     expect(validateAddress({ address: ' ', newCityCode: '79', newWardCode: '1' })).toMatch(/số nhà/);
+    // Địa chỉ mới đã đủ vẫn không bỏ qua địa chỉ cũ dở dang (giống web).
+    expect(validateAddress({ address: 'A', ...fullNew, cityCode: '79' })).toMatch(/quận \/ huyện cho địa chỉ cũ/);
+    expect(validateAddress({ address: 'A', ...fullNew, cityCode: '79', districtCode: '760' })).toMatch(/phường \/ xã cho địa chỉ cũ/);
+    expect(validateAddress({ address: 'A', ...fullNew, cityCode: '79', districtCode: '760', wardCode: '26734' })).toBeNull();
+    // Lỗi địa chỉ cũ chỉ cách bỏ hẳn nó.
+    expect(validateAddress({ address: 'A', cityCode: '79' })).toMatch(/Bỏ địa chỉ cũ/);
+  });
+
+  it('kiểm tra: bỏ địa chỉ cũ dở dang thì lưu được nếu địa chỉ mới đủ', () => {
+    const half = { address: 'A', newCityCode: '79', newWardCode: '1', cityCode: '79', cityName: 'TP HCM' };
+    expect(validateAddress(half)).not.toBeNull();
+    expect(validateAddress({ ...half, ...OLD_ADDRESS_CLEARED })).toBeNull();
+  });
+
+  it('kiểm tra: huyện đảo không có phường / xã thì không bắt chọn phường', () => {
+    const islands = [
+      ['31', '318'], // Bạch Long Vĩ
+      ['45', '471'], // Cồn Cỏ
+      ['48', '498'], // Hoàng Sa
+      ['51', '536'], // Lý Sơn
+      ['77', '755'], // Côn Đảo
+    ];
+    for (const [cityCode, districtCode] of islands) {
+      expect(oldWardsOf(cityCode, districtCode)).toEqual([]);
+      expect(validateAddress({ address: 'A', cityCode, districtCode })).toBeNull();
+      expect(validateAddress({ address: 'A', newCityCode: '79', newWardCode: '1', cityCode, districtCode })).toBeNull();
+      // Vẫn phải chọn huyện.
+      expect(validateAddress({ address: 'A', cityCode })).toMatch(/quận \/ huyện/);
+    }
   });
 });
