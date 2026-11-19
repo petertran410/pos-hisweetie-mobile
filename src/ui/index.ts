@@ -6,7 +6,7 @@ export { MoneyField, QtyField, QtyStepper, SearchField } from './Inputs';
 export { ImageViewer } from './ImageViewer';
 export { KeyboardResize, useAndroidKeyboardHeight } from './keyboard';
 export { PeriodField, PeriodModal, PeriodSheet, periodText, type PeriodOption } from './PeriodPicker';
-export { MultiSelect, pickFromSheet, Select, selectSummary, type SelectOption } from './Select';
+export { fold, MultiSelect, pickFromSheet, Select, selectSummary, SelectTrigger, type SelectOption } from './Select';
 export { Icon, type IconName } from './icons';
 export {
   Avatar,

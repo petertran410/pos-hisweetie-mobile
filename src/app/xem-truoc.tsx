@@ -61,6 +61,7 @@ import { CustomerPickerView } from '@/features/sales/CustomerPickerScreen';
 import { DeliveryView } from '@/features/sales/DeliveryScreen';
 import { DiscountView } from '@/features/sales/DiscountScreen';
 import {
+  closeDraft,
   draftLabel,
   draftOptions,
   DRAFTS_FULL_MESSAGE,
@@ -417,6 +418,8 @@ export default function PreviewScreen() {
           onScan={noop}
           onAdd={(p) => useCart.getState().add(p, p.basePrice)}
           onSetQty={(p, n) => setProductQty(p.id, n)}
+          onEditLine={toView('sua-hang')}
+          onRemove={(p) => useCart.getState().removeProduct(p.id)}
           cartCount={t.itemCount}
           cartTotal={t.total}
           onOpenCart={toView('gio-hang')}
@@ -429,6 +432,8 @@ export default function PreviewScreen() {
                   onAdd: () => {
                     if (newDraft() === 'full') toast.info(DRAFTS_FULL_MESSAGE);
                   },
+                  // Bản web không hiện hộp hỏi: xóa luôn để xem kết quả.
+                  onRemove: (id) => closeDraft(id),
                 }
               : undefined
           }
@@ -447,6 +452,7 @@ export default function PreviewScreen() {
           onSubmit={toView('xong')}
           onOpenCustomer={toView('khach')}
           onCreateCustomer={toView('them-kh')}
+          onEditCustomer={toView('sua-kh')}
           onOpenLine={toView('sua-hang')}
           onOpenDelivery={toView('giao-hang')}
           onOpenDiscount={toView('giam-gia')}
@@ -556,6 +562,7 @@ export default function PreviewScreen() {
         onPrint={toView('phieu-in')}
         onOpenOrder={noop}
         onOpenInvoice={noop}
+        onEditCustomer={toView('sua-kh')}
         actions={{
           canProcess: true,
           onProcess: toView(man === 'chi-tiet-hd' ? 'xu-ly-hd' : 'xu-ly'),
@@ -580,9 +587,11 @@ export default function PreviewScreen() {
           onSave={noop}
           onInvoice={toView('tao-hd')}
           onOpenCustomer={noop}
+          onEditCustomer={toView('sua-kh')}
           onOpenLine={noop}
           onOpenDelivery={noop}
           onOpenDiscount={noop}
+          onOpenPriceBook={noop}
           onAddMore={noop}
         />
       </SaleScopeProvider>

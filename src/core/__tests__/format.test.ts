@@ -1,10 +1,13 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   dayLabel,
+  decimalInput,
+  decimalText,
   initials,
   money,
   parseMoney,
   parseQty,
+  percentInput,
   periodRange,
   qty,
   shortWhen,
@@ -12,24 +15,43 @@ import {
 } from '../format';
 
 describe('format', () => {
-  it('formats VND with dot thousand separators', () => {
-    expect(money(1250000)).toBe('1.250.000');
-    expect(money(-30000)).toBe('-30.000');
+  it('formats VND with comma thousand separators (en-US)', () => {
+    expect(money(1250000)).toBe('1,250,000');
+    expect(money(-30000)).toBe('-30,000');
     expect(money(null)).toBe('0');
-    expect(vnd('650000')).toBe('650.000 ₫');
+    expect(vnd('650000')).toBe('650,000 ₫');
   });
 
-  it('formats quantities with a decimal comma', () => {
+  it('formats quantities with a decimal point (en-US)', () => {
     expect(qty(2)).toBe('2');
-    expect(qty(0.1666)).toBe('0,17');
-    expect(qty(1250.5)).toBe('1.250,5');
+    expect(qty(0.1666)).toBe('0.17');
+    expect(qty(1250.5)).toBe('1,250.5');
   });
 
   it('parses typed money and quantities', () => {
-    expect(parseMoney('1.250.000 ₫')).toBe(1250000);
+    expect(parseMoney('1,250,000 ₫')).toBe(1250000);
     expect(parseMoney('')).toBe(0);
-    expect(parseQty('2,5')).toBe(2.5);
-    expect(parseQty('1.200')).toBe(1200);
+    expect(parseQty('2.5')).toBe(2.5);
+    expect(parseQty('1,200')).toBe(1200);
+    expect(parseQty('1,250.5')).toBe(1250.5);
+  });
+
+  it('cleans typed decimals: a comma from the keypad becomes the decimal point', () => {
+    expect(decimalInput('2,5')).toBe('2.5');
+    expect(decimalInput('2.5.1')).toBe('2.51');
+    expect(decimalInput('1,2,3')).toBe('1.23');
+    expect(decimalInput('12a')).toBe('12');
+    expect(decimalText(1250.5)).toBe('1250.5');
+    expect(decimalText(0.1666)).toBe('0.17');
+    expect(decimalText(0)).toBe('');
+  });
+
+  it('keeps a half-typed percent and caps it', () => {
+    expect(percentInput('12.')).toBe('12.');
+    expect(percentInput('12,5')).toBe('12.5');
+    expect(percentInput('12.345')).toBe('12.34');
+    expect(percentInput('150')).toBe('100');
+    expect(percentInput('')).toBe('');
   });
 
   it('labels days relative to today', () => {

@@ -195,7 +195,8 @@ export interface DocDetail {
   /** Id người tạo: tài khoản chỉ xem dữ liệu của mình chỉ mở được chứng từ mình tạo. */
   createdBy: number | null;
   priceBookName: string | null;
-  customer: { name: string; code: string | null; phone: string | null } | null;
+  /** `id`: để mở form sửa hồ sơ khách. */
+  customer: { id?: number; name: string; code: string | null; phone: string | null } | null;
   delivery: { receiver: string; phone: string; address: string; note: string | null } | null;
   note: string | null;
   lines: DocLine[];
@@ -251,7 +252,7 @@ interface RawDetail {
   soldBy?: { name?: string | null } | null;
   creator?: { name?: string | null } | null;
   createdBy?: number | null;
-  customer?: { name?: string | null; code?: string | null; contactNumber?: string | null; phone?: string | null } | null;
+  customer?: { id?: number; name?: string | null; code?: string | null; contactNumber?: string | null; phone?: string | null } | null;
   delivery?: {
     receiver?: string | null;
     contactNumber?: string | null;
@@ -298,6 +299,7 @@ export function toDocDetail(kind: DocKind, r: RawDetail): DocDetail {
     priceBookName: r.priceBookName || null,
     customer: r.customer
       ? {
+          id: r.customer.id,
           name: r.customer.name || 'Khách vãng lai',
           code: r.customer.code ?? null,
           phone: r.customer.contactNumber || r.customer.phone || null,

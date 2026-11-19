@@ -193,4 +193,9 @@ describe('customerPerms', () => {
     expect(customerPerms({ permissions: ['customers:update_comments'] }).editNote).toBe(true);
     expect(customerPerms({ permissions: ['customers:view'] })).toMatchObject({ view: true, editNote: false, viewDebt: false });
   });
+
+  it('ngừng hoạt động: chỉ theo quyền customers:delete, không theo quyền sửa', () => {
+    expect(customerPerms({ permissions: ['customers:delete'] }).changeStatus).toBe(true);
+    expect(customerPerms({ permissions: ['customers:update'] })).toMatchObject({ update: true, changeStatus: false });
+  });
 });

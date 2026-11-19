@@ -6,6 +6,8 @@ import { canDo } from '@/core/can';
 import { money, vnd } from '@/core/format';
 import { errorMessage } from '@/core/http';
 import { useSession } from '@/core/session';
+import { customerPerms } from '@/features/customers/model';
+import { useCustomerEditor } from '@/features/customers/openEdit';
 import {
   addOrderPayment,
   addPaymentNote,
@@ -35,6 +37,7 @@ import {
   PressableScale,
   Section,
   Select,
+  SelectTrigger,
   SubHeader,
   TabPanel,
   TextField,
@@ -69,9 +72,15 @@ export interface OrderEditViewProps {
   onSave: () => void;
   onInvoice: () => void;
   onOpenCustomer: () => void;
+  /** Sửa hồ sơ khách của đơn (không có = không được sửa). */
+  onEditCustomer?: () => void;
+  /** Đang tải hồ sơ khách để mở form sửa. */
+  editingCustomer?: boolean;
   onOpenLine: (rowId: string) => void;
   onOpenDelivery: () => void;
   onOpenDiscount: () => void;
+  /** Đổi bảng giá của đơn (không có = không có quyền xem bảng giá). */
+  onOpenPriceBook?: () => void;
   onAddMore?: () => void;
 }
 
@@ -220,13 +229,18 @@ export function OrderEditView(p: OrderEditViewProps) {
           message={
             invoice
               ? 'Để giữ đúng khuyến mãi, app chưa đổi được hàng, khách, giảm giá và bảng giá của hóa đơn này. Muốn đổi, hãy sửa trên web.'
-              : 'Để giữ đúng khuyến mãi, app chưa đổi được hàng và khách của đơn này. Muốn đổi hàng, hãy sửa trên web.'
+              : 'Để giữ đúng khuyến mãi, app chưa đổi được hàng, khách và bảng giá của đơn này. Muốn đổi, hãy sửa trên web.'
           }
         />
       ) : null}
 
       <Section index={0} title="Khách hàng">
-        <CustomerCard perms={p.perms} onPress={locked ? undefined : p.onOpenCustomer} />
+        <CustomerCard
+          perms={p.perms}
+          onPress={locked ? undefined : p.onOpenCustomer}
+          onEdit={p.onEditCustomer}
+          editBusy={p.editingCustomer}
+        />
       </Section>
 
       <Section
@@ -234,6 +248,16 @@ export function OrderEditView(p: OrderEditViewProps) {
         title={`Hàng hóa · ${cart.lines.length}`}
         actionLabel={!locked && p.onAddMore ? 'Thêm hàng' : undefined}
         onAction={!locked ? p.onAddMore : undefined}>
+        {p.onOpenPriceBook ? (
+          <SelectTrigger
+            variant="field"
+            label="Bảng giá"
+            text={cart.priceBookName ?? 'Bảng giá chung'}
+            empty={false}
+            disabled={locked}
+            onPress={p.onOpenPriceBook}
+          />
+        ) : null}
         {cart.lines.length ? (
           <Card>
             {cart.lines.map((l, i) => (
@@ -245,6 +269,12 @@ export function OrderEditView(p: OrderEditViewProps) {
                   total={lineTotal({ price: l.price, quantity: l.quantity, discount: { type: 'amount', value: l.discount } })}
                   onPress={() => p.onOpenLine(l.rowId)}
                   onChangeQty={(n) => cart.setQuantity(l.rowId, n)}
+                  onRemove={() =>
+                    Alert.alert(`Xóa khỏi ${noun}?`, l.product.name, [
+                      { text: 'Hủy', style: 'cancel' },
+                      { text: 'Xóa', style: 'destructive', onPress: () => cart.remove(l.rowId) },
+                    ])
+                  }
                 />
               </View>
             ))}
@@ -342,6 +372,8 @@ function OrderEditScreen() {
   // Đã chọn "Bỏ thay đổi": thôi chặn rời màn.
   const [discarding, setDiscarding] = useState(false);
   const busyRef = useRef(false);
+  const editor = useCustomerEditor();
+  const canEditCustomer = perms.customers && customerPerms(user).update;
 
   // Cho màn chi tiết ở tab khác biết đơn này đang mở để hỏi trước khi ghi đè.
   useEffect(() => markEditOpen(), []);
@@ -589,9 +621,19 @@ function OrderEditScreen() {
       onSave={onSave}
       onInvoice={onInvoice}
       onOpenCustomer={() => router.push(paths.customer as never)}
+      onEditCustomer={
+        canEditCustomer && cart.customer
+          ? () => {
+              const id = store.getState().customer?.id;
+              if (id) void editor.open(id, (fresh) => store.getState().refreshCustomer(fresh));
+            }
+          : undefined
+      }
+      editingCustomer={editor.busy}
       onOpenLine={(rowId) => router.push({ pathname: paths.line, params: { rowId } } as never)}
       onOpenDelivery={() => router.push(paths.delivery as never)}
       onOpenDiscount={() => router.push(paths.discount as never)}
+      onOpenPriceBook={perms.priceBooks ? () => router.push(paths.priceBook as never) : undefined}
       onAddMore={perms.products ? () => router.push(routes.editPicker as never) : undefined}
     />
   );

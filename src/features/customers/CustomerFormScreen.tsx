@@ -10,7 +10,7 @@ import { FormCard, Note, PickRow, TextRow } from '../products/formParts';
 import { useCart } from '../sales/cart';
 import { toSaleCustomer } from '../sales/mappers';
 import { createCustomer, lookupTaxCode, updateCustomer, useSalePicId, useStaff } from './api';
-import { ADDRESS_PATH, patchCustomerDraft, setLoadedSalePic, startAddressDraft, useCustomerDraft } from './draft';
+import { patchCustomerDraft, setLoadedSalePic, startAddressDraft, useCustomerDraft } from './draft';
 import {
   buildCustomerCreate,
   buildCustomerUpdate,
@@ -21,14 +21,10 @@ import {
   type AddressForm,
   type CustomerForm,
 } from './form';
+import { useCustomerFormPaths } from './formPaths';
 import { addressLine, addressTitle, customerPerms, type CustomerPerms } from './model';
 
 export type FormPick = 'parent' | 'groups' | 'salePic';
-const PICK_PATH: Record<FormPick, string> = {
-  parent: '/khach-hang/chon-cha',
-  groups: '/khach-hang/chon-nhom',
-  salePic: '/khach-hang/chon-sale',
-};
 
 const TYPES: { value: '0' | '1'; label: string }[] = [
   { value: '0', label: 'Cá nhân' },
@@ -278,6 +274,7 @@ export default function CustomerFormScreen() {
   const baseline = useCustomerDraft((s) => s.baseline);
   const customerId = useCustomerDraft((s) => s.customerId);
   const origin = useCustomerDraft((s) => s.origin);
+  const paths = useCustomerFormPaths();
   const user = useSession((s) => s.user);
   const branchId = useSession((s) => s.branchId);
   const perms = customerPerms(user);
@@ -376,7 +373,13 @@ export default function CustomerFormScreen() {
         const body = buildCustomerUpdate(form, baseline, { assignSalePic: perms.assignSalePic });
         if (Object.keys(body).length) await updateCustomer(editId, body);
         toast.success(`Đã lưu ${form.name.trim()}`);
-        await Promise.all([qc.invalidateQueries({ queryKey: ['customer'] }), qc.invalidateQueries({ queryKey: ['customers'] })]);
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: ['customer'] }),
+          qc.invalidateQueries({ queryKey: ['customers'] }),
+          qc.invalidateQueries({ queryKey: ['sales', 'customers'] }),
+        ]);
+        // Mở từ giỏ hàng / xử lý đơn / chi tiết đơn: để màn đó cập nhật khách.
+        useCustomerDraft.getState().onSaved?.();
         setExit({ go: () => router.back() });
       } else {
         const created = await createCustomer(buildCustomerCreate(form, { branchId, assignSalePic: perms.assignSalePic }));
@@ -413,10 +416,10 @@ export default function CustomerFormScreen() {
       perms={perms}
       hasChildren={hasChildren}
       onChange={patchCustomerDraft}
-      onPick={(t) => router.push(PICK_PATH[t] as never)}
+      onPick={(t) => router.push(paths[t] as never)}
       onAddress={(a) => {
         startAddressDraft(a ?? emptyAddress(form.addresses.length === 0, form.name.trim(), form.contactNumber.trim()));
-        router.push(ADDRESS_PATH as never);
+        router.push(paths.address as never);
       }}
       onLookupTax={() => void lookupTax()}
       lookingUp={lookingUp}

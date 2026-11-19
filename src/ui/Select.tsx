@@ -7,7 +7,7 @@ import { SearchField } from './Inputs';
 import { Icon } from './icons';
 import { PressableScale } from './motion';
 import { Txt } from './Text';
-import { C, radius } from './theme';
+import { C, radius, toneColors } from './theme';
 
 export interface SelectOption<T> {
   value: T;
@@ -20,7 +20,7 @@ export interface SelectOption<T> {
 const SEARCH_AFTER = 8;
 
 /** Bỏ dấu, chữ thường để tìm "tra" ra "Trà". */
-const fold = (s: string) =>
+export const fold = (s: string) =>
   s
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -74,6 +74,8 @@ function SelectSheet<T>({
   onPick,
   onDone,
   onClose,
+  onRemove,
+  canRemove,
 }: {
   title: string;
   options: SelectOption<T>[];
@@ -84,6 +86,10 @@ function SelectSheet<T>({
   onPick: (v: T | null) => void;
   onDone?: () => void;
   onClose: () => void;
+  /** Nút xóa ở cuối từng dòng (vd xóa đơn nháp). */
+  onRemove?: (v: T) => void;
+  /** Dòng nào được xóa (mặc định: mọi dòng). */
+  canRemove?: (v: T) => boolean;
 }) {
   const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
@@ -110,7 +116,8 @@ function SelectSheet<T>({
         renderItem={({ item }) => {
           const on = item ? selected.includes(item.value) : selected.length === 0;
           const label = item ? item.label : (clearLabel ?? '');
-          return (
+          const removable = !!item && !!onRemove && (canRemove?.(item.value) ?? true);
+          const row = (
             <PressableScale
               onPress={() => onPick(item ? item.value : null)}
               haptic="selection"
@@ -118,7 +125,7 @@ function SelectSheet<T>({
               accessibilityState={multiple && item ? { checked: on } : { selected: on }}
               accessibilityLabel={[label, item?.sub].filter(Boolean).join(', ')}
               scaleTo={0.985}
-              style={[styles.row, on ? styles.rowOn : null]}>
+              style={removable ? styles.rowMain : [styles.row, on ? styles.rowOn : null]}>
               <View style={{ flex: 1, gap: 2 }}>
                 <Txt variant="body" weight={on ? 'semibold' : 'medium'} numberOfLines={2} numeric>
                   {label}
@@ -135,6 +142,22 @@ function SelectSheet<T>({
                 <Icon name="check" size={20} color={C.brand} strokeWidth={2.4} />
               ) : null}
             </PressableScale>
+          );
+          if (!removable || !item) return row;
+          // Nút xóa nằm cạnh (không lồng trong) dòng chọn để đọc màn hình bấm riêng được.
+          return (
+            <View style={[styles.row, styles.rowSplit, on ? styles.rowOn : null]}>
+              {row}
+              <PressableScale
+                onPress={() => onRemove?.(item.value)}
+                haptic="selection"
+                accessibilityLabel={`Xóa ${label}`}
+                hitSlop={6}
+                scaleTo={0.88}
+                style={styles.rowRemove}>
+                <Icon name="trash" size={17} color={toneColors.danger.fg} />
+              </PressableScale>
+            </View>
           );
         }}
       />
@@ -250,6 +273,8 @@ export function Select<T>({
   disabled,
   variant = 'row',
   trigger,
+  onRemove,
+  canRemove,
 }: FieldProps & {
   options: SelectOption<T>[];
   value: T | null;
@@ -257,6 +282,10 @@ export function Select<T>({
   clearLabel?: string;
   /** Tự vẽ nút mở sheet (thay cho các kiểu `variant`). */
   trigger?: (p: { text: string; open: () => void }) => ReactNode;
+  /** Nút xóa ở từng dòng trong sheet (sheet vẫn mở sau khi xóa). */
+  onRemove?: (v: T) => void;
+  /** Dòng nào được xóa (mặc định: mọi dòng). */
+  canRemove?: (v: T) => boolean;
 }) {
   const [open, setOpen] = useState(false);
   const current = value === null ? undefined : options.find((o) => o.value === value);
@@ -289,6 +318,8 @@ export function Select<T>({
               onChange(v);
             }}
             onClose={() => setOpen(false)}
+            onRemove={onRemove}
+            canRemove={canRemove}
           />
         ) : null}
       </Modal>
@@ -363,6 +394,25 @@ const styles = StyleSheet.create({
     borderColor: C.border,
   },
   rowOn: { borderColor: C.brand, borderWidth: 1.5 },
+  rowSplit: { paddingVertical: 0, paddingHorizontal: 0, paddingRight: 8, gap: 4 },
+  rowMain: {
+    flex: 1,
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingLeft: 14,
+    paddingRight: 6,
+    paddingVertical: 10,
+  },
+  rowRemove: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: toneColors.danger.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   box: {
     width: 22,
     height: 22,

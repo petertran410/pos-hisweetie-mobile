@@ -222,7 +222,7 @@ export function FileLine({ name, size, state, onOpen, onRemove, onRetry }: {
 }) {
   const failed = state === 'error';
   const busy = state === 'uploading' || state === 'queued';
-  const kb = size ? (size >= 1_048_576 ? `${(size / 1_048_576).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(size / 1024))} KB`) : null;
+  const kb = size ? (size >= 1_048_576 ? `${(size / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(size / 1024))} KB`) : null;
   return (
     <View style={styles.fileRow}>
       <PressableScale

@@ -198,7 +198,9 @@ export const createCustomer = (body: Record<string, unknown>) => http.post<RawCu
 
 export const updateCustomer = (id: number, body: Record<string, unknown>) => http.put<RawCustomer>(`/customers/${id}`, body);
 
-export const setCustomerActive = (id: number, isActive: boolean) => updateCustomer(id, { isActive });
+/** Ngừng hoạt động / kích hoạt — endpoint riêng, cần quyền customers:delete ("Ngừng hoạt động"). */
+export const setCustomerActive = (id: number, isActive: boolean) =>
+  http.patch<{ id: number; isActive: boolean }>(`/customers/${id}/status`, { isActive });
 
 export const saveCustomerNote = (id: number, comments: string) =>
   http.patch<{ id: number; comments: string | null }>(`/customers/${id}/comments`, { comments: comments.trim() });

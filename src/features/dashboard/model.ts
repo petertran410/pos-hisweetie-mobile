@@ -159,10 +159,10 @@ export function periodDates(period: FinancePeriod, now = new Date()): DateRange 
 
 // ---------- Định dạng số ----------
 
-/** Làm tròn `digits` chữ số thập phân, dấu phẩy thập phân ("22,2"). */
+/** Làm tròn `digits` chữ số thập phân, dấu chấm thập phân ("22.2"). */
 const dec = (n: number, digits: number) => qty(Math.round(n * 10 ** digits) / 10 ** digits);
 
-/** Tiền rút gọn kiểu web: "1,25 tỷ", "22,2 tr", "925k", "800". */
+/** Tiền rút gọn: "1.25 tỷ", "22.2 tr", "925k", "800". */
 export function compactMoney(vnd: number): string {
   const n = Number(vnd) || 0;
   const abs = Math.abs(n);
@@ -172,7 +172,7 @@ export function compactMoney(vnd: number): string {
   return money(n);
 }
 
-/** Nhãn trục tiền: "2 tỷ", "1,5 tỷ", "200tr", "50k". */
+/** Nhãn trục tiền: "2 tỷ", "1.5 tỷ", "200tr", "50k". */
 export function axisMoney(vnd: number): string {
   const abs = Math.abs(vnd);
   if (abs >= 1e9) return `${dec(vnd / 1e9, abs >= 1e10 ? 0 : 1)} tỷ`;
@@ -186,11 +186,11 @@ export function marginText(marginAvg: number | null | undefined): string {
   return `${Math.round((Number(marginAvg) || 0) * 100)}%`;
 }
 
-/** "+12,5%" / "-3%" / "0%"; null khi không có kỳ trước để so. */
+/** "+12.5%" / "-3%" / "0%"; null khi không có kỳ trước để so. */
 export function formatDelta(pct: number | null | undefined): string | null {
   if (pct === null || pct === undefined || !Number.isFinite(pct)) return null;
   const rounded = Math.round(pct * 10) / 10;
-  const text = String(Math.abs(rounded)).replace('.', ',');
+  const text = String(Math.abs(rounded));
   if (rounded > 0) return `+${text}%`;
   if (rounded < 0) return `-${text}%`;
   return '0%';

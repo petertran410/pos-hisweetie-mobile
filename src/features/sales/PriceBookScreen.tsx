@@ -1,10 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorMessage } from '@/core/http';
 import { useSession } from '@/core/session';
-import { C, ErrorState, Icon, LoadingState, PressableScale, SheetHeader, toast, Txt } from '@/ui';
+import { C, EmptyState, ErrorState, fold, Icon, LoadingState, PressableScale, SearchField, SheetHeader, toast, Txt } from '@/ui';
 import { fetchPriceBook, useApplicablePriceBooks, type PriceBookSummary } from './api';
 import { useSalePerms } from './perms';
 import { rememberPriceBook } from './persist';
@@ -12,6 +13,7 @@ import { useSaleScope, useScopedCart } from './scope';
 
 const GENERAL: PriceBookSummary = { id: 0, name: 'Bảng giá chung' };
 
+/** Chọn bảng giá: tìm theo tên (không dấu cũng được), bấm để áp vào giỏ / đơn đang sửa. */
 export function PriceBookView({
   books,
   loading,
@@ -20,6 +22,7 @@ export function PriceBookView({
   selectedId,
   busyId,
   onPick,
+  hint = 'Giá trong giỏ sẽ đổi theo bảng giá bạn chọn.',
 }: {
   books: PriceBookSummary[];
   loading?: boolean;
@@ -28,24 +31,43 @@ export function PriceBookView({
   selectedId: number;
   busyId?: number | null;
   onPick: (b: PriceBookSummary) => void;
+  /** Dòng chú thích dưới ô tìm. */
+  hint?: string;
 }) {
+  const insets = useSafeAreaInsets();
+  const [q, setQ] = useState('');
+  const key = fold(q);
+  const all = [GENERAL, ...books];
+  const shown = key ? all.filter((b) => fold(b.name).includes(key)) : all;
+
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <SheetHeader title="Bảng giá" cancelLabel="Đóng" formSheet />
+      <SheetHeader title="Bảng giá" cancelLabel="Đóng" />
+      <View style={styles.top}>
+        <SearchField value={q} onChangeText={setQ} placeholder="Tìm bảng giá" />
+        <Txt variant="caption" color={C.muted}>
+          {hint}
+        </Txt>
+      </View>
       {loading ? (
         <LoadingState />
       ) : error ? (
         <ErrorState error={error} onRetry={onRetry} />
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
-          <Txt variant="caption" color={C.muted}>
-            Giá trong giỏ sẽ đổi theo bảng giá bạn chọn.
-          </Txt>
-          {[GENERAL, ...books].map((b) => {
+        <FlatList
+          data={shown}
+          keyExtractor={(b) => String(b.id)}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          ListEmptyComponent={
+            <EmptyState icon="search" color="slate" title="Không có bảng giá" message={`Không có bảng giá nào khớp “${q.trim()}”.`} />
+          }
+          renderItem={({ item: b }) => {
             const on = b.id === selectedId;
             return (
               <PressableScale
-                key={b.id}
                 onPress={() => onPick(b)}
                 disabled={busyId !== null && busyId !== undefined}
                 haptic="selection"
@@ -63,8 +85,8 @@ export function PriceBookView({
                 ) : null}
               </PressableScale>
             );
-          })}
-        </ScrollView>
+          }}
+        />
       )}
     </View>
   );
@@ -120,12 +142,14 @@ export default function PriceBookScreen() {
       selectedId={selectedId}
       busyId={busyId}
       onPick={(b) => void pick(b)}
+      hint={editing ? 'Giá hàng trong đơn sẽ đổi theo bảng giá bạn chọn.' : undefined}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 10, paddingBottom: 40 },
+  top: { paddingHorizontal: 16, paddingTop: 12, gap: 8 },
+  content: { paddingHorizontal: 16, paddingTop: 12 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

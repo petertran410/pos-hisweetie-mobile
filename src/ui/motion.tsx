@@ -6,6 +6,7 @@ import {
   type AccessibilityRole,
   type LayoutChangeEvent,
   type AccessibilityState,
+  type Insets,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -62,7 +63,8 @@ export function PressableScale({
   accessibilityLabel?: string;
   accessibilityHint?: string;
   accessibilityState?: AccessibilityState;
-  hitSlop?: number;
+  /** Nới vùng chạm: cùng một số cho 4 phía, hoặc riêng từng phía. */
+  hitSlop?: number | Insets;
   onLayout?: (e: LayoutChangeEvent) => void;
 }) {
   const scale = useSharedValue(1);

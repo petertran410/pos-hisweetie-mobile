@@ -20,16 +20,7 @@ export function OrdersStack() {
       <Stack.Screen name="xu-ly/dong/[rowId]" options={sheet} />
       <Stack.Screen name="xu-ly/giao-hang" options={sheet} />
       <Stack.Screen name="xu-ly/giam-gia" options={sheet} />
-      <Stack.Screen
-        name="xu-ly/bang-gia"
-        options={{
-          presentation: 'formSheet',
-          sheetAllowedDetents: [0.5, 1],
-          sheetGrabberVisible: true,
-          sheetCornerRadius: 24,
-          contentStyle: { backgroundColor: C.bg },
-        }}
-      />
+      <Stack.Screen name="xu-ly/bang-gia" options={sheet} />
       <Stack.Screen name="xu-ly/quet-ma" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="phieu-in" options={sheet} />
     </TabStack>

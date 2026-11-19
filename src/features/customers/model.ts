@@ -523,6 +523,8 @@ export interface CustomerPerms {
   update: boolean;
   /** Sửa ghi chú (có quyền sửa khách hoặc quyền riêng "sửa ghi chú"). */
   editNote: boolean;
+  /** Ngừng hoạt động / kích hoạt: quyền customers:delete, hiển thị là "Ngừng hoạt động" (không xóa thật). */
+  changeStatus: boolean;
   /** Xem công nợ: chỉ ẩn trên giao diện (API vẫn trả). */
   viewDebt: boolean;
   /** Chọn Sale PIC; có quyền này thì tạo khách bắt buộc chọn. */
@@ -542,6 +544,7 @@ export function customerPerms(user: PermissionHolder | null): CustomerPerms {
     create: can('customers:create'),
     update,
     editNote: update || can('customers:update_comments'),
+    changeStatus: can('customers:delete'),
     viewDebt: can('customers:view_debt'),
     assignSalePic: can('customers:assign_sale_pic'),
     viewGroups: can('customer_groups:view'),

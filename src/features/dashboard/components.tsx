@@ -229,7 +229,7 @@ export function CategoryBreakdown({ parts }: { parts: CategoryPart[] }) {
                 {p.name}
               </Txt>
               <Txt variant="label" color={C.muted} numeric style={styles.pct}>
-                {String(p.percent).replace('.', ',')}%
+                {p.percent}%
               </Txt>
               <Txt variant="body" weight="semibold" numeric style={styles.amount}>
                 {compactMoney(p.revenue)}
@@ -372,7 +372,7 @@ export function ReturnsBlock({ data }: { data: ReturnsSummary }) {
         <Figure label="Số phiếu" value={money(data.count)} />
         <Figure
           label="Tỷ lệ trả"
-          value={`${String(data.rate).replace('.', ',')}%`}
+          value={`${data.rate}%`}
           color={data.rate >= 5 ? toneColors.danger.fg : C.text}
         />
       </View>

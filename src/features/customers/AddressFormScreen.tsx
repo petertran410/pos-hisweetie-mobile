@@ -9,17 +9,10 @@ import { FormCard, PickRow, SwitchRow, TextRow } from '../products/formParts';
 import { updateCustomer } from './api';
 import { patchAddressDraft, patchCustomerDraft, useAddressDraft, useCustomerDraft } from './draft';
 import { OLD_ADDRESS_CLEARED, removeAddress, toAddressPayload, upsertAddress, validateAddress, type AddressForm } from './form';
+import { useCustomerFormPaths } from './formPaths';
 
 /** Cấp địa giới để chọn: tỉnh / xã mới (2 cấp), tỉnh / huyện / xã cũ (3 cấp). */
 export type PlaceLevel = 'newCity' | 'newWard' | 'oldCity' | 'district' | 'oldWard';
-
-export const PLACE_PATH: Record<PlaceLevel, string> = {
-  newCity: '/khach-hang/chon-tinh',
-  newWard: '/khach-hang/chon-xa',
-  oldCity: '/khach-hang/chon-tinh-cu',
-  district: '/khach-hang/chon-huyen',
-  oldWard: '/khach-hang/chon-xa-cu',
-};
 
 const hasOld = (a: AddressForm) => !!(a.cityCode || a.cityName || a.districtName || a.wardName || a.locationName);
 const hasNew = (a: AddressForm) => !!(a.newCityCode || a.newCityName);
@@ -157,6 +150,7 @@ export default function AddressFormScreen() {
   const customerId = useAddressDraft((s) => s.customerId);
   const list = useAddressDraft((s) => s.list);
   const formAddresses = useCustomerDraft((s) => s.form?.addresses);
+  const paths = useCustomerFormPaths();
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -221,7 +215,7 @@ export default function AddressFormScreen() {
       isNew={isNew}
       lockedDefault={lockedDefault}
       onChange={patchAddressDraft}
-      onPick={(level) => router.push(PLACE_PATH[level] as never)}
+      onPick={(level) => router.push(paths[level] as never)}
       busy={busy}
       onSave={() => {
         if (busy) return;

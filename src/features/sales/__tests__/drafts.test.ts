@@ -110,15 +110,15 @@ describe('thao tác trên danh sách', () => {
     expect(draftSummary(EMPTY_CART)).toBe('Trống');
     expect(draftSummary(cartWith({ customer: lan }))).toBe('Chị Lan · Chưa có hàng');
     expect(draftSummary(cartWith({ customer: lan, lines: [line(3, 40_000)], shippingFee: 10_000 }))).toBe(
-      'Chị Lan · 3 món · 130.000 ₫',
+      'Chị Lan · 3 món · 130,000 ₫',
     );
-    expect(draftSummary(cartWith({ lines: [line(1)] }))).toBe('1 món · 50.000 ₫');
+    expect(draftSummary(cartWith({ lines: [line(1)] }))).toBe('1 món · 50,000 ₫');
   });
 
   it('ô chọn lấy giỏ đang mở mới nhất thay cho bản đã lưu', () => {
     const opts = draftOptions(book(EMPTY_CART, cartWith({ customer: lan })), cartWith({ lines: [line(2)] }));
     expect(opts).toEqual([
-      { value: 'd1', label: 'Đơn 1', sub: '2 món · 100.000 ₫' },
+      { value: 'd1', label: 'Đơn 1', sub: '2 món · 100,000 ₫' },
       { value: 'd2', label: 'Đơn 2', sub: 'Chị Lan · Chưa có hàng' },
     ]);
   });

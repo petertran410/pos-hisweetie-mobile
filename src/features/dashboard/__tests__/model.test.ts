@@ -110,13 +110,13 @@ describe('bộ lọc', () => {
 
 describe('định dạng số', () => {
   it('tiền rút gọn kiểu web', () => {
-    expect(compactMoney(1_250_000_000)).toBe('1,25 tỷ');
-    expect(compactMoney(22_200_000)).toBe('22,2 tr');
+    expect(compactMoney(1_250_000_000)).toBe('1.25 tỷ');
+    expect(compactMoney(22_200_000)).toBe('22.2 tr');
     expect(compactMoney(925_000)).toBe('925k');
     expect(compactMoney(800)).toBe('800');
-    expect(compactMoney(-5_120_000)).toBe('-5,1 tr');
+    expect(compactMoney(-5_120_000)).toBe('-5.1 tr');
     expect(axisMoney(2_000_000)).toBe('2tr');
-    expect(axisMoney(1_500_000_000)).toBe('1,5 tỷ');
+    expect(axisMoney(1_500_000_000)).toBe('1.5 tỷ');
     expect(axisMoney(0)).toBe('0');
   });
 
@@ -126,7 +126,7 @@ describe('định dạng số', () => {
   });
 
   it('mức thay đổi so với kỳ trước', () => {
-    expect(formatDelta(12.345)).toBe('+12,3%');
+    expect(formatDelta(12.345)).toBe('+12.3%');
     expect(formatDelta(-3)).toBe('-3%');
     expect(formatDelta(0)).toBe('0%');
     expect(formatDelta(null)).toBeNull();
@@ -221,7 +221,7 @@ describe('đổi dữ liệu cho từng khối', () => {
 
   it('khách mua nhiều', () => {
     expect(buyerRows([{ id: 3, code: 'KH3', name: 'Quán A', totalRevenue: 6_400_000, invoiceCount: 5 }])).toEqual([
-      { key: 3, title: 'Quán A', sub: 'KH3, 5 hóa đơn', value: '6,4 tr', share: 1 },
+      { key: 3, title: 'Quán A', sub: 'KH3, 5 hóa đơn', value: '6.4 tr', share: 1 },
     ]);
   });
 

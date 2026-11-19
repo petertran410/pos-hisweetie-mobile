@@ -13,6 +13,8 @@ interface DraftState {
   customerId: number | null;
   /** Nơi mở form, để lưu xong hoặc quay lại đúng luồng. */
   origin: 'customers' | 'sale';
+  /** Sửa khách xong: báo cho màn đã mở form (vd cập nhật khách trên đơn đang làm). */
+  onSaved: (() => void) | null;
 }
 
 export const useCustomerDraft = create<DraftState>(() => ({
@@ -20,14 +22,16 @@ export const useCustomerDraft = create<DraftState>(() => ({
   baseline: null,
   customerId: null,
   origin: 'customers',
+  onSaved: null,
 }));
 
 export function startCustomerDraft(
   form: CustomerForm,
   customerId: number | null = null,
   origin: DraftState['origin'] = 'customers',
+  onSaved: DraftState['onSaved'] = null,
 ) {
-  useCustomerDraft.setState({ form, baseline: form, customerId, origin });
+  useCustomerDraft.setState({ form, baseline: form, customerId, origin, onSaved });
 }
 
 export function patchCustomerDraft(patch: Partial<CustomerForm> | ((f: CustomerForm) => Partial<CustomerForm>)) {

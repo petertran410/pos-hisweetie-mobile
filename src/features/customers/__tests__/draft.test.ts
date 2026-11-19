@@ -10,4 +10,13 @@ describe('customer draft origin', () => {
     startCustomerDraft(newCustomerForm());
     expect(useCustomerDraft.getState().origin).toBe('customers');
   });
+
+  it('chỉ giữ hàm báo "đã lưu" cho đúng lần mở form đó', () => {
+    const onSaved = () => undefined;
+    startCustomerDraft(newCustomerForm(), 5, 'customers', onSaved);
+    expect(useCustomerDraft.getState().onSaved).toBe(onSaved);
+
+    startCustomerDraft(newCustomerForm(), 5);
+    expect(useCustomerDraft.getState().onSaved).toBeNull();
+  });
 });

@@ -20,16 +20,7 @@ export function SalesStack() {
       <Stack.Screen name="giao-hang" options={sheet} />
       <Stack.Screen name="giam-gia" options={sheet} />
       <Stack.Screen name="phieu-in" options={sheet} />
-      <Stack.Screen
-        name="bang-gia"
-        options={{
-          presentation: 'formSheet',
-          sheetAllowedDetents: [0.5, 1],
-          sheetGrabberVisible: true,
-          sheetCornerRadius: 24,
-          contentStyle: { backgroundColor: C.bg },
-        }}
-      />
+      <Stack.Screen name="bang-gia" options={sheet} />
       <Stack.Screen name="quet-ma" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
     </TabStack>
   );

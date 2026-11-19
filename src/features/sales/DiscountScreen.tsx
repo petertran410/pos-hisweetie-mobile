@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { money, parseQty } from '@/core/format';
+import { money, parseQty, percentInput } from '@/core/format';
 import { C, Card, ChipGroup, MoneyField, SheetHeader, TextField, Txt } from '@/ui';
 import { cartTotals } from './cart';
 import { useSalePerms } from './perms';
@@ -23,6 +23,10 @@ export function DiscountView({
   onSave: (d: Discount, shipping: number) => void;
 }) {
   const [d, setD] = useState(initialDiscount);
+  // Chữ đang gõ ở ô %, giữ nguyên chữ để gõ được số lẻ ("12." → "12.5").
+  const [percentText, setPercentText] = useState(
+    initialDiscount.type === 'percent' && initialDiscount.value ? String(initialDiscount.value) : '',
+  );
   const [shipping, setShipping] = useState(initialShipping);
   const preview = cartTotals({
     lines: [{ rowId: '', product: { id: 0, code: '', name: '', basePrice: 0 }, quantity: 1, price: subtotal, discount: 0, note: '' }],
@@ -46,15 +50,22 @@ export function DiscountView({
                 { value: 'percent', label: 'Theo %' },
               ]}
               value={d.type}
-              onChange={(type) => setD({ type, value: 0 })}
+              onChange={(type) => {
+                setD({ type, value: 0 });
+                setPercentText('');
+              }}
             />
             {d.type === 'amount' ? (
               <MoneyField label="Số tiền giảm" value={d.value} onChange={(n) => setD({ type: 'amount', value: Math.min(n, subtotal) })} />
             ) : (
               <TextField
                 label="Phần trăm giảm"
-                value={d.value ? String(d.value).replace('.', ',') : ''}
-                onChangeText={(t) => setD({ type: 'percent', value: Math.min(100, Math.round(parseQty(t) * 100) / 100) })}
+                value={percentText}
+                onChangeText={(t) => {
+                  const text = percentInput(t);
+                  setPercentText(text);
+                  setD({ type: 'percent', value: parseQty(text) });
+                }}
                 keyboardType="decimal-pad"
                 placeholder="0"
                 right={
