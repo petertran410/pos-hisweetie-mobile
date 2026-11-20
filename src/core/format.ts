@@ -1,33 +1,62 @@
-/** 1250000 → "1.250.000" (không phụ thuộc Intl). */
+// Số hiển thị theo kiểu en-US: dấu phẩy ngăn hàng nghìn, dấu chấm thập phân
+// (1,250,000 và 2.5). Không phụ thuộc Intl.
+const group = (digits: string) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+/** 1250000 → "1,250,000". */
 export function money(value: number | string | null | undefined): string {
   const n = Math.round(Number(value) || 0);
   const sign = n < 0 ? '-' : '';
-  return sign + String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return sign + group(String(Math.abs(n)));
 }
 
-/** 1250000 → "1.250.000 ₫". */
+/** 1250000 → "1,250,000 ₫". */
 export function vnd(value: number | string | null | undefined): string {
   return `${money(value)} ₫`;
 }
 
-/** Số lượng: tối đa 2 chữ số thập phân, dấu phẩy thập phân. */
+/** Số lượng: tối đa 2 chữ số thập phân, vd "1,250.5". */
 export function qty(value: number | string | null | undefined): string {
   const n = Number(value) || 0;
   const rounded = Math.round(n * 100) / 100;
   const [int, dec] = String(Math.abs(rounded)).split('.');
-  const s = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (dec ? `,${dec}` : '');
+  const s = group(int) + (dec ? `.${dec}` : '');
   return rounded < 0 ? `-${s}` : s;
 }
 
-/** "1.250.000" / "1250000" → 1250000; rỗng → 0. */
+/** Số lẻ để điền sẵn vào ô nhập: tối đa 2 chữ số thập phân, không ngăn hàng nghìn (1250.5 → "1250.5"). */
+export function decimalText(value: number | null | undefined): string {
+  return value ? String(Math.round(value * 100) / 100) : '';
+}
+
+/**
+ * Chữ đang gõ trong ô số lẻ → chỉ giữ chữ số và một dấu chấm thập phân. Phím
+ * thập phân của bàn phím theo vùng Việt Nam gõ ra dấu phẩy, nên đổi phẩy thành
+ * chấm (ô nhập không bao giờ hiện dấu ngăn hàng nghìn).
+ */
+export function decimalInput(text: string): string {
+  const s = text.replace(/,/g, '.').replace(/[^\d.]/g, '');
+  const dot = s.indexOf('.');
+  return dot < 0 ? s : s.slice(0, dot + 1) + s.slice(dot + 1).replace(/\./g, '');
+}
+
+/**
+ * Chữ đang gõ trong ô phần trăm: như `decimalInput`, tối đa 2 chữ số thập
+ * phân, không quá 100. Giữ nguyên chữ dở dang ("12.") để gõ tiếp được.
+ */
+export function percentInput(text: string): string {
+  const s = decimalInput(text).replace(/(\.\d{2})\d+$/, '$1');
+  return Number(s) > 100 ? '100' : s;
+}
+
+/** "1,250,000" / "1250000" → 1250000; rỗng → 0. */
 export function parseMoney(text: string): number {
   const digits = text.replace(/[^\d-]/g, '');
   return digits ? Number(digits) : 0;
 }
 
-/** "2,5" → 2.5 (số lượng có thể lẻ khi quy đổi thùng). */
+/** "1,250.5" / "2.5" → số (số lượng có thể lẻ khi quy đổi thùng). Chữ gõ tay: qua `decimalInput` trước. */
 export function parseQty(text: string): number {
-  const cleaned = text.replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+  const cleaned = text.replace(/,/g, '').replace(/[^\d.]/g, '');
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : 0;
 }

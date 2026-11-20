@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { useDebounced } from '@/core/useDebounced';
 import { usePullRefresh } from '@/core/usePullRefresh';
 import {
@@ -26,7 +26,7 @@ import {
 import { priceFor, usePriceBook, useSaleProducts, type PriceBookDetail } from './api';
 import { cartTotals, useCart, type CartStore, type SaleProduct } from './cart';
 import { CartBar, ProductRow } from './components';
-import { draftOptions, DRAFTS_FULL_MESSAGE, newDraft, switchDraft, useDrafts } from './drafts';
+import { closeDraft, draftLabel, draftOptions, DRAFTS_FULL_MESSAGE, isBlankCart, newDraft, switchDraft, useDrafts } from './drafts';
 import { useSalePerms } from './perms';
 import { useSaleScope, useScopedCart } from './scope';
 
@@ -49,6 +49,10 @@ export interface SalesViewProps {
   onScan?: () => void;
   onAdd: (p: SaleProduct) => void;
   onSetQty: (p: SaleProduct, n: number) => void;
+  /** Hàng đã có trong giỏ: mở màn sửa dòng hàng. */
+  onEditLine?: (p: SaleProduct) => void;
+  /** Hàng đã có trong giỏ: nút xóa cạnh ô số lượng. */
+  onRemove?: (p: SaleProduct) => void;
   cartCount: number;
   cartTotal: number;
   onOpenCart: () => void;
@@ -60,6 +64,9 @@ export interface SalesViewProps {
     value: string;
     onChange: (id: string) => void;
     onAdd: () => void;
+    /** Nút xóa ở từng đơn trong sheet chọn đơn nháp. */
+    onRemove?: (id: string) => void;
+    canRemove?: (id: string) => boolean;
   };
 }
 
@@ -117,6 +124,8 @@ export function SalesView(p: SalesViewProps) {
                 options={p.drafts.options}
                 value={p.drafts.value}
                 onChange={(id) => id && p.drafts?.onChange(id)}
+                onRemove={p.drafts.onRemove}
+                canRemove={p.drafts.canRemove}
                 trigger={({ text, open }) => (
                   <HeaderPill icon="receipt-text" text={text} label={`Đơn nháp: ${text}. Bấm để đổi`} onPress={open} />
                 )}
@@ -167,6 +176,8 @@ export function SalesView(p: SalesViewProps) {
               showStock={p.showStock}
               onAdd={() => p.onAdd(item)}
               onChangeQty={(n) => p.onSetQty(item, n)}
+              onEdit={p.onEditLine ? () => p.onEditLine?.(item) : undefined}
+              onRemove={p.onRemove ? () => p.onRemove?.(item) : undefined}
             />
           )}
         />
@@ -208,6 +219,22 @@ export function setProductQty(productId: number, next: number, store: CartStore 
   const target = mine[0];
   if (!target) return;
   setQuantity(target.rowId, target.quantity + (next - current));
+}
+
+/** Xóa 1 đơn nháp từ sheet chọn đơn; đơn còn hàng / khách thì hỏi trước. */
+function removeDraftAsk(id: string) {
+  const book = useDrafts.getState();
+  const draft = book.drafts.find((d) => d.id === id);
+  if (!draft) return;
+  const cart = useCart.getState();
+  const content = id === book.activeId ? cart : draft.cart;
+  // Giữ loại đơn và bảng giá của đơn đang mở cho đơn trống thay thế (nếu xóa hết).
+  const remove = () => closeDraft(id, { mode: cart.mode, priceBookId: cart.priceBookId, priceBookName: cart.priceBookName });
+  if (isBlankCart(content)) return remove();
+  Alert.alert(`Xóa ${draftLabel(draft)}?`, 'Toàn bộ hàng, khách và thanh toán của đơn nháp này sẽ bị xóa.', [
+    { text: 'Hủy', style: 'cancel' },
+    { text: 'Xóa đơn', style: 'destructive', onPress: remove },
+  ]);
 }
 
 export default function SalesScreen() {
@@ -273,6 +300,17 @@ export default function SalesScreen() {
         addToCart(p, book.data, 1, store);
       }}
       onSetQty={(p, n) => setProductQty(p.id, n, store)}
+      onEditLine={(p) => {
+        // Cùng dòng mà nút − SL + đang đổi (dòng mới nhất của sản phẩm).
+        const row = lines.find((l) => l.product.id === p.id);
+        if (row) router.push({ pathname: paths.line, params: { rowId: row.rowId } } as never);
+      }}
+      onRemove={(p) =>
+        Alert.alert(editing ? 'Xóa khỏi đơn?' : 'Xóa khỏi giỏ?', p.name, [
+          { text: 'Hủy', style: 'cancel' },
+          { text: 'Xóa', style: 'destructive', onPress: () => store.getState().removeProduct(p.id) },
+        ])
+      }
       cartCount={totals.itemCount}
       cartTotal={totals.total}
       // Đơn đang sửa: màn chọn hàng mở từ đơn nên quay lại là về đơn.
@@ -290,6 +328,9 @@ export default function SalesScreen() {
                 if (r === 'already') toast.info('Đơn đang mở còn trống');
                 if (r === 'full') toast.info(DRAFTS_FULL_MESSAGE);
               },
+              onRemove: removeDraftAsk,
+              // Chỉ còn 1 đơn (là đơn đang mở) và đơn đó trống: xóa cũng không đổi gì.
+              canRemove: () => draftBook.drafts.length > 1 || !isBlankCart({ lines, customer }),
             }
       }
     />

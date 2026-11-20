@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { create } from 'zustand';
 import { money, vnd } from '@/core/format';
 import { ApiError, errorMessage } from '@/core/http';
@@ -32,6 +32,7 @@ import {
 import { startCustomerDraft } from '../customers/draft';
 import { newCustomerForm } from '../customers/form';
 import { customerPerms } from '../customers/model';
+import { useCustomerEditor } from '../customers/openEdit';
 import {
   addOrderPayment,
   addPaymentNote,
@@ -83,6 +84,10 @@ export interface CheckoutViewProps {
   onSubmit: () => void;
   onOpenCustomer: () => void;
   onCreateCustomer?: () => void;
+  /** Sửa hồ sơ khách đang chọn (không có = không được sửa). */
+  onEditCustomer?: () => void;
+  /** Đang tải hồ sơ khách để mở form sửa. */
+  editingCustomer?: boolean;
   onOpenLine: (rowId: string) => void;
   onOpenDelivery: () => void;
   onOpenDiscount: () => void;
@@ -94,8 +99,52 @@ export interface CheckoutViewProps {
   manyDrafts?: boolean;
 }
 
-/** Khách của giỏ đang mở; không truyền `onPress` thì không cho đổi khách. */
-export function CustomerCard({ perms, onPress }: { perms: SalePerms; onPress?: () => void }) {
+/** Hàng nút dưới thẻ khách: sửa hồ sơ khách, đổi sang khách khác. */
+export function CustomerActions({ onEdit, onChange, editBusy }: { onEdit?: () => void; onChange?: () => void; editBusy?: boolean }) {
+  return (
+    <View style={styles.customerActions}>
+      {onEdit ? (
+        <PressableScale
+          onPress={onEdit}
+          disabled={editBusy}
+          accessibilityRole="button"
+          accessibilityLabel="Sửa thông tin khách hàng"
+          scaleTo={0.96}
+          style={styles.customerAction}>
+          {editBusy ? <ActivityIndicator size="small" color={C.brand} /> : <Icon name="pencil" size={16} color={C.brand} />}
+          <Txt variant="label" weight="semibold" color={C.brand}>
+            Sửa thông tin
+          </Txt>
+        </PressableScale>
+      ) : null}
+      {onEdit && onChange ? <View style={styles.customerActionSep} /> : null}
+      {onChange ? (
+        <PressableScale onPress={onChange} accessibilityRole="button" accessibilityLabel="Đổi khách hàng" scaleTo={0.96} style={styles.customerAction}>
+          <Icon name="refresh-cw" size={16} color={C.brand} />
+          <Txt variant="label" weight="semibold" color={C.brand}>
+            Đổi khách
+          </Txt>
+        </PressableScale>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Khách của giỏ đang mở; không truyền `onPress` thì không cho đổi khách.
+ * Có `onEdit` (được sửa hồ sơ khách): thẻ có hàng nút Sửa thông tin / Đổi khách.
+ */
+export function CustomerCard({
+  perms,
+  onPress,
+  onEdit,
+  editBusy,
+}: {
+  perms: SalePerms;
+  onPress?: () => void;
+  onEdit?: () => void;
+  editBusy?: boolean;
+}) {
   const customer = useScopedCart((s) => s.customer);
   if (!customer) {
     return (
@@ -116,11 +165,8 @@ export function CustomerCard({ perms, onPress }: { perms: SalePerms; onPress?: (
     );
   }
   const debt = customer.totalDebt ?? 0;
-  return (
-    <Card
-      onPress={onPress}
-      accessibilityLabel={onPress ? `Khách hàng ${customer.name}. Bấm để đổi` : `Khách hàng ${customer.name}`}
-      style={styles.customer}>
+  const info = (
+    <>
       <Avatar name={customer.name} size={44} />
       <View style={{ flex: 1, gap: 2 }}>
         <Txt variant="body" weight="semibold" numberOfLines={1}>
@@ -135,6 +181,23 @@ export function CustomerCard({ perms, onPress }: { perms: SalePerms; onPress?: (
           </View>
         ) : null}
       </View>
+    </>
+  );
+  if (onEdit) {
+    return (
+      <Card>
+        <View style={styles.customer}>{info}</View>
+        <Divider />
+        <CustomerActions onEdit={onEdit} onChange={onPress} editBusy={editBusy} />
+      </Card>
+    );
+  }
+  return (
+    <Card
+      onPress={onPress}
+      accessibilityLabel={onPress ? `Khách hàng ${customer.name}. Bấm để đổi` : `Khách hàng ${customer.name}`}
+      style={styles.customer}>
+      {info}
       {onPress ? (
         <Txt variant="label" weight="semibold" color={C.brand}>
           Đổi
@@ -311,7 +374,7 @@ export function CheckoutView(p: CheckoutViewProps) {
         title="Khách hàng"
         actionLabel={p.onCreateCustomer ? 'Tạo khách' : undefined}
         onAction={p.onCreateCustomer}>
-        <CustomerCard perms={p.perms} onPress={p.onOpenCustomer} />
+        <CustomerCard perms={p.perms} onPress={p.onOpenCustomer} onEdit={p.onEditCustomer} editBusy={p.editingCustomer} />
       </Section>
 
       {cart.lines.length === 0 ? (
@@ -336,6 +399,12 @@ export function CheckoutView(p: CheckoutViewProps) {
                     total={lineTotal({ price: l.price, quantity: l.quantity, discount: { type: 'amount', value: l.discount } })}
                     onPress={() => p.onOpenLine(l.rowId)}
                     onChangeQty={(n) => cart.setQuantity(l.rowId, n)}
+                    onRemove={() =>
+                      Alert.alert('Xóa khỏi giỏ?', l.product.name, [
+                        { text: 'Hủy', style: 'cancel' },
+                        { text: 'Xóa', style: 'destructive', onPress: () => cart.remove(l.rowId) },
+                      ])
+                    }
                   />
                 </View>
               ))}
@@ -409,6 +478,8 @@ export default function CheckoutScreen() {
   const busyRef = useRef(false);
   const [busy, setBusy] = useState(false);
   const canCreateCustomer = perms.customers && customerPerms(user).create;
+  const canEditCustomer = perms.customers && customerPerms(user).update;
+  const editor = useCustomerEditor();
 
   const banks = useBankAccounts(perms.viewPayment && payKind === 'transfer' && paidAmount > 0);
   const promos = usePromotionCheck(
@@ -515,6 +586,12 @@ export default function CheckoutScreen() {
             }
           : undefined
       }
+      onEditCustomer={
+        canEditCustomer && customer
+          ? () => void editor.open(customer.id, (fresh) => useCart.getState().refreshCustomer(fresh))
+          : undefined
+      }
+      editingCustomer={editor.busy}
       onOpenLine={(rowId) => router.push({ pathname: '/ban-hang/dong/[rowId]', params: { rowId } })}
       onOpenDelivery={() => router.push('/ban-hang/giao-hang')}
       onOpenDiscount={() => router.push('/ban-hang/giam-gia')}
@@ -571,6 +648,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   customer: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+  customerActions: { flexDirection: 'row', alignItems: 'center' },
+  customerAction: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 44,
+    paddingHorizontal: 8,
+  },
+  customerActionSep: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', marginVertical: 10, backgroundColor: C.border },
   delivery: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   sum: { paddingHorizontal: 16, paddingVertical: 6 },
   pay: { padding: 16, gap: 12 },

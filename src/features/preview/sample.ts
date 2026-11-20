@@ -247,12 +247,24 @@ const ago = (days: number, h: number, m = 0) => {
   return d.toISOString();
 };
 
+const noAlerts: Pick<DocRow, 'shippingFee' | 'alerts' | 'warnings'> = { shippingFee: 0, alerts: [], warnings: null };
+
 export const sampleDocRows: DocRow[] = [
-  { id: 1, code: 'DH000131', date: ago(0, 10, 42), status: 1, customerName: 'Quán mẫu Trà Mây', customerPhone: '0900000111', sellerName: 'Nguyễn Thị Lan', grandTotal: 1_250_000, paidAmount: 0, debtAmount: 1_250_000 },
-  { id: 2, code: 'DH000130', date: ago(0, 9, 5), status: 5, customerName: 'Tiệm mẫu Gió Chiều', customerPhone: null, sellerName: 'Trần Văn Nam', grandTotal: 865_000, paidAmount: 300_000, debtAmount: 565_000 },
-  { id: 3, code: 'DH000129', date: ago(1, 16, 20), status: 6, customerName: 'Quán mẫu Lối Nhỏ', customerPhone: null, sellerName: 'Nguyễn Thị Lan', grandTotal: 2_400_000, paidAmount: 2_400_000, debtAmount: 0 },
-  { id: 4, code: 'DH000128', date: ago(1, 11, 2), status: 4, customerName: 'Quán mẫu Trà Mây', customerPhone: null, sellerName: 'Nguyễn Thị Lan', grandTotal: 455_000, paidAmount: 0, debtAmount: 0 },
-  { id: 5, code: 'DH000127', date: ago(3, 14, 30), status: 3, customerName: 'Tiệm mẫu Gió Chiều', customerPhone: null, sellerName: 'Trần Văn Nam', grandTotal: 1_980_000, paidAmount: 1_980_000, debtAmount: 0 },
+  {
+    id: 1, code: 'DH000131', date: ago(0, 10, 42), status: 1, customerName: 'Quán mẫu Trà Mây', customerPhone: '0900000111', sellerName: 'Nguyễn Thị Lan', grandTotal: 1_250_000, paidAmount: 0, debtAmount: 1_250_000,
+    shippingFee: 30_000,
+    alerts: ['price', 'shippingFee', 'cold'],
+    warnings: {
+      price: [{ productCode: 'SP001', productName: 'Trà đen mẫu 1kg', price: 170_000, listPrice: 185_000 }],
+      quantity: [],
+      orderCode: null,
+      previousInvoiceCodes: [],
+    },
+  },
+  { id: 2, code: 'DH000130', date: ago(0, 9, 5), status: 5, customerName: 'Tiệm mẫu Gió Chiều', customerPhone: null, sellerName: 'Trần Văn Nam', grandTotal: 865_000, paidAmount: 300_000, debtAmount: 565_000, shippingFee: 67_000, alerts: ['shippingFee'], warnings: null },
+  { id: 3, code: 'DH000129', date: ago(1, 16, 20), status: 6, customerName: 'Quán mẫu Lối Nhỏ', customerPhone: null, sellerName: 'Nguyễn Thị Lan', grandTotal: 2_400_000, paidAmount: 2_400_000, debtAmount: 0, ...noAlerts },
+  { id: 4, code: 'DH000128', date: ago(1, 11, 2), status: 4, customerName: 'Quán mẫu Trà Mây', customerPhone: null, sellerName: 'Nguyễn Thị Lan', grandTotal: 455_000, paidAmount: 0, debtAmount: 0, ...noAlerts },
+  { id: 5, code: 'DH000127', date: ago(3, 14, 30), status: 3, customerName: 'Tiệm mẫu Gió Chiều', customerPhone: null, sellerName: 'Trần Văn Nam', grandTotal: 1_980_000, paidAmount: 1_980_000, debtAmount: 0, ...noAlerts },
 ];
 
 export const sampleDocCounts = { all: 24, pending: 6, confirmed: 5, partially_invoiced: 3, completed: 8, cancelled: 2 };

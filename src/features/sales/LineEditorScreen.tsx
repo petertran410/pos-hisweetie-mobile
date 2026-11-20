@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
-import { money, parseQty, qty } from '@/core/format';
+import { money, parseQty, percentInput, qty } from '@/core/format';
 import { Button, C, Card, ChipGroup, EmptyState, MoneyField, QtyField, SheetHeader, TextField, Txt } from '@/ui';
 import type { CartLine } from './cart';
 import { Thumb } from './components';
@@ -27,7 +27,8 @@ export function LineEditorView({
   const [price, setPrice] = useState(line.price);
   const [discount, setDiscount] = useState(line.discount);
   const [kind, setKind] = useState<DiscountKind>('amount');
-  const [percent, setPercent] = useState(0);
+  // Chữ đang gõ ở ô %, giữ nguyên chữ để gõ được số lẻ ("12." → "12.5").
+  const [percentText, setPercentText] = useState('');
   const [note, setNote] = useState(line.note);
 
   const net = Math.max(0, price - discount);
@@ -42,7 +43,7 @@ export function LineEditorView({
       setPrice(n);
       setDiscount(0);
     }
-    setPercent(0);
+    setPercentText('');
   };
 
   return (
@@ -99,7 +100,7 @@ export function LineEditorView({
               value={kind}
               onChange={(k) => {
                 setKind(k);
-                setPercent(0);
+                setPercentText('');
                 setDiscount(0);
               }}
             />
@@ -112,10 +113,11 @@ export function LineEditorView({
             ) : (
               <TextField
                 label="Phần trăm giảm"
-                value={percent ? String(percent).replace('.', ',') : ''}
+                value={percentText}
                 onChangeText={(t) => {
-                  const pct = Math.min(100, parseQty(t));
-                  setPercent(pct);
+                  const text = percentInput(t);
+                  setPercentText(text);
+                  const pct = parseQty(text);
                   setDiscount(Math.floor((price * pct) / 100));
                 }}
                 keyboardType="decimal-pad"

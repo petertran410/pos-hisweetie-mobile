@@ -6,7 +6,8 @@ import { dayText, isRange, monthGrid, pickDay, rangeLabel, type DateRange, type 
 import { IconButton } from './Button';
 import { ChipGroup } from './Cards';
 import { SheetHeader } from './Header';
-import { PressableScale } from './motion';
+import { Icon } from './icons';
+import { PressableScale, TabPanel } from './motion';
 import { SelectTrigger } from './Select';
 import { Txt } from './Text';
 import { C, radius } from './theme';
@@ -14,6 +15,69 @@ import { C, radius } from './theme';
 export interface PeriodOption<K extends string> {
   value: K;
   label: string;
+  /**
+   * Nhóm của mốc (vd "Theo tuần"). Có nhóm thì sheet liệt kê các mốc thành danh sách
+   * theo nhóm (như bảng mốc thời gian của web) thay cho hàng chip.
+   */
+  group?: string;
+}
+
+type SheetMode = 'quick' | 'range';
+const MODES: { value: SheetMode; label: string }[] = [
+  { value: 'quick', label: 'Mốc có sẵn' },
+  { value: 'range', label: 'Chọn ngày' },
+];
+const MODE_ORDER: SheetMode[] = ['quick', 'range'];
+
+/** Gom mốc theo nhóm, giữ thứ tự xuất hiện. */
+function groupOptions<K extends string>(options: PeriodOption<K>[]): { title: string; items: PeriodOption<K>[] }[] {
+  const groups: { title: string; items: PeriodOption<K>[] }[] = [];
+  for (const o of options) {
+    const title = o.group ?? '';
+    const last = groups[groups.length - 1];
+    if (last && last.title === title) last.items.push(o);
+    else groups.push({ title, items: [o] });
+  }
+  return groups;
+}
+
+/** Danh sách mốc theo nhóm; bấm là áp dụng. */
+function PresetList<K extends string>({ options, value, onPick }: { options: PeriodOption<K>[]; value: K | null; onPick: (k: K) => void }) {
+  return (
+    <View style={{ gap: 14 }}>
+      {groupOptions(options).map((g) => (
+        <View key={g.title} style={{ gap: 6 }}>
+          {g.title ? (
+            <Txt variant="label" weight="semibold" color={C.muted}>
+              {g.title}
+            </Txt>
+          ) : null}
+          <View style={styles.listCard}>
+            {g.items.map((o, i) => {
+              const on = o.value === value;
+              return (
+                <View key={o.value}>
+                  {i > 0 ? <View style={styles.listSep} /> : null}
+                  <PressableScale
+                    onPress={() => onPick(o.value)}
+                    haptic="selection"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={o.label}
+                    scaleTo={0.985}
+                    style={styles.listRow}>
+                    <Txt variant="body" weight={on ? 'semibold' : 'medium'} color={on ? C.brand : C.text} style={{ flex: 1 }}>
+                      {o.label}
+                    </Txt>
+                    {on ? <Icon name="check" size={20} color={C.brand} strokeWidth={2.4} /> : null}
+                  </PressableScale>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
 }
 
 const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -98,6 +162,7 @@ function DayBox({ label, value, active }: { label: string; value: string; active
 /**
  * Sheet chọn thời gian: chip chọn nhanh (bấm là áp dụng) và lịch để chọn
  * khoảng ngày bất kỳ (bấm ngày bắt đầu rồi ngày kết thúc, rồi "Áp dụng").
+ * Mốc có nhóm (nhiều mốc như web): 2 mục "Mốc có sẵn" (danh sách theo nhóm) / "Chọn ngày" (lịch).
  */
 export function PeriodSheet<K extends string>({
   title,
@@ -119,36 +184,68 @@ export function PeriodSheet<K extends string>({
   const today = isoDate(new Date());
   const start = isRange(value) ? value : (initialRange ?? null);
   const [draft, setDraft] = useState<RangeDraft>({ from: start?.from ?? null, to: start?.to ?? null });
+  const grouped = options.some((o) => o.group);
+  const [mode, setMode] = useState<SheetMode>(isRange(value) ? 'range' : 'quick');
   const ready = !!draft.from;
   const apply = () => {
     if (!draft.from) return;
     onChange({ from: draft.from, to: draft.to ?? draft.from });
   };
+  const body = [styles.body, { paddingBottom: insets.bottom + 24 }];
+
+  const range = (heading: string) => (
+    <View style={{ gap: 10 }}>
+      <Txt variant="label" weight="semibold" color={C.muted}>
+        {heading}
+      </Txt>
+      <View style={styles.boxes}>
+        <DayBox label="Từ ngày" value={dayText(draft.from)} active={!draft.from || !!draft.to} />
+        <DayBox label="Đến ngày" value={dayText(draft.to)} active={!!draft.from && !draft.to} />
+      </View>
+      <Calendar draft={draft} onPick={(day) => setDraft((d) => pickDay(d, day))} today={today} />
+      <Txt variant="caption" color={C.muted}>
+        Bấm ngày bắt đầu rồi ngày kết thúc. Chỉ chọn 1 ngày thì xem riêng ngày đó.
+      </Txt>
+    </View>
+  );
+
+  if (grouped) {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <SheetHeader
+          title={title}
+          onCancel={onClose}
+          actionLabel={mode === 'range' ? 'Áp dụng' : undefined}
+          onAction={apply}
+          actionDisabled={!ready}
+        />
+        <View style={styles.modes}>
+          <ChipGroup fill options={MODES} value={mode} onChange={setMode} />
+        </View>
+        <TabPanel value={mode} order={MODE_ORDER} style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={body}>
+            {mode === 'quick' ? (
+              <PresetList options={options} value={isRange(value) ? null : value} onPick={(k) => onChange(k)} />
+            ) : (
+              range('Từ ngày đến ngày')
+            )}
+          </ScrollView>
+        </TabPanel>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <SheetHeader title={title} onCancel={onClose} actionLabel="Áp dụng" onAction={apply} actionDisabled={!ready} />
-      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 24 }]}>
+      <ScrollView contentContainerStyle={body}>
         <View style={{ gap: 8 }}>
           <Txt variant="label" weight="semibold" color={C.muted}>
             Chọn nhanh
           </Txt>
           <ChipGroup options={options} value={isRange(value) ? null : value} onChange={(k) => onChange(k)} />
         </View>
-
-        <View style={{ gap: 10 }}>
-          <Txt variant="label" weight="semibold" color={C.muted}>
-            Hoặc chọn từ ngày đến ngày
-          </Txt>
-          <View style={styles.boxes}>
-            <DayBox label="Từ ngày" value={dayText(draft.from)} active={!draft.from || !!draft.to} />
-            <DayBox label="Đến ngày" value={dayText(draft.to)} active={!!draft.from && !draft.to} />
-          </View>
-          <Calendar draft={draft} onPick={(day) => setDraft((d) => pickDay(d, day))} today={today} />
-          <Txt variant="caption" color={C.muted}>
-            Bấm ngày bắt đầu rồi ngày kết thúc. Chỉ chọn 1 ngày thì xem riêng ngày đó.
-          </Txt>
-        </View>
+        {range('Hoặc chọn từ ngày đến ngày')}
       </ScrollView>
     </View>
   );
@@ -220,6 +317,16 @@ export function PeriodModal<K extends string>({
 
 const styles = StyleSheet.create({
   body: { padding: 16, gap: 22 },
+  modes: { paddingHorizontal: 16, paddingTop: 12 },
+  listCard: {
+    borderRadius: radius.card,
+    backgroundColor: C.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: C.border,
+    overflow: 'hidden',
+  },
+  listRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingHorizontal: 14 },
+  listSep: { height: StyleSheet.hairlineWidth, marginLeft: 14, backgroundColor: C.border },
   boxes: { flexDirection: 'row', gap: 10 },
   dayBox: {
     flex: 1,

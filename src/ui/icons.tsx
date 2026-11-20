@@ -54,6 +54,7 @@ import MapPin from 'lucide-react-native/icons/map-pin';
 import Minus from 'lucide-react-native/icons/minus';
 import Package from 'lucide-react-native/icons/package';
 import PackageSearch from 'lucide-react-native/icons/package-search';
+import PackageX from 'lucide-react-native/icons/package-x';
 import Pencil from 'lucide-react-native/icons/pencil';
 import Percent from 'lucide-react-native/icons/percent';
 import Phone from 'lucide-react-native/icons/phone';
@@ -147,6 +148,7 @@ const ICONS = {
   minus: Minus,
   package: Package,
   'package-search': PackageSearch,
+  'package-x': PackageX,
   pencil: Pencil,
   percent: Percent,
   phone: Phone,
@@ -191,12 +193,15 @@ export function Icon({
   size = 22,
   color = C.text,
   strokeWidth = 1.9,
+  fill,
 }: {
   name: IconName;
   size?: number;
   color?: ColorValue;
   strokeWidth?: number;
+  /** Tô nền bên trong nét (vd ⚠ vàng nhạt như web `fill-yellow-100`). */
+  fill?: ColorValue;
 }) {
   const Cmp = ICONS[name];
-  return <Cmp size={size} color={color as string} strokeWidth={strokeWidth} />;
+  return <Cmp size={size} color={color as string} strokeWidth={strokeWidth} fill={(fill as string | undefined) ?? 'none'} />;
 }

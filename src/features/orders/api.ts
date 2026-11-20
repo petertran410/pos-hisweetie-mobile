@@ -1,10 +1,20 @@
 import { keepPreviousData, useInfiniteQuery, useQuery, type QueryClient, type QueryKey } from '@tanstack/react-query';
-import { resolvePeriod, type PeriodChoice } from '@/core/period';
+import { resolveRange } from '@/core/period';
 import { http, type Query } from '@/core/http';
 import { useSession } from '@/core/session';
 import type { RawInvoiceForEdit, RawOrderForEdit } from './editOrder';
 import { toInvoiceDraft, type RawOrderForInvoice } from './fromOrder';
-import { dayBoundsIso, type DocKind, type StatusFilter } from './model';
+import {
+  activeAlerts,
+  alertsFor,
+  dayBoundsIso,
+  type DocAlert,
+  type DocKind,
+  type DocListFilters,
+  type DocPeriod,
+  type DocWarnings,
+  type StatusFilter,
+} from './model';
 
 const num = (v: unknown): number => {
   const n = Number(v);
@@ -55,6 +65,49 @@ export interface DocRow {
   grandTotal: number;
   paidAmount: number;
   debtAmount: number;
+  shippingFee: number;
+  /** Icon cảnh báo (cùng điều kiện, thứ tự với web). */
+  alerts: DocAlert[];
+  /** Chi tiết lệch giá / lệch số lượng để xem khi bấm icon. */
+  warnings: DocWarnings | null;
+}
+
+interface RawWarnings {
+  price?: { productCode?: string | null; productName?: string | null; price?: unknown; listPrice?: unknown }[] | null;
+  quantity?:
+    | {
+        productCode?: string | null;
+        productName?: string | null;
+        unit?: string | null;
+        orderQuantity?: unknown;
+        previousQuantity?: unknown;
+        expectedQuantity?: unknown;
+        invoiceQuantity?: unknown;
+      }[]
+    | null;
+  orderCode?: string | null;
+  previousInvoiceCodes?: string[] | null;
+}
+
+function toWarnings(w: RawWarnings | null | undefined): DocWarnings | null {
+  if (!w) return null;
+  const price = (w.price ?? []).map((p) => ({
+    productCode: p.productCode ?? '',
+    productName: p.productName ?? '',
+    price: num(p.price),
+    listPrice: num(p.listPrice),
+  }));
+  const quantity = (w.quantity ?? []).map((q) => ({
+    productCode: q.productCode ?? '',
+    productName: q.productName ?? '',
+    unit: q.unit ?? null,
+    orderQuantity: num(q.orderQuantity),
+    previousQuantity: num(q.previousQuantity),
+    expectedQuantity: num(q.expectedQuantity),
+    invoiceQuantity: num(q.invoiceQuantity),
+  }));
+  if (!price.length && !quantity.length) return null;
+  return { price, quantity, orderCode: w.orderCode ?? null, previousInvoiceCodes: w.previousInvoiceCodes ?? [] };
 }
 
 interface RawRow {
@@ -69,9 +122,17 @@ interface RawRow {
   debtAmount?: string | number | null;
   customer?: { name?: string | null; contactNumber?: string | null; phone?: string | null } | null;
   soldBy?: { name?: string | null } | null;
+  shippingFee?: string | number | null;
+  // Cờ cảnh báo backend gắn vào danh sách (hóa đơn: attachPriceBookWarnings; đặt hàng: findAll).
+  hasPriceBookWarning?: boolean | null;
+  hasOrphanedPacking?: boolean | null;
+  hasShippingFee?: boolean | null;
+  hasColdItems?: boolean | null;
+  warnings?: RawWarnings | null;
 }
 
 export function toDocRow(kind: DocKind, r: RawRow): DocRow {
+  const warnings = toWarnings(r.warnings);
   return {
     id: r.id,
     code: r.code,
@@ -83,40 +144,62 @@ export function toDocRow(kind: DocKind, r: RawRow): DocRow {
     grandTotal: num(r.grandTotal),
     paidAmount: num(r.paidAmount),
     debtAmount: Math.max(0, num(r.debtAmount)),
+    shippingFee: num(r.shippingFee),
+    alerts: activeAlerts({ ...r, warnings }),
+    warnings,
   };
 }
 
-export interface DocFilters {
+export interface DocFilters extends Partial<Omit<DocListFilters, 'period'>> {
   search: string;
   status: StatusFilter;
-  /** Kỳ có sẵn, "all" hoặc khoảng ngày tự chọn. */
-  period: PeriodChoice;
+  /** Thời gian chính: mốc có sẵn (như web), "all" hoặc khoảng ngày tự chọn. */
+  period: DocPeriod;
 }
 
+const isoBounds = (p: DocPeriod | undefined, now: Date) => {
+  const range = p ? resolveRange(p, now) : null;
+  return range ? dayBoundsIso(range.from, range.to) : null;
+};
+
 /**
- * Tham số lọc đúng với DTO của backend (tham số lạ bị trả lỗi 400).
+ * Tham số lọc đúng với DTO của backend (tham số lạ bị trả lỗi 400) và cùng tên
+ * với sidebar lọc của web (`OrdersSidebar`, `InvoicesSidebar`):
+ * - Thời gian: đặt hàng gửi fromCreatedDate/toCreatedDate; hóa đơn gửi
+ *   fromPurchaseDate/toPurchaseDate (thời gian mua hàng) và fromCreatedDate/toCreatedDate (thời gian tạo).
+ * - Người bán `soldByIds`, người tạo `createdByIds`.
+ * - Cảnh báo: priceWarning, quantityWarning, orphanedPacking, hasShippingFee, hasColdItems.
  * Chỉ dùng `page` + `limit` (không trộn với `pageSize`/`currentItem`).
  */
 export function listQuery(kind: DocKind, f: DocFilters, branchId: number | null, page: number, now = new Date()): Query {
   const q: Query = { page, limit: PAGE_SIZE, includeStatusCounts: true, search: f.search || undefined };
-  const range = resolvePeriod(f.period, now);
-  const bounds = range ? dayBoundsIso(range.from, range.to) : null;
+  const main = isoBounds(f.period, now);
   if (kind === 'invoice') {
     q.branchIds = branchId ? [branchId] : undefined;
     if (f.status !== 'all') q.statusIds = [Number(f.status)];
-    if (bounds) {
-      q.fromPurchaseDate = bounds.fromIso;
-      q.toPurchaseDate = bounds.toIso;
+    if (main) {
+      q.fromPurchaseDate = main.fromIso;
+      q.toPurchaseDate = main.toIso;
+    }
+    const created = isoBounds(f.createdPeriod, now);
+    if (created) {
+      q.fromCreatedDate = created.fromIso;
+      q.toCreatedDate = created.toIso;
     }
     q.orderBy = 'purchaseDate';
   } else {
     q.branchId = branchId ?? undefined;
     if (f.status !== 'all') q.statuses = [f.status];
-    if (bounds) {
-      q.fromDate = bounds.fromIso;
-      q.toDate = bounds.toIso;
+    if (main) {
+      q.fromCreatedDate = main.fromIso;
+      q.toCreatedDate = main.toIso;
     }
     q.orderBy = 'orderDate';
+  }
+  if (f.sellerIds?.length) q.soldByIds = f.sellerIds;
+  if (f.creatorIds?.length) q.createdByIds = f.creatorIds;
+  for (const a of alertsFor(kind)) {
+    if (f.alerts?.includes(a.value)) q[a.param] = true;
   }
   q.orderDirection = 'desc';
   return q;
@@ -195,7 +278,8 @@ export interface DocDetail {
   /** Id người tạo: tài khoản chỉ xem dữ liệu của mình chỉ mở được chứng từ mình tạo. */
   createdBy: number | null;
   priceBookName: string | null;
-  customer: { name: string; code: string | null; phone: string | null } | null;
+  /** `id`: để mở form sửa hồ sơ khách. */
+  customer: { id?: number; name: string; code: string | null; phone: string | null } | null;
   delivery: { receiver: string; phone: string; address: string; note: string | null } | null;
   note: string | null;
   lines: DocLine[];
@@ -251,7 +335,7 @@ interface RawDetail {
   soldBy?: { name?: string | null } | null;
   creator?: { name?: string | null } | null;
   createdBy?: number | null;
-  customer?: { name?: string | null; code?: string | null; contactNumber?: string | null; phone?: string | null } | null;
+  customer?: { id?: number; name?: string | null; code?: string | null; contactNumber?: string | null; phone?: string | null } | null;
   delivery?: {
     receiver?: string | null;
     contactNumber?: string | null;
@@ -298,6 +382,7 @@ export function toDocDetail(kind: DocKind, r: RawDetail): DocDetail {
     priceBookName: r.priceBookName || null,
     customer: r.customer
       ? {
+          id: r.customer.id,
           name: r.customer.name || 'Khách vãng lai',
           code: r.customer.code ?? null,
           phone: r.customer.contactNumber || r.customer.phone || null,

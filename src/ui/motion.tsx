@@ -3,9 +3,12 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import {
   Platform,
   Pressable,
+  type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
   type AccessibilityRole,
   type LayoutChangeEvent,
   type AccessibilityState,
+  type Insets,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -50,6 +53,8 @@ export function PressableScale({
   accessibilityState,
   hitSlop,
   onLayout,
+  accessibilityActions,
+  onAccessibilityAction,
 }: {
   children?: ReactNode;
   onPress?: () => void;
@@ -62,8 +67,12 @@ export function PressableScale({
   accessibilityLabel?: string;
   accessibilityHint?: string;
   accessibilityState?: AccessibilityState;
-  hitSlop?: number;
+  /** Nới vùng chạm: cùng một số cho 4 phía, hoặc riêng từng phía. */
+  hitSlop?: number | Insets;
   onLayout?: (e: LayoutChangeEvent) => void;
+  /** Thao tác phụ cho trình đọc màn hình (vd "Xem cảnh báo" trên thẻ có nút lồng bên trong). */
+  accessibilityActions?: readonly AccessibilityActionInfo[];
+  onAccessibilityAction?: (e: AccessibilityActionEvent) => void;
 }) {
   const scale = useSharedValue(1);
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
@@ -88,6 +97,8 @@ export function PressableScale({
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
       accessibilityState={accessibilityState}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={onAccessibilityAction}
       style={[style, animated]}>
       {children}
     </AnimatedPressable>

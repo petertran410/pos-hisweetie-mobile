@@ -1,11 +1,11 @@
-import { useState, type Ref } from 'react';
+import { useRef, useState, type Ref } from 'react';
 import { StyleSheet, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
-import { money, parseMoney, parseQty, qty } from '@/core/format';
+import { decimalInput, decimalText, money, parseMoney, parseQty, qty } from '@/core/format';
 import { Icon } from './icons';
 import { PressableScale } from './motion';
 import { TextField, type TextInputRef } from './TextField';
 import { Txt } from './Text';
-import { C, fonts, radius } from './theme';
+import { C, fonts, radius, toneColors } from './theme';
 
 /** Ô tìm kiếm: kính lúp, nút xóa nhanh. */
 export function SearchField({
@@ -49,7 +49,7 @@ export function SearchField({
   );
 }
 
-/** Ô nhập tiền: hiện dấu chấm ngăn cách, bàn phím số. */
+/** Ô nhập tiền: hiện dấu phẩy ngăn hàng nghìn, bàn phím số. */
 export function MoneyField({
   label,
   value,
@@ -90,15 +90,18 @@ export function MoneyField({
   );
 }
 
-/** Ô nhập số lượng (cho phép số lẻ với dấu phẩy, vd 2,5). */
+/** Chữ số lượng đang gõ: chỉ giữ số và 1 dấu chấm thập phân (phẩy cũng thành chấm). */
+const cleanQty = decimalInput;
+
+/** Ô nhập số lượng (cho phép số lẻ với dấu chấm, vd 2.5). */
 export function QtyField({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
-  const [text, setText] = useState(value ? qty(value) : '');
+  const [text, setText] = useState(decimalText(value));
   return (
     <TextField
       label={label}
       value={text}
       onChangeText={(t) => {
-        const clean = t.replace(/[^\d,]/g, '').replace(/,(?=.*,)/g, '');
+        const clean = cleanQty(t);
         setText(clean);
         onChange(parseQty(clean));
       }}
@@ -109,54 +112,112 @@ export function QtyField({ label, value, onChange }: { label: string; value: num
   );
 }
 
-/** Nút − số lượng +. */
+/**
+ * Nút − số lượng +.
+ *  - Bấm vào số ở giữa để gõ số lượng (ghi ngay khi số hợp lệ; gõ dở / không
+ *    hợp lệ thì rời ô sẽ trả về số cũ). `editable={false}`: chỉ hiện số.
+ *  - Ở mức thấp nhất, nút − thành nút xóa (thùng rác đỏ): gọi `onRemove` nếu
+ *    có (nơi gọi tự hỏi lại), không thì đưa về 0 khi `min` là 0. Nhờ vậy không
+ *    cần nút xóa riêng nằm sát nút −, dễ bấm nhầm.
+ *  - Nút nhìn 40pt, vùng chạm khoảng 44–48pt (chuẩn tối thiểu iOS / Android).
+ */
 export function QtyStepper({
   value,
   onChange,
+  onRemove,
   min = 0,
   max,
   size = 'medium',
   label,
+  editable = true,
 }: {
   value: number;
   onChange: (n: number) => void;
+  /** Bấm nút − khi đã ở mức thấp nhất (`min`): xóa dòng này. */
+  onRemove?: () => void;
   min?: number;
   /** Không cho tăng quá số này. */
   max?: number;
   size?: 'small' | 'medium';
   label: string;
+  editable?: boolean;
 }) {
-  const h = size === 'small' ? 32 : 38;
-  const canMinus = value - 1 >= min;
+  const h = size === 'small' ? 40 : 44;
+  // Nút − đang là nút xóa: đã ở mức thấp nhất mà có onRemove, hoặc còn ≤ 1 mà được về 0.
+  const removing = onRemove ? value <= min : min === 0 && value > 0 && value <= 1;
+  const canMinus = removing || value > min;
   const canPlus = max === undefined || value < max;
+  // Chữ đang gõ; null = không gõ (hiện số của giỏ).
+  const [text, setText] = useState<string | null>(null);
+  const input = useRef<TextInputRef>(null);
+  const shown = text ?? qty(value);
+  const step = (n: number) => {
+    // Đang gõ mà bấm − / +: thôi gõ, lấy số mới.
+    if (text !== null) {
+      setText(null);
+      input.current?.blur();
+    }
+    onChange(n);
+  };
   return (
     <View style={[styles.stepper, { height: h }]} accessibilityLabel={`${label}: ${qty(value)}`}>
       <PressableScale
-        onPress={() => onChange(Math.max(min, value - 1))}
+        onPress={() => (removing && onRemove ? onRemove() : step(Math.max(min, value - 1)))}
         disabled={!canMinus}
-        accessibilityLabel={`Giảm ${label}`}
+        accessibilityLabel={removing ? `Xóa ${label}` : `Giảm ${label}`}
         haptic="selection"
-        hitSlop={4}
+        // Vùng chạm nới ra phía ngoài, không lấn sang ô số ở giữa.
+        hitSlop={MINUS_SLOP}
         scaleTo={0.85}
         style={[styles.stepBtn, { width: h, height: h }]}>
-        <Icon name={value <= 1 && min === 0 ? 'trash' : 'minus'} size={17} color={canMinus ? C.brand : C.faint} />
+        {removing ? (
+          <Icon name="trash" size={19} color={toneColors.danger.fg} strokeWidth={2.1} />
+        ) : (
+          <Icon name="minus" size={20} color={canMinus ? C.brand : C.faint} strokeWidth={2.4} />
+        )}
       </PressableScale>
-      <Txt variant="body" weight="semibold" numeric align="center" style={{ minWidth: 30 }}>
-        {qty(value)}
-      </Txt>
+      {editable ? (
+        <TextInput
+          ref={input}
+          value={shown}
+          onFocus={() => setText(decimalText(value))}
+          onBlur={() => setText(null)}
+          onChangeText={(t) => {
+            const clean = cleanQty(t);
+            setText(clean);
+            const n = parseQty(clean);
+            if (n > 0 && n >= min && (max === undefined || n <= max)) onChange(n);
+          }}
+          keyboardType="decimal-pad"
+          returnKeyType="done"
+          selectTextOnFocus
+          maxLength={9}
+          accessibilityLabel={`Số lượng ${label}`}
+          accessibilityHint="Bấm để nhập số lượng"
+          // Bề rộng theo số đang hiện: ô nhập không tự co theo chữ (web mặc định rất rộng).
+          style={[styles.qtyInput, { height: h - 8, width: Math.max(44, shown.length * 9 + 14) }]}
+        />
+      ) : (
+        <Txt variant="body" weight="semibold" numeric align="center" style={{ minWidth: 36 }}>
+          {qty(value)}
+        </Txt>
+      )}
       <PressableScale
-        onPress={() => onChange(max === undefined ? value + 1 : Math.min(max, value + 1))}
+        onPress={() => step(max === undefined ? value + 1 : Math.min(max, value + 1))}
         disabled={!canPlus}
         accessibilityLabel={`Tăng ${label}`}
         haptic="selection"
-        hitSlop={4}
+        hitSlop={PLUS_SLOP}
         scaleTo={0.85}
         style={[styles.stepBtn, { width: h, height: h }]}>
-        <Icon name="plus" size={17} color={canPlus ? C.brand : C.faint} />
+        <Icon name="plus" size={20} color={canPlus ? C.brand : C.faint} strokeWidth={2.4} />
       </PressableScale>
     </View>
   );
 }
+
+const MINUS_SLOP = { top: 4, bottom: 4, left: 4, right: 0 } as const;
+const PLUS_SLOP = { top: 4, bottom: 4, left: 0, right: 4 } as const;
 
 const styles = StyleSheet.create({
   search: {
@@ -180,4 +241,17 @@ const styles = StyleSheet.create({
     backgroundColor: C.brandSoft,
   },
   stepBtn: { alignItems: 'center', justifyContent: 'center' },
+  // Ô số gõ được: nền trắng để biết bấm vào sửa được.
+  qtyInput: {
+    minWidth: 44,
+    paddingHorizontal: 4,
+    paddingVertical: 0,
+    borderRadius: 8,
+    backgroundColor: C.card,
+    fontSize: 15,
+    fontFamily: fonts.semibold,
+    fontVariant: ['tabular-nums'],
+    color: C.text,
+    textAlign: 'center',
+  },
 });

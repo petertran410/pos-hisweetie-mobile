@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert, StyleSheet, TextInput, View } from 'react-native';
-import { money, parseQty, qty } from '@/core/format';
+import { decimalInput, decimalText, money, parseQty, qty } from '@/core/format';
 import { C, ChipGroup, Divider, fonts, Icon, PressableScale, QtyStepper, Txt } from '@/ui';
 import { Thumb } from '../sales/components';
 import { comboTotalsOf, defaultFormula, newKey, type FormFormula, type ProductForm } from './form';
@@ -78,13 +78,13 @@ export function ComboEditor({ form, perms, onChange, onAdd }: { form: ProductFor
 
 /** Ô nhập số lượng nguyên liệu (cho phép số lẻ). */
 function AmountInput({ value, onChange, label }: { value: number; onChange: (n: number) => void; label: string }) {
-  const [text, setText] = useState(value ? qty(value) : '');
-  const shown = parseQty(text) === value ? text : value ? qty(Math.round(value * 10000) / 10000) : '';
+  const [text, setText] = useState(decimalText(value));
+  const shown = parseQty(text) === value ? text : decimalText(value);
   return (
     <TextInput
       value={shown}
       onChangeText={(t) => {
-        const clean = t.replace(/[^\d,]/g, '').replace(/,(?=.*,)/g, '');
+        const clean = decimalInput(t);
         setText(clean);
         onChange(parseQty(clean));
       }}

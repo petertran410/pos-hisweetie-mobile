@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { StyleSheet, Switch, TextInput, View, type TextInputProps } from 'react-native';
-import { parseQty, qty } from '@/core/format';
+import { decimalInput, decimalText, parseQty, qty } from '@/core/format';
 import { C, fonts, Icon, PressableScale, radius, toneColors, Txt } from '@/ui';
 
 /** Thẻ nhóm trường trong form. */
@@ -97,8 +97,11 @@ export function NumRow({
   placeholder?: string;
   right?: ReactNode;
 }) {
-  const [text, setText] = useState(value ? qty(value) : '');
-  const shown = parseQty(text) === value ? text : value ? qty(value) : '';
+  const isDecimal = decimal && !money;
+  // Ô số lẻ không ngăn hàng nghìn khi gõ (dấu phẩy gõ vào là dấu thập phân).
+  const prefill = (n: number) => (isDecimal ? decimalText(n) : n ? qty(n) : '');
+  const [text, setText] = useState(prefill(value));
+  const shown = parseQty(text) === value ? text : prefill(value);
   return (
     <View style={styles.row}>
       <Txt variant="body" color={C.muted} style={{ flexShrink: 1 }}>
@@ -107,13 +110,13 @@ export function NumRow({
       <TextInput
         value={shown}
         onChangeText={(t) => {
-          const clean = decimal && !money ? t.replace(/[^\d,]/g, '').replace(/,(?=.*,)/g, '') : t.replace(/[^\d]/g, '');
+          const clean = isDecimal ? decimalInput(t) : t.replace(/[^\d]/g, '');
           const n = parseQty(clean);
-          setText(clean && !clean.endsWith(',') ? (decimal && !money ? clean : qty(n)) : clean);
+          setText(clean && !clean.endsWith('.') ? (isDecimal ? clean : qty(n)) : clean);
           onChange(n);
         }}
         editable={editable}
-        keyboardType={decimal && !money ? 'decimal-pad' : 'number-pad'}
+        keyboardType={isDecimal ? 'decimal-pad' : 'number-pad'}
         placeholder={placeholder}
         placeholderTextColor={C.faint}
         selectTextOnFocus

@@ -42,7 +42,10 @@ import {
 } from './api';
 import { toInvoiceEdit, toOrderEdit } from './editOrder';
 import { confirmReplaceEdit, startOrderEdit, useDocRoutes } from './editScope';
+import { customerPerms } from '../customers/model';
+import { useCustomerEditor } from '../customers/openEdit';
 import { canPrintDoc } from '../print/perms';
+import { CustomerActions } from '../sales/CheckoutScreen';
 import {
   INVOICE_STATUS,
   INVOICE_STEPS,
@@ -132,6 +135,10 @@ export interface OrderDetailViewProps {
   onOpenOrder?: (id: number) => void;
   /** Không có = không có quyền xem hóa đơn: không hiện link. */
   onOpenInvoice?: (id: number) => void;
+  /** Sửa hồ sơ khách của chứng từ (không có = không được sửa). */
+  onEditCustomer?: () => void;
+  /** Đang tải hồ sơ khách để mở form sửa. */
+  editingCustomer?: boolean;
   /** Thao tác đổi trạng thái / kết thúc / hủy. */
   actions?: {
     /** "Xử lý đơn hàng" / "Xử lý hóa đơn": mở màn sửa. */
@@ -148,7 +155,16 @@ export interface OrderDetailViewProps {
 }
 
 /** Chi tiết hóa đơn / đơn đặt hàng. */
-export function OrderDetailView({ doc, canPrint, onPrint, onOpenOrder, onOpenInvoice, actions }: OrderDetailViewProps) {
+export function OrderDetailView({
+  doc,
+  canPrint,
+  onPrint,
+  onOpenOrder,
+  onOpenInvoice,
+  onEditCustomer,
+  editingCustomer,
+  actions,
+}: OrderDetailViewProps) {
   const st = statusOf(doc.kind, doc.status);
   const cancelled = isCancelled(doc.kind, doc.status);
   const discountLabel = doc.discountRatio > 0 ? `Giảm giá (${qty(doc.discountRatio)}%)` : 'Giảm giá';
@@ -212,16 +228,24 @@ export function OrderDetailView({ doc, canPrint, onPrint, onOpenOrder, onOpenInv
 
       {doc.customer ? (
         <Section index={1} title="Khách hàng">
-          <Card style={styles.customer}>
-            <Avatar name={doc.customer.name} size={44} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <Txt variant="body" weight="semibold" numberOfLines={1}>
-                {doc.customer.name}
-              </Txt>
-              <Txt variant="caption" color={C.muted} numberOfLines={1}>
-                {[doc.customer.code, doc.customer.phone].filter(Boolean).join(' · ')}
-              </Txt>
+          <Card>
+            <View style={styles.customer}>
+              <Avatar name={doc.customer.name} size={44} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Txt variant="body" weight="semibold" numberOfLines={1}>
+                  {doc.customer.name}
+                </Txt>
+                <Txt variant="caption" color={C.muted} numberOfLines={1}>
+                  {[doc.customer.code, doc.customer.phone].filter(Boolean).join(' · ')}
+                </Txt>
+              </View>
             </View>
+            {onEditCustomer ? (
+              <>
+                <Divider />
+                <CustomerActions onEdit={onEditCustomer} editBusy={editingCustomer} />
+              </>
+            ) : null}
           </Card>
           {doc.delivery ? (
             <Card style={styles.delivery}>
@@ -416,6 +440,8 @@ export default function OrderDetailScreen() {
   const doc = useDocDetail(kind, id, canView);
   const routes = useDocRoutes();
   const [busy, setBusy] = useState(false);
+  const editor = useCustomerEditor();
+  const canEditCustomer = canDo(user, 'customers:view') && customerPerms(user).update;
   const isAdmin = isAdminRole(user);
   const invoicePerms = {
     update: canDo(user, 'invoices:update'),
@@ -636,6 +662,15 @@ export default function OrderDetailScreen() {
       onPrint={() => router.push({ pathname: routes.print, params: { kind, id: String(data.id), code: data.code } } as never)}
       onOpenOrder={canDo(user, 'orders:view') ? (orderId) => open('order', orderId) : undefined}
       onOpenInvoice={canDo(user, 'invoices:view') ? (invoiceId) => open('invoice', invoiceId) : undefined}
+      onEditCustomer={
+        canEditCustomer && data.customer?.id
+          ? () => {
+              const customerId = data.customer?.id;
+              if (customerId) void editor.open(customerId, () => void qc.invalidateQueries({ queryKey: ['doc'] }));
+            }
+          : undefined
+      }
+      editingCustomer={editor.busy}
       actions={actions}
     />
   );

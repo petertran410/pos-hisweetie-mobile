@@ -183,11 +183,25 @@ export function useParentSearch(search: string, excludeId: number | null) {
   });
 }
 
-/** Tra mã số thuế (dịch vụ công khai VietQR, không cần khóa). */
+/**
+ * Tra mã số thuế (dịch vụ công khai VietQR, không cần khóa) — giống web `lib/api/vietqr.ts`:
+ * không kiểm định dạng ở app, để VietQR quyết định. Không thấy → `null`;
+ * quá tải / lỗi mạng → throw Error có câu báo tiếng Việt.
+ */
 export async function lookupTaxCode(taxCode: string): Promise<{ name: string; address: string } | null> {
-  const res = await fetch(`https://api.vietqr.io/v2/business/${encodeURIComponent(taxCode.trim())}`);
-  if (!res.ok) return null;
-  const json = (await res.json()) as { code?: string; data?: { name?: string; address?: string } };
+  const failed = 'Chưa tra cứu được, kiểm tra mạng rồi thử lại';
+  let res: Response;
+  try {
+    res = await fetch(`https://api.vietqr.io/v2/business/${encodeURIComponent(taxCode)}`, {
+      headers: { Accept: 'application/json' },
+    });
+  } catch {
+    throw new Error(failed);
+  }
+  if (res.status === 429) throw new Error('Hệ thống tra cứu đang quá tải, thử lại sau ít phút');
+  if (!res.ok) throw new Error(failed);
+  const json = (await res.json().catch(() => null)) as { code?: string; data?: { name?: string; address?: string } } | null;
+  if (!json) throw new Error(failed);
   if (json.code !== '00' || !json.data?.name) return null;
   return { name: json.data.name, address: json.data.address ?? '' };
 }
@@ -198,7 +212,9 @@ export const createCustomer = (body: Record<string, unknown>) => http.post<RawCu
 
 export const updateCustomer = (id: number, body: Record<string, unknown>) => http.put<RawCustomer>(`/customers/${id}`, body);
 
-export const setCustomerActive = (id: number, isActive: boolean) => updateCustomer(id, { isActive });
+/** Ngừng hoạt động / kích hoạt — endpoint riêng, cần quyền customers:delete ("Ngừng hoạt động"). */
+export const setCustomerActive = (id: number, isActive: boolean) =>
+  http.patch<{ id: number; isActive: boolean }>(`/customers/${id}/status`, { isActive });
 
 export const saveCustomerNote = (id: number, comments: string) =>
   http.patch<{ id: number; comments: string | null }>(`/customers/${id}/comments`, { comments: comments.trim() });

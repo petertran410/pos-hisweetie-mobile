@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { money, qty } from '@/core/format';
-import { C, gradients, Icon, Pill, PressableScale, QtyStepper, radius, shadow, Txt } from '@/ui';
+import { C, gradients, Icon, Pill, PressableScale, QtyStepper, radius, shadow, toneColors, Txt } from '@/ui';
 import type { CartLine, SaleProduct } from './cart';
 import { mediaUri } from '@/core/config';
 
@@ -33,7 +33,27 @@ export function StockText({ onHand, unit }: { onHand?: number | null; unit?: str
   );
 }
 
-/** Một dòng hàng trong danh sách chọn: bấm + để thêm, đã có trong giỏ thì hiện − SL +. */
+/** Nút xóa tròn riêng bên trái ô số lượng (luôn hiện, không phụ thuộc số lượng). */
+function RemoveButton({ name, onPress }: { name: string; onPress: () => void }) {
+  return (
+    <PressableScale
+      onPress={onPress}
+      haptic="selection"
+      accessibilityLabel={`Xóa ${name}`}
+      hitSlop={4}
+      scaleTo={0.88}
+      style={styles.removeBtn}>
+      <Icon name="trash" size={19} color={toneColors.danger.fg} strokeWidth={2.1} />
+    </PressableScale>
+  );
+}
+
+/**
+ * Một dòng hàng trong danh sách chọn: bấm + để thêm, đã có trong giỏ thì hiện
+ * − SL +. Đã có trong giỏ và có `onEdit`: bấm vào hàng để sửa dòng đó (giá,
+ * giảm giá, ghi chú, xóa) thay vì cộng thêm 1. Có `onRemove`: nút xóa riêng
+ * bên trái ô số lượng (nút − dừng ở 1, giống dòng trong giỏ).
+ */
 export function ProductRow({
   product,
   price,
@@ -41,6 +61,8 @@ export function ProductRow({
   showStock,
   onAdd,
   onChangeQty,
+  onEdit,
+  onRemove,
 }: {
   product: SaleProduct;
   price: number;
@@ -48,10 +70,17 @@ export function ProductRow({
   showStock: boolean;
   onAdd: () => void;
   onChangeQty: (n: number) => void;
+  onEdit?: () => void;
+  onRemove?: () => void;
 }) {
+  const edit = inCart > 0 && onEdit ? onEdit : null;
   return (
     <View style={styles.product}>
-      <PressableScale onPress={onAdd} accessibilityLabel={`Thêm ${product.name}`} scaleTo={0.985} style={styles.productMain}>
+      <PressableScale
+        onPress={edit ?? onAdd}
+        accessibilityLabel={edit ? `Sửa ${product.name}` : `Thêm ${product.name}`}
+        scaleTo={0.985}
+        style={styles.productMain}>
         <Thumb uri={product.image} />
         <View style={{ flex: 1, gap: 2 }}>
           <Txt variant="body" weight="semibold" numberOfLines={2}>
@@ -62,6 +91,11 @@ export function ProductRow({
             {product.unit ? ` · ${product.unit}` : ''}
           </Txt>
           {showStock ? <StockText onHand={product.onHand} unit={product.unit} /> : null}
+          {edit ? (
+            <Txt variant="caption" weight="semibold" color={C.brand}>
+              Sửa
+            </Txt>
+          ) : null}
         </View>
       </PressableScale>
       <View style={{ alignItems: 'flex-end', gap: 8 }}>
@@ -69,10 +103,13 @@ export function ProductRow({
           {money(price)}
         </Txt>
         {inCart > 0 ? (
-          <QtyStepper value={inCart} onChange={onChangeQty} size="small" label={product.name} />
+          <View style={styles.lineQty}>
+            {onRemove ? <RemoveButton name={product.name} onPress={onRemove} /> : null}
+            <QtyStepper value={inCart} onChange={onChangeQty} min={onRemove ? 1 : 0} size="small" label={product.name} />
+          </View>
         ) : (
-          <PressableScale onPress={onAdd} haptic="selection" accessibilityLabel={`Thêm ${product.name}`} hitSlop={6} scaleTo={0.88} style={styles.addBtn}>
-            <Icon name="plus" size={18} color={C.white} strokeWidth={2.4} />
+          <PressableScale onPress={onAdd} haptic="selection" accessibilityLabel={`Thêm ${product.name}`} hitSlop={4} scaleTo={0.88} style={styles.addBtn}>
+            <Icon name="plus" size={20} color={C.white} strokeWidth={2.4} />
           </PressableScale>
         )}
       </View>
@@ -138,18 +175,23 @@ function lineTags(line: CartLine): { label: string; gift: boolean }[] {
   ].filter((t): t is { label: string; gift: boolean } => !!t);
 }
 
-/** Một dòng trong giỏ: tên, đơn giá × SL, thành tiền; bấm để sửa. `locked`: chỉ xem. */
+/**
+ * Một dòng trong giỏ: tên, đơn giá × SL, thành tiền; bấm để sửa. `locked`:
+ * chỉ xem. Có `onRemove`: nút xóa riêng bên trái ô số lượng.
+ */
 export function LineRow({
   line,
   total,
   onPress,
   onChangeQty,
+  onRemove,
   locked,
 }: {
   line: CartLine;
   total: number;
   onPress: () => void;
   onChangeQty: (n: number) => void;
+  onRemove?: () => void;
   locked?: boolean;
 }) {
   const net = line.price - line.discount;
@@ -205,7 +247,10 @@ export function LineRow({
             SL {qty(line.quantity)}
           </Txt>
         ) : (
-          <QtyStepper value={line.quantity} onChange={onChangeQty} min={1} size="small" label={line.product.name} />
+          <View style={styles.lineQty}>
+            {onRemove ? <RemoveButton name={line.product.name} onPress={onRemove} /> : null}
+            <QtyStepper value={line.quantity} onChange={onChangeQty} min={1} size="small" label={line.product.name} />
+          </View>
         )}
       </View>
     </View>
@@ -280,9 +325,9 @@ const styles = StyleSheet.create({
     borderColor: C.border,
   },
   addBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: C.brand,
     alignItems: 'center',
     justifyContent: 'center',
@@ -317,6 +362,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   line: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  // Nút xóa cách nút − 12pt để khó bấm nhầm.
+  lineQty: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  removeBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: toneColors.danger.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   strike: { textDecorationLine: 'line-through' },
   sum: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, minHeight: 40 },
 });

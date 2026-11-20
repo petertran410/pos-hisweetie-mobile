@@ -147,6 +147,25 @@ export function addressToDelivery(customer: SaleCustomer, address?: CustomerAddr
   };
 }
 
+/**
+ * Khách đang chọn vừa được sửa hồ sơ: thay thông tin khách trên đơn. Giao hàng
+ * vẫn đang lấy theo địa chỉ cũ của khách (người dùng chưa tự sửa) thì lấy lại
+ * theo địa chỉ mới, giữ ghi chú cho tài xế. Đơn đã đổi sang khách khác: bỏ qua.
+ */
+export function refreshedCustomer(
+  state: Pick<CartState, 'customer' | 'delivery'>,
+  customer: SaleCustomer,
+): Pick<CartState, 'customer' | 'delivery'> | null {
+  const prev = state.customer;
+  if (!prev || prev.id !== customer.id) return null;
+  const auto = addressToDelivery(prev);
+  const untouched = (Object.keys(auto) as (keyof Delivery)[]).every((k) => k === 'noteForDriver' || auto[k] === state.delivery[k]);
+  return {
+    customer,
+    delivery: untouched ? { ...addressToDelivery(customer), noteForDriver: state.delivery.noteForDriver } : state.delivery,
+  };
+}
+
 export function cartTotals(state: Pick<CartState, 'lines' | 'orderDiscount' | 'shippingFee'>) {
   const base = computeTotals(
     state.lines.map((l) => ({ price: l.price, quantity: l.quantity, discount: { type: 'amount', value: l.discount } })),
@@ -164,7 +183,11 @@ export interface CartActions {
   setQuantity: (rowId: string, quantity: number) => void;
   updateLine: (rowId: string, patch: Partial<Pick<CartLine, 'quantity' | 'price' | 'discount' | 'note'>>) => void;
   remove: (rowId: string) => void;
+  /** Bỏ mọi dòng của 1 sản phẩm (màn chọn hàng hiện tổng SL của sản phẩm). */
+  removeProduct: (productId: number) => void;
   setCustomer: (customer: SaleCustomer | null) => void;
+  /** Cập nhật thông tin khách vừa sửa hồ sơ (xem `refreshedCustomer`). */
+  refreshCustomer: (customer: SaleCustomer) => void;
   setDelivery: (patch: Partial<Delivery>) => void;
   setPriceBook: (id: number | null, name: string | null, prices?: Map<number, number>) => void;
   setOrderDiscount: (d: Discount) => void;
@@ -209,7 +232,12 @@ export const createCartStore = () =>
         }),
       }),
     remove: (rowId) => set({ lines: get().lines.filter((l) => l.rowId !== rowId) }),
+    removeProduct: (productId) => set({ lines: get().lines.filter((l) => l.product.id !== productId) }),
     setCustomer: (customer) => set({ customer, delivery: customer ? addressToDelivery(customer) : EMPTY_DELIVERY }),
+    refreshCustomer: (customer) => {
+      const next = refreshedCustomer(get(), customer);
+      if (next) set(next);
+    },
     setDelivery: (patch) => set({ delivery: { ...get().delivery, ...patch } }),
     setPriceBook: (id, name, prices) =>
       set({

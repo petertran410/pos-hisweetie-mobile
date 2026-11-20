@@ -10,25 +10,20 @@ import { FormCard, Note, PickRow, TextRow } from '../products/formParts';
 import { useCart } from '../sales/cart';
 import { toSaleCustomer } from '../sales/mappers';
 import { createCustomer, lookupTaxCode, updateCustomer, useSalePicId, useStaff } from './api';
-import { ADDRESS_PATH, patchCustomerDraft, setLoadedSalePic, startAddressDraft, useCustomerDraft } from './draft';
+import { patchCustomerDraft, setLoadedSalePic, startAddressDraft, useCustomerDraft } from './draft';
 import {
   buildCustomerCreate,
   buildCustomerUpdate,
   emptyAddress,
   isFormDirty,
-  isTaxCode,
   validateCustomerForm,
   type AddressForm,
   type CustomerForm,
 } from './form';
+import { useCustomerFormPaths } from './formPaths';
 import { addressLine, addressTitle, customerPerms, type CustomerPerms } from './model';
 
 export type FormPick = 'parent' | 'groups' | 'salePic';
-const PICK_PATH: Record<FormPick, string> = {
-  parent: '/khach-hang/chon-cha',
-  groups: '/khach-hang/chon-nhom',
-  salePic: '/khach-hang/chon-sale',
-};
 
 const TYPES: { value: '0' | '1'; label: string }[] = [
   { value: '0', label: 'Cá nhân' },
@@ -86,7 +81,6 @@ export function CustomerFormView(p: CustomerFormViewProps) {
   const company = form.type === 1;
   // Giống web: khách con không đổi khách cha; khách cha không thể thành khách con.
   const parentEditable = !p.hasChildren && !(p.editing && form.parent);
-  const canTaxLookup = isTaxCode(form.taxCode);
 
   return (
     <Page
@@ -210,12 +204,12 @@ export function CustomerFormView(p: CustomerFormViewProps) {
             p.onLookupTax ? (
               <PressableScale
                 onPress={p.onLookupTax}
-                disabled={!canTaxLookup || p.lookingUp}
+                disabled={p.lookingUp}
                 hitSlop={6}
                 scaleTo={0.94}
                 accessibilityRole="button"
                 accessibilityLabel="Tra cứu mã số thuế"
-                style={[styles.lookup, !canTaxLookup ? { opacity: 0.45 } : null]}>
+                style={styles.lookup}>
                 {p.lookingUp ? (
                   <ActivityIndicator size="small" color={C.brand} />
                 ) : (
@@ -278,6 +272,7 @@ export default function CustomerFormScreen() {
   const baseline = useCustomerDraft((s) => s.baseline);
   const customerId = useCustomerDraft((s) => s.customerId);
   const origin = useCustomerDraft((s) => s.origin);
+  const paths = useCustomerFormPaths();
   const user = useSession((s) => s.user);
   const branchId = useSession((s) => s.branchId);
   const perms = customerPerms(user);
@@ -342,21 +337,28 @@ export default function CustomerFormScreen() {
   }
 
   const lookupTax = async () => {
+    // Giống web: nút luôn bấm được, kiểm khi bấm. Bỏ khoảng trắng (dán "0101 234 567").
+    const code = form.taxCode.replace(/\s+/g, '');
+    if (!code) {
+      toast.error('Nhập mã số thuế trước khi tra cứu');
+      return;
+    }
     setLookingUp(true);
     try {
-      const hit = await lookupTaxCode(form.taxCode);
+      const hit = await lookupTaxCode(code);
       if (!hit) {
-        toast.error('Không tìm thấy mã số thuế này');
+        toast.error('Không tìm thấy thông tin mã số thuế này');
         return;
       }
       patchCustomerDraft((f) => ({
+        taxCode: code,
         ...(f.type === 1 ? { organization: hit.name } : { invoiceBuyerName: hit.name }),
         invoiceAddress: hit.address || f.invoiceAddress,
         name: f.name.trim() ? f.name : hit.name,
       }));
       toast.success('Đã điền theo mã số thuế');
-    } catch {
-      toast.error('Chưa tra cứu được, kiểm tra mạng rồi thử lại');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Chưa tra cứu được, kiểm tra mạng rồi thử lại');
     } finally {
       setLookingUp(false);
     }
@@ -376,7 +378,13 @@ export default function CustomerFormScreen() {
         const body = buildCustomerUpdate(form, baseline, { assignSalePic: perms.assignSalePic });
         if (Object.keys(body).length) await updateCustomer(editId, body);
         toast.success(`Đã lưu ${form.name.trim()}`);
-        await Promise.all([qc.invalidateQueries({ queryKey: ['customer'] }), qc.invalidateQueries({ queryKey: ['customers'] })]);
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: ['customer'] }),
+          qc.invalidateQueries({ queryKey: ['customers'] }),
+          qc.invalidateQueries({ queryKey: ['sales', 'customers'] }),
+        ]);
+        // Mở từ giỏ hàng / xử lý đơn / chi tiết đơn: để màn đó cập nhật khách.
+        useCustomerDraft.getState().onSaved?.();
         setExit({ go: () => router.back() });
       } else {
         const created = await createCustomer(buildCustomerCreate(form, { branchId, assignSalePic: perms.assignSalePic }));
@@ -413,10 +421,10 @@ export default function CustomerFormScreen() {
       perms={perms}
       hasChildren={hasChildren}
       onChange={patchCustomerDraft}
-      onPick={(t) => router.push(PICK_PATH[t] as never)}
+      onPick={(t) => router.push(paths[t] as never)}
       onAddress={(a) => {
         startAddressDraft(a ?? emptyAddress(form.addresses.length === 0, form.name.trim(), form.contactNumber.trim()));
-        router.push(ADDRESS_PATH as never);
+        router.push(paths.address as never);
       }}
       onLookupTax={() => void lookupTax()}
       lookingUp={lookingUp}

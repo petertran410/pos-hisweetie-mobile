@@ -617,7 +617,7 @@ export default function CustomerDetailScreen() {
           ? () => router.push({ pathname: '/khach-hang/thu-no/[id]', params: { id: String(id) } } as never)
           : undefined
       }
-      onToggleActive={perms.update ? toggleActive : undefined}
+      onToggleActive={perms.changeStatus ? toggleActive : undefined}
       busy={busy}
       refreshing={refreshing}
       onRefresh={() => {
