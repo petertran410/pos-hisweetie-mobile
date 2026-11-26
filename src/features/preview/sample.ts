@@ -9,7 +9,7 @@ import type { SalePerms } from '../sales/perms';
 import { toInvoiceEdit, toOrderEdit, type RawOrderForEdit } from '../orders/editOrder';
 import { toInvoiceDraft, type InvoiceDraft } from '../orders/fromOrder';
 import { toStockMove, type RawProduct, type StockMove } from '../products/model';
-import { toDebtEntry, type DebtEntry, type RawCustomer, type UnpaidInvoice } from '../customers/model';
+import { toDebtEntry, type DebtEntry, type RawCustomer, type ReturnRow, type UnpaidInvoice } from '../customers/model';
 import { toPackDetail, toPackRow, type PackRow, type RawPacking } from '../packing/model';
 
 export const sampleUser = {
@@ -285,9 +285,9 @@ export const sampleDocDetail: DocDetail = {
   delivery: { receiver: 'Chị Gió', phone: '0900 000 333', address: '9 Đường Thử, Phường Thử, TP. Mẫu', note: 'Gọi trước khi giao' },
   note: 'Giao buổi sáng',
   lines: [
-    { key: '1', code: 'SP001', name: 'Trà đen mẫu 1kg', unit: 'Gói', quantity: 3, price: 185_000, discount: 15_000, total: 510_000, note: null, gift: false, condition: 'normal', invoicedQty: 2 },
-    { key: '2', code: 'SP002', name: 'Siro đào mẫu 2,5L', unit: 'Chai', quantity: 3, price: 96_000, discount: 0, total: 288_000, note: 'Giao chai mới', gift: false, condition: 'near_expiry', invoicedQty: 0 },
-    { key: '3', code: 'SP009', name: 'Ly nhựa mẫu (quà tặng)', unit: 'Cây', quantity: 1, price: 0, discount: 0, total: 0, note: null, gift: true, condition: 'normal', invoicedQty: 0 },
+    { key: '1', productId: 1, code: 'SP001', name: 'Trà đen mẫu 1kg', unit: 'Gói', quantity: 3, price: 185_000, discount: 15_000, total: 510_000, note: null, gift: false, condition: 'normal', invoicedQty: 2 },
+    { key: '2', productId: 2, code: 'SP002', name: 'Siro đào mẫu 2,5L', unit: 'Chai', quantity: 3, price: 96_000, discount: 0, total: 288_000, note: 'Giao chai mới', gift: false, condition: 'near_expiry', invoicedQty: 0 },
+    { key: '3', productId: 9, code: 'SP009', name: 'Ly nhựa mẫu (quà tặng)', unit: 'Cây', quantity: 1, price: 0, discount: 0, total: 0, note: null, gift: true, condition: 'normal', invoicedQty: 0 },
   ],
   totalAmount: 798_000,
   discount: 0,
@@ -528,6 +528,12 @@ export const sampleStockMoves: StockMove[] = [
   { id: 4, transactionType: 'TRANSFER_OUT', refType: 'transfer', refId: 7, refCode: 'CH000007', partnerName: 'Chi nhánh mẫu B', quantity: '-10', tonCuoi: '5', costPrice: '120000', transactionDate: '2026-10-25T10:00:00.000Z' },
 ].map((r) => toStockMove(r));
 
+/** Phiếu trả hàng mẫu (gộp vào tab Hóa đơn của chi tiết khách). */
+export const sampleReturnRows: ReturnRow[] = [
+  { id: 1, code: 'TH000012', date: ago(0, 9, 30), status: 4, amount: 185_000, creatorName: 'Nguyễn Thị Lan', invoiceCode: 'HD000128' },
+  { id: 2, code: 'TH000011', date: ago(3, 15, 10), status: 5, amount: 90_000, creatorName: 'Trần Văn Nam', invoiceCode: 'HD000120' },
+];
+
 /** Khách mẫu dạng dữ liệu API (danh sách, chi tiết, form). */
 export const sampleRawCustomers: RawCustomer[] = [
   {
@@ -551,6 +557,7 @@ export const sampleRawCustomers: RawCustomer[] = [
     invoiceAddress: '25 Đường Mẫu',
     invoiceEmail: 'hoadon@example.com',
     branch: { id: 1, name: 'Chi nhánh mẫu 1' },
+    debtPolicy: { isActive: true, debtForm: 'TRUST', debtRuleType: 'CREDIT_LIMIT', creditLimit: '20000000', requireFullPaymentForInvoice: false },
     addresses: [
       { id: 1, label: 'Quán chính', receiver: 'Chị Mây', contactNumber: '0900 000 111', address: '25 Đường Mẫu', newWardName: 'Phường Mẫu', newCityName: 'Thành phố Mẫu', newCityCode: '79', newWardCode: '26734', isDefault: true },
       { id: 2, label: 'Kho', receiver: 'Anh Nam', contactNumber: '0900 000 222', address: '9 Đường Thử', wardName: 'Phường 3', districtName: 'Quận Thử', cityName: 'TP. Mẫu', cityCode: '79' },

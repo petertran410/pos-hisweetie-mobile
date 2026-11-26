@@ -15,9 +15,9 @@ export const useOrderEditMeta = create<{ meta: OrderEditMeta | null }>(() => ({ 
  * Nơi chứa các màn chứng từ (chi tiết, xử lý đơn, tạo hóa đơn, in phiếu):
  * tab Đơn hàng, tab Khách hàng (mở từ lịch sử của khách) và mục Hàng hóa (mở
  * từ thẻ kho) đều có đủ các màn này, để thao tác xong bấm quay lại vẫn về đúng
- * chỗ đã mở.
+ * chỗ đã mở. `/xem-khach`: chi tiết khách mở từ giỏ hàng (phủ lên giỏ).
  */
-export type DocBase = '/don-hang' | '/khach-hang' | '/hang-hoa' | '/bao-don';
+export type DocBase = '/don-hang' | '/khach-hang' | '/hang-hoa' | '/bao-don' | '/xem-khach';
 
 function makeScope(base: DocBase): SaleScope {
   return {
@@ -31,6 +31,7 @@ function makeScope(base: DocBase): SaleScope {
       discount: `${base}/xu-ly/giam-gia`,
       priceBook: `${base}/xu-ly/bang-gia`,
       scan: `${base}/xu-ly/quet-ma`,
+      product: `${base}/xu-ly/san-pham/[id]`,
     },
   };
 }
@@ -41,6 +42,7 @@ const SCOPES: Record<DocBase, SaleScope> = {
   '/khach-hang': makeScope('/khach-hang'),
   '/hang-hoa': makeScope('/hang-hoa'),
   '/bao-don': makeScope('/bao-don'),
+  '/xem-khach': makeScope('/xem-khach'),
 };
 
 const DocBaseContext = createContext<DocBase>('/don-hang');

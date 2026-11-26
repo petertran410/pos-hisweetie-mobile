@@ -7,6 +7,7 @@ import { money, vnd } from '@/core/format';
 import { errorMessage } from '@/core/http';
 import { useSession } from '@/core/session';
 import { customerPerms } from '@/features/customers/model';
+import { customerViewHref } from '@/features/customers/formPaths';
 import { useCustomerEditor } from '@/features/customers/openEdit';
 import {
   addOrderPayment,
@@ -72,6 +73,8 @@ export interface OrderEditViewProps {
   onSave: () => void;
   onInvoice: () => void;
   onOpenCustomer: () => void;
+  /** Xem chi tiết khách của đơn (không có = thẻ khách không mở chi tiết). */
+  onViewCustomer?: () => void;
   /** Sửa hồ sơ khách của đơn (không có = không được sửa). */
   onEditCustomer?: () => void;
   /** Đang tải hồ sơ khách để mở form sửa. */
@@ -238,6 +241,7 @@ export function OrderEditView(p: OrderEditViewProps) {
         <CustomerCard
           perms={p.perms}
           onPress={locked ? undefined : p.onOpenCustomer}
+          onView={p.onViewCustomer}
           onEdit={p.onEditCustomer}
           editBusy={p.editingCustomer}
         />
@@ -621,6 +625,14 @@ function OrderEditScreen() {
       onSave={onSave}
       onInvoice={onInvoice}
       onOpenCustomer={() => router.push(paths.customer as never)}
+      onViewCustomer={
+        perms.customers && cart.customer
+          ? () => {
+              const id = store.getState().customer?.id;
+              if (id) router.push(customerViewHref(id, 'edit') as never);
+            }
+          : undefined
+      }
       onEditCustomer={
         canEditCustomer && cart.customer
           ? () => {

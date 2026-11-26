@@ -30,22 +30,34 @@ import {
   Txt,
 } from '@/ui';
 import type { DocRow } from '../orders/api';
+import { useDocRoutes } from '../orders/editScope';
 import { KIND_SLUG, type DocKind } from '../orders/model';
 import { KV } from '../products/components';
-import { saveCustomerNote, setCustomerActive, updateCustomer, useCustomerDetail, useCustomerDocs, useDebtTimeline } from './api';
-import { DebtRow, HistoryCard } from './components';
-import { ADDRESS_PATH, EDIT_CUSTOMER_PATH, startAddressDraft, startCustomerDraft } from './draft';
+import {
+  saveCustomerNote,
+  setCustomerActive,
+  updateCustomer,
+  useCustomerDetail,
+  useCustomerDocs,
+  useCustomerReturns,
+  useDebtTimeline,
+} from './api';
+import { DebtRow, HistoryCard, ReturnCard } from './components';
+import { startAddressDraft, startCustomerDraft } from './draft';
 import { emptyAddress, removeAddress, setDefaultAddress, toAddressForm, toAddressPayload, toCustomerForm, type AddressForm } from './form';
+import { customerDetailPaths, useCustomerFormBase, useCustomerFormPaths } from './formPaths';
 import {
   addressLine,
   addressTitle,
   customerPerms,
+  mergeHistory,
   oldAddressLine,
   toCustomerDetail,
   type CustomerDetail,
   type CustomerPerms,
   type DebtEntry,
   type RawAddress,
+  type ReturnRow,
 } from './model';
 
 export type CustomerTab = 'info' | 'address' | 'invoice' | 'order' | 'debt' | 'children';
@@ -65,6 +77,11 @@ export interface DocList {
   onRetry: () => void;
 }
 
+/** Phiếu trả hàng của khách (gộp vào tab Hóa đơn). */
+export interface ReturnList extends Omit<DocList, 'rows'> {
+  rows: ReturnRow[];
+}
+
 /** Ô số liệu (lưới 2 cột ở đầu trang). */
 function Stat({ label, value, danger }: { label: string; value: string; danger?: boolean }) {
   return (
@@ -81,10 +98,13 @@ function Stat({ label, value, danger }: { label: string; value: string; danger?:
 
 function InfoTab({
   d,
+  showDebt,
   onSaveNote,
   savingNote,
 }: {
   d: CustomerDetail;
+  /** Có quyền xem công nợ: hiện chính sách công nợ. */
+  showDebt: boolean;
   onSaveNote?: (note: string) => void;
   savingNote?: boolean;
 }) {
@@ -99,6 +119,16 @@ function InfoTab({
         {d.phone2 ? <KV label="Điện thoại 2" value={d.phone2} /> : null}
         <KV label="Email" value={d.email ?? '—'} tone={d.email ? undefined : 'muted'} />
         <KV label="Nhóm khách" value={d.groups.map((g) => g.name).join(', ') || 'Chưa có'} tone={d.groups.length ? undefined : 'muted'} />
+        {showDebt ? (
+          <>
+            <KV label="Hình thức công nợ" value={d.debtForm ?? 'Chưa chọn'} tone={d.debtForm ? undefined : 'muted'} />
+            <KV
+              label="Quy tắc công nợ"
+              value={[d.debtRule.label, d.debtRule.detail].filter(Boolean).join(' · ')}
+              tone={d.debtRule.unset ? 'muted' : undefined}
+            />
+          </>
+        ) : null}
         {d.branchName ? <KV label="Chi nhánh tạo" value={d.branchName} /> : null}
         <KV label="Ngày tạo" value={dateVN(d.createdAt) || '—'} />
         {d.totalInvoiced > 0 ? <KV label="Tổng tiền hóa đơn" value={money(d.totalInvoiced)} /> : null}
@@ -184,33 +214,58 @@ function AddressCard({ a, index, onPress }: { a: RawAddress; index: number; onPr
 function DocListView({
   kind,
   data,
+  returns,
   showDebt,
   onOpen,
 }: {
   kind: DocKind;
   data: DocList;
+  /** Có = gộp phiếu trả hàng vào danh sách theo ngày (tab Hóa đơn). */
+  returns?: ReturnList;
   showDebt: boolean;
   onOpen?: (id: number) => void;
 }) {
   const what = kind === 'invoice' ? 'hóa đơn' : 'đơn đặt hàng';
-  if (data.loading) return <LoadingState />;
-  if (data.error) return <ErrorState error={data.error} onRetry={data.onRetry} />;
-  if (!data.rows.length) {
-    return <EmptyState icon={kind === 'invoice' ? 'receipt-text' : 'clipboard-list'} color="slate" title={`Chưa có ${what}`} message={`Khách này chưa có ${what} nào.`} />;
+  if (data.loading || returns?.loading) return <LoadingState />;
+  const error = data.error ?? returns?.error;
+  if (error) {
+    return (
+      <ErrorState
+        error={error}
+        onRetry={() => {
+          if (data.error) data.onRetry();
+          if (returns?.error) returns.onRetry();
+        }}
+      />
+    );
   }
+  const merged = returns
+    ? mergeHistory(data, returns)
+    : { items: data.rows.map((row) => ({ kind: 'invoice' as const, row })), next: data.hasMore ? ('invoice' as const) : null };
+  if (!merged.items.length) {
+    const title = returns ? `Chưa có ${what} hoặc phiếu trả hàng` : `Chưa có ${what}`;
+    return <EmptyState icon={kind === 'invoice' ? 'receipt-text' : 'clipboard-list'} color="slate" title={title} message={`Khách này chưa có ${returns ? 'giao dịch' : what} nào.`} />;
+  }
+  const counts = [
+    data.total !== undefined ? `${money(data.total)} ${what}` : null,
+    returns?.total !== undefined ? `${money(returns.total)} phiếu trả hàng` : null,
+  ].filter(Boolean);
+  const more = merged.next === 'return' ? returns : merged.next === 'invoice' ? data : null;
   return (
     <View style={{ gap: 8 }}>
-      {data.total !== undefined ? (
+      {counts.length ? (
         <Txt variant="label" color={C.muted} numeric>
-          {money(data.total)} {what}
+          {counts.join(' · ')}
         </Txt>
       ) : null}
-      {data.rows.map((r) => (
-        <HistoryCard key={r.id} kind={kind} row={r} showDebt={showDebt} onPress={onOpen ? () => onOpen(r.id) : undefined} />
-      ))}
-      {data.hasMore ? (
-        <Button title="Xem thêm" variant="outline" size="medium" loading={data.loadingMore} onPress={data.onMore} />
-      ) : null}
+      {merged.items.map((it) =>
+        it.kind === 'invoice' ? (
+          <HistoryCard key={`d-${it.row.id}`} kind={kind} row={it.row} showDebt={showDebt} onPress={onOpen ? () => onOpen(it.row.id) : undefined} />
+        ) : (
+          <ReturnCard key={`r-${it.row.id}`} row={it.row} />
+        ),
+      )}
+      {more ? <Button title="Xem thêm" variant="outline" size="medium" loading={more.loadingMore} onPress={more.onMore} /> : null}
     </View>
   );
 }
@@ -291,6 +346,8 @@ export interface CustomerDetailViewProps {
   tab: CustomerTab;
   onTab: (t: CustomerTab) => void;
   invoices: DocList;
+  /** Phiếu trả hàng gộp vào tab Hóa đơn (không có = không có quyền xem trả hàng). */
+  returns?: ReturnList;
   orders: DocList;
   debt: { entries?: DebtEntry[]; loading: boolean; error?: unknown; onRetry: () => void; withChildren: boolean; onWithChildren: (v: boolean) => void };
   onEdit?: () => void;
@@ -313,7 +370,7 @@ export function CustomerDetailView(p: CustomerDetailViewProps) {
   const tabs = [
     { value: 'info' as const, label: 'Thông tin' },
     { value: 'address' as const, label: `Địa chỉ (${d.addresses.length})` },
-    ...(perms.viewInvoices ? [{ value: 'invoice' as const, label: 'Hóa đơn' }] : []),
+    ...(perms.viewInvoices || perms.viewReturns ? [{ value: 'invoice' as const, label: 'Hóa đơn' }] : []),
     ...(perms.viewOrders ? [{ value: 'order' as const, label: 'Đặt hàng' }] : []),
     ...(perms.viewDebt ? [{ value: 'debt' as const, label: 'Công nợ' }] : []),
     ...(d.children.length ? [{ value: 'children' as const, label: `Khách con (${d.children.length})` }] : []),
@@ -381,7 +438,7 @@ export function CustomerDetailView(p: CustomerDetailViewProps) {
         <ChipGroup options={tabs} value={tab} onChange={p.onTab} />
         <TabPanel value={tab} order={TAB_ORDER}>
           {tab === 'info' ? (
-            <InfoTab d={d} onSaveNote={p.onSaveNote} savingNote={p.savingNote} />
+            <InfoTab d={d} showDebt={perms.viewDebt} onSaveNote={p.onSaveNote} savingNote={p.savingNote} />
           ) : tab === 'address' ? (
             <View style={{ gap: 10 }}>
               {d.addresses.length ? (
@@ -394,7 +451,7 @@ export function CustomerDetailView(p: CustomerDetailViewProps) {
               {p.onAddAddress ? <Button title="Thêm địa chỉ" icon="plus" variant="outline" size="medium" onPress={p.onAddAddress} /> : null}
             </View>
           ) : tab === 'invoice' ? (
-            <DocListView kind="invoice" data={p.invoices} showDebt={perms.viewDebt} onOpen={openInvoice} />
+            <DocListView kind="invoice" data={p.invoices} returns={p.returns} showDebt={perms.viewDebt} onOpen={openInvoice} />
           ) : tab === 'order' ? (
             <DocListView kind="order" data={p.orders} showDebt={false} onOpen={p.onOpenDoc ? (id) => p.onOpenDoc?.('order', id) : undefined} />
           ) : tab === 'debt' ? (
@@ -470,8 +527,13 @@ export default function CustomerDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const invoices = useCustomerDocs('invoice', id, tab === 'invoice' && perms.viewInvoices);
   const orders = useCustomerDocs('order', id, tab === 'order' && perms.viewOrders);
+  const returns = useCustomerReturns(id, tab === 'invoice' && perms.viewReturns);
   const hasChildren = !!detail.data?.children?.length;
   const debt = useDebtTimeline(id, withChildren && hasChildren, tab === 'debt' && perms.viewDebt);
+  // Đường dẫn theo ngăn đang chứa màn này (tab Khách hàng hoặc phủ lên giỏ hàng).
+  const paths = customerDetailPaths(useCustomerFormBase());
+  const addressPath = useCustomerFormPaths().address;
+  const docPath = useDocRoutes().detail;
 
   if (detail.isLoading || !detail.data) {
     return (
@@ -496,6 +558,17 @@ export default function CustomerDetailScreen() {
     onMore: () => void q.fetchNextPage(),
     onRetry: () => void q.refetch(),
   });
+
+  const returnList: ReturnList = {
+    rows: returns.data?.pages.flatMap((pg) => pg.rows) ?? [],
+    total: returns.data?.pages[0]?.total,
+    loading: returns.isLoading,
+    error: returns.isError ? returns.error : undefined,
+    hasMore: !!returns.hasNextPage,
+    loadingMore: returns.isFetchingNextPage,
+    onMore: () => void returns.fetchNextPage(),
+    onRetry: () => void returns.refetch(),
+  };
 
   const addressForms = (): AddressForm[] => d.addresses.map(toAddressForm);
 
@@ -522,7 +595,7 @@ export default function CustomerDetailScreen() {
     pickFromSheet(addressTitle(a, index), items, null, (v) => {
       if (v === 'edit') {
         startAddressDraft(a, { customerId: id, list });
-        router.push(ADDRESS_PATH as never);
+        router.push(addressPath as never);
       } else if (v === 'default') {
         saveAddresses(setDefaultAddress(list, a.key), 'Đã đổi địa chỉ mặc định');
       } else {
@@ -566,6 +639,7 @@ export default function CustomerDetailScreen() {
       tab={tab}
       onTab={setTab}
       invoices={docList(invoices)}
+      returns={perms.viewReturns ? returnList : undefined}
       orders={docList(orders)}
       debt={{
         entries: debt.data,
@@ -579,7 +653,7 @@ export default function CustomerDetailScreen() {
         perms.update
           ? () => {
               startCustomerDraft(toCustomerForm(raw), id);
-              router.push({ pathname: EDIT_CUSTOMER_PATH, params: { id: String(id) } } as never);
+              router.push({ pathname: paths.edit, params: { id: String(id) } } as never);
             }
           : undefined
       }
@@ -603,18 +677,18 @@ export default function CustomerDetailScreen() {
           ? () => {
               const list = addressForms();
               startAddressDraft(emptyAddress(list.length === 0, d.name, d.phone1 ?? ''), { customerId: id, list });
-              router.push(ADDRESS_PATH as never);
+              router.push(addressPath as never);
             }
           : undefined
       }
       onAddressPress={perms.update ? onAddressPress : undefined}
       onOpenDoc={(kind, docId) =>
-        router.push({ pathname: '/khach-hang/chung-tu/[kind]/[id]', params: { kind: KIND_SLUG[kind], id: String(docId) } } as never)
+        router.push({ pathname: docPath, params: { kind: KIND_SLUG[kind], id: String(docId) } } as never)
       }
-      onOpenCustomer={(cid) => router.push({ pathname: '/khach-hang/[id]', params: { id: String(cid) } } as never)}
+      onOpenCustomer={(cid) => router.push({ pathname: paths.detail, params: { id: String(cid) } } as never)}
       onCollect={
         perms.collect && perms.viewDebt && d.isActive
-          ? () => router.push({ pathname: '/khach-hang/thu-no/[id]', params: { id: String(id) } } as never)
+          ? () => router.push({ pathname: paths.collect, params: { id: String(id) } } as never)
           : undefined
       }
       onToggleActive={perms.changeStatus ? toggleActive : undefined}
@@ -624,7 +698,8 @@ export default function CustomerDetailScreen() {
         setRefreshing(true);
         void Promise.all([
           detail.refetch(),
-          tab === 'invoice' ? invoices.refetch() : null,
+          tab === 'invoice' && perms.viewInvoices ? invoices.refetch() : null,
+          tab === 'invoice' && perms.viewReturns ? returns.refetch() : null,
           tab === 'order' ? orders.refetch() : null,
           tab === 'debt' ? debt.refetch() : null,
         ]).finally(() => setRefreshing(false));

@@ -82,6 +82,7 @@ import TrendingDown from 'lucide-react-native/icons/trending-down';
 import TrendingUp from 'lucide-react-native/icons/trending-up';
 import TriangleAlert from 'lucide-react-native/icons/triangle-alert';
 import Truck from 'lucide-react-native/icons/truck';
+import Undo2 from 'lucide-react-native/icons/undo-2';
 import User from 'lucide-react-native/icons/user';
 import UserPlus from 'lucide-react-native/icons/user-plus';
 import Users from 'lucide-react-native/icons/users';
@@ -176,6 +177,7 @@ const ICONS = {
   'trending-up': TrendingUp,
   'triangle-alert': TriangleAlert,
   truck: Truck,
+  'undo-2': Undo2,
   user: User,
   'user-plus': UserPlus,
   users: Users,

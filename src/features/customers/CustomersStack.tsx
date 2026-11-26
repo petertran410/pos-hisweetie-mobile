@@ -37,6 +37,7 @@ export function CustomersStack() {
         <Stack.Screen name="xu-ly/them-hang" />
         <Stack.Screen name="xu-ly/khach-hang" options={sheet} />
         <Stack.Screen name="xu-ly/dong/[rowId]" options={sheet} />
+        <Stack.Screen name="xu-ly/san-pham/[id]" options={sheet} />
         <Stack.Screen name="xu-ly/giao-hang" options={sheet} />
         <Stack.Screen name="xu-ly/giam-gia" options={sheet} />
         <Stack.Screen name="xu-ly/bang-gia" options={sheet} />

@@ -31,6 +31,7 @@ import {
 } from '@/ui';
 import { startCustomerDraft } from '../customers/draft';
 import { newCustomerForm } from '../customers/form';
+import { customerViewHref } from '../customers/formPaths';
 import { customerPerms } from '../customers/model';
 import { useCustomerEditor } from '../customers/openEdit';
 import {
@@ -83,6 +84,8 @@ export interface CheckoutViewProps {
   submitting?: boolean;
   onSubmit: () => void;
   onOpenCustomer: () => void;
+  /** Xem chi tiết khách đang chọn (không có = thẻ khách không mở chi tiết). */
+  onViewCustomer?: () => void;
   onCreateCustomer?: () => void;
   /** Sửa hồ sơ khách đang chọn (không có = không được sửa). */
   onEditCustomer?: () => void;
@@ -132,16 +135,19 @@ export function CustomerActions({ onEdit, onChange, editBusy }: { onEdit?: () =>
 
 /**
  * Khách của giỏ đang mở; không truyền `onPress` thì không cho đổi khách.
- * Có `onEdit` (được sửa hồ sơ khách): thẻ có hàng nút Sửa thông tin / Đổi khách.
+ * Có `onView`: bấm vào tên khách mở chi tiết khách. Có `onEdit` hoặc `onView`:
+ * thẻ có hàng nút Sửa thông tin (khi được sửa) / Đổi khách bên dưới.
  */
 export function CustomerCard({
   perms,
   onPress,
+  onView,
   onEdit,
   editBusy,
 }: {
   perms: SalePerms;
   onPress?: () => void;
+  onView?: () => void;
   onEdit?: () => void;
   editBusy?: boolean;
 }) {
@@ -183,12 +189,28 @@ export function CustomerCard({
       </View>
     </>
   );
-  if (onEdit) {
+  if (onEdit || onView) {
     return (
       <Card>
-        <View style={styles.customer}>{info}</View>
-        <Divider />
-        <CustomerActions onEdit={onEdit} onChange={onPress} editBusy={editBusy} />
+        {onView ? (
+          <PressableScale
+            onPress={onView}
+            accessibilityRole="button"
+            accessibilityLabel={`Khách hàng ${customer.name}. Bấm để xem chi tiết`}
+            scaleTo={0.98}
+            style={styles.customer}>
+            {info}
+            <Icon name="chevron-right" size={18} color={C.faint} />
+          </PressableScale>
+        ) : (
+          <View style={styles.customer}>{info}</View>
+        )}
+        {onEdit || onPress ? (
+          <>
+            <Divider />
+            <CustomerActions onEdit={onEdit} onChange={onPress} editBusy={editBusy} />
+          </>
+        ) : null}
       </Card>
     );
   }
@@ -374,7 +396,13 @@ export function CheckoutView(p: CheckoutViewProps) {
         title="Khách hàng"
         actionLabel={p.onCreateCustomer ? 'Tạo khách' : undefined}
         onAction={p.onCreateCustomer}>
-        <CustomerCard perms={p.perms} onPress={p.onOpenCustomer} onEdit={p.onEditCustomer} editBusy={p.editingCustomer} />
+        <CustomerCard
+          perms={p.perms}
+          onPress={p.onOpenCustomer}
+          onView={p.onViewCustomer}
+          onEdit={p.onEditCustomer}
+          editBusy={p.editingCustomer}
+        />
       </Section>
 
       {cart.lines.length === 0 ? (
@@ -578,6 +606,11 @@ export default function CheckoutScreen() {
       submitting={busy}
       onSubmit={() => void submit()}
       onOpenCustomer={() => router.push('/ban-hang/khach-hang')}
+      onViewCustomer={
+        perms.customers && customer
+          ? () => router.push(customerViewHref(customer.id) as never)
+          : undefined
+      }
       onCreateCustomer={
         canCreateCustomer
           ? () => {

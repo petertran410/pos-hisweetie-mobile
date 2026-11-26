@@ -41,7 +41,8 @@ export function toSaleProduct(p: RawProduct, branchId: number | null): SaleProdu
     unit: p.unit ?? null,
     basePrice: num(p.basePrice),
     conversionValue: conv > 1 ? conv : null,
-    image: p.images?.[0]?.image ?? null,
+    // Ảnh đầu tiên có link (ảnh đầu danh sách có thể trống).
+    image: p.images?.find((i) => !!i.image)?.image ?? null,
     onHand: inv ? num(inv.onHand) : null,
     weightGrams: toGrams(p.shippingWeight, p.shippingWeightUnit ?? 'g') ?? toGrams(p.weight, p.weightUnit ?? 'kg'),
   };
@@ -77,5 +78,37 @@ export function toSaleCustomer(c: RawCustomer): SaleCustomer {
       id: a.id ?? -(index + 1),
       isDefault: isDefault ?? undefined,
     })),
+  };
+}
+
+/** 1 lần khách mua món hàng (lịch sử giá trong màn Sửa hàng). */
+export interface RawPriceHistory {
+  code?: string | null;
+  date?: string | null;
+  price?: number | string | null;
+  discount?: number | string | null;
+  quantity?: number | string | null;
+  finalPrice?: number | string | null;
+}
+
+export interface PriceHistoryRow {
+  code: string;
+  date: string | null;
+  /** Giá bán sau giảm. */
+  finalPrice: number;
+  /** Giảm trên mỗi đơn vị (0 = không giảm). */
+  discount: number;
+  quantity: number;
+}
+
+export function toPriceHistoryRow(r: RawPriceHistory): PriceHistoryRow {
+  const price = num(r.price);
+  const discount = num(r.discount);
+  return {
+    code: r.code ?? '',
+    date: r.date ?? null,
+    finalPrice: r.finalPrice != null ? num(r.finalPrice) : price - discount,
+    discount,
+    quantity: num(r.quantity),
   };
 }

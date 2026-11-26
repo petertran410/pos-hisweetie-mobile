@@ -1,6 +1,8 @@
 import { canDo, type PermissionHolder } from '@/core/can';
+import { money } from '@/core/format';
 import { dayBoundsIso, resolvePeriod, type PeriodChoice } from '@/core/period';
 import type { Query } from '@/core/http';
+import type { Tone } from '@/ui';
 
 /** Số Decimal của backend trả về dạng chuỗi. */
 export const num = (v: unknown): number => {
@@ -69,10 +71,7 @@ export interface RawCustomer {
   branch?: { id?: number; name?: string | null } | null;
   parentId?: number | null;
   parent?: { id: number; code?: string | null; name?: string | null } | null;
-  debtPolicy?: {
-    isActive?: boolean | null;
-    requireFullPaymentForInvoice?: boolean | null;
-  } | null;
+  debtPolicy?: RawDebtPolicy | null;
   children?: {
     id: number;
     code?: string | null;
@@ -296,6 +295,9 @@ export interface CustomerDetail extends CustomerRow {
   addresses: RawAddress[];
   groups: { id: number; name: string }[];
   invoiceInfo: InvoiceInfoLine[];
+  /** Hình thức công nợ (null = chưa chọn). */
+  debtForm: string | null;
+  debtRule: DebtRuleSummary;
 }
 
 export function toCustomerDetail(r: RawCustomer): CustomerDetail {
@@ -340,7 +342,167 @@ export function toCustomerDetail(r: RawCustomer): CustomerDetail {
     addresses,
     groups,
     invoiceInfo,
+    debtForm: debtFormLabel(r.debtPolicy?.debtForm),
+    debtRule: describeDebtRule(r.debtPolicy),
   };
+}
+
+// ---------- Chính sách công nợ (giống web: lib/api/debt-tracking.ts) ----------
+
+export interface RawDebtPolicy {
+  isActive?: boolean | null;
+  requireFullPaymentForInvoice?: boolean | null;
+  debtForm?: string | null;
+  debtRuleType?: string | null;
+  creditLimit?: string | number | null;
+  termDays?: number | null;
+  paymentScheduleDays?: number[] | null;
+}
+
+export const DEBT_FORM_LABELS: Record<string, string> = {
+  TRUST: 'Công Nợ Tín Nhiệm',
+  CONTRACT: 'Hợp Đồng Công Nợ',
+  COD: 'Thanh Toán Khi Nhận Hàng',
+  PREPAID: 'Chuyển khoản ngay',
+};
+
+export const DEBT_RULE_TYPE_LABELS: Record<string, string> = {
+  NONE: 'Không công nợ',
+  CREDIT_LIMIT: 'Hạn mức công nợ',
+  TERM_DAYS: 'Công nợ theo số ngày',
+  MONTHLY_SCHEDULE: 'Thanh toán cố định theo tháng',
+  WEEKLY_SCHEDULE: 'Thanh toán cố định theo tuần',
+};
+
+export const debtFormLabel = (form: string | null | undefined): string | null => (form ? (DEBT_FORM_LABELS[form] ?? null) : null);
+
+export interface DebtRuleSummary {
+  /** Chưa thiết lập (chưa có chính sách, hoặc khách cũ: NONE mà không bắt trả đủ). */
+  unset: boolean;
+  label: string;
+  /** Chi tiết ngắn: hạn mức, số ngày, ngày / thứ thanh toán cố định. */
+  detail: string;
+}
+
+/** Mô tả quy tắc công nợ của khách (cùng cách hiển thị với web). */
+export function describeDebtRule(policy: RawDebtPolicy | null | undefined): DebtRuleSummary {
+  const type = policy?.debtRuleType ?? 'NONE';
+  if (!policy || (type === 'NONE' && !policy.requireFullPaymentForInvoice)) {
+    return { unset: true, label: 'Chưa thiết lập', detail: '' };
+  }
+  const days = policy.paymentScheduleDays ?? [];
+  const detail =
+    type === 'CREDIT_LIMIT' && policy.creditLimit != null
+      ? `${money(num(policy.creditLimit))} đ`
+      : type === 'TERM_DAYS' && policy.termDays != null
+        ? `${policy.termDays} ngày`
+        : type === 'MONTHLY_SCHEDULE' && days.length > 0
+          ? `ngày ${days.join(', ')}`
+          : type === 'WEEKLY_SCHEDULE' && days.length > 0
+            ? days.map((d) => (d === 7 ? 'CN' : `T${d + 1}`)).join(', ')
+            : '';
+  return { unset: false, label: DEBT_RULE_TYPE_LABELS[type] ?? '—', detail };
+}
+
+// ---------- Trả hàng (gộp vào lịch sử hóa đơn của khách) ----------
+
+export interface RawReturnOrder {
+  id: number;
+  code?: string | null;
+  status?: number | string | null;
+  createdAt?: string | null;
+  refundAmount?: number | string | null;
+  creator?: { name?: string | null } | null;
+  invoice?: { code?: string | null } | null;
+}
+
+export interface ReturnRow {
+  id: number;
+  code: string;
+  date: string | null;
+  status: number;
+  /** Tiền trả khách (cột "Giá trị" của phiếu trả trên web). */
+  amount: number;
+  creatorName: string | null;
+  /** Hóa đơn gốc. */
+  invoiceCode: string | null;
+}
+
+export const RETURN_STATUS: Record<number, { label: string; tone: Tone }> = {
+  1: { label: 'Yêu cầu trả hàng', tone: 'info' },
+  2: { label: 'Nhập hàng trả', tone: 'warning' },
+  3: { label: 'Yêu cầu hoàn tiền', tone: 'warning' },
+  4: { label: 'Hoàn thành', tone: 'success' },
+  5: { label: 'Đã hủy', tone: 'danger' },
+};
+export const RETURN_CANCELLED = 5;
+
+export const returnStatusOf = (status: number) => RETURN_STATUS[status] ?? { label: 'Không rõ', tone: 'neutral' as Tone };
+
+export function toReturnRow(r: RawReturnOrder): ReturnRow {
+  return {
+    id: r.id,
+    code: r.code ?? '',
+    date: r.createdAt ?? null,
+    status: num(r.status),
+    amount: num(r.refundAmount),
+    creatorName: text(r.creator?.name),
+    invoiceCode: text(r.invoice?.code),
+  };
+}
+
+interface Dated {
+  date: string | null;
+}
+
+/** 1 luồng đang tải dần (mới nhất trước). */
+export interface HistoryStream<T extends Dated> {
+  rows: T[];
+  hasMore: boolean;
+}
+
+export type HistoryItem<I extends Dated, R extends Dated> = { kind: 'invoice'; row: I } | { kind: 'return'; row: R };
+
+const timeOf = (d: string | null): number => {
+  const t = d ? Date.parse(d) : NaN;
+  return Number.isFinite(t) ? t : -Infinity;
+};
+
+/**
+ * Gộp hóa đơn và phiếu trả (2 luồng tải dần riêng, cùng mới nhất trước) thành
+ * 1 danh sách theo ngày. Luồng còn trang chỉ chắc đã đủ dòng từ dòng cuối đã
+ * tải trở về sau, nên chỉ hiện các dòng mới hơn mốc muộn nhất trong các luồng
+ * còn trang (không để lọt dòng chưa tải vào giữa). `next` là luồng cần tải
+ * thêm để đi tiếp; hết cả hai thì null.
+ */
+export function mergeHistory<I extends Dated, R extends Dated>(
+  inv: HistoryStream<I>,
+  ret: HistoryStream<R>,
+): { items: HistoryItem<I, R>[]; next: 'invoice' | 'return' | null } {
+  const frontier = (st: HistoryStream<Dated>) =>
+    !st.hasMore ? null : st.rows.length ? timeOf(st.rows[st.rows.length - 1].date) : Infinity;
+  const fi = frontier(inv);
+  const fr = frontier(ret);
+  let next: 'invoice' | 'return' | null = null;
+  let cutoff = -Infinity;
+  if (fi !== null && (fr === null || fi >= fr)) {
+    next = 'invoice';
+    cutoff = fi;
+  } else if (fr !== null) {
+    next = 'return';
+    cutoff = fr;
+  }
+  const all: HistoryItem<I, R>[] = [
+    ...inv.rows.map((row) => ({ kind: 'invoice' as const, row })),
+    ...ret.rows.map((row) => ({ kind: 'return' as const, row })),
+  ];
+  const items = all
+    .filter((it) => timeOf(it.row.date) >= cutoff)
+    .sort((a, b) => {
+      const d = timeOf(b.row.date) - timeOf(a.row.date);
+      return Number.isNaN(d) ? 0 : d;
+    });
+  return { items, next };
 }
 
 // ---------- Công nợ ----------
@@ -534,6 +696,8 @@ export interface CustomerPerms {
   collect: boolean;
   viewInvoices: boolean;
   viewOrders: boolean;
+  /** Phiếu trả hàng trong lịch sử hóa đơn của khách. */
+  viewReturns: boolean;
 }
 
 export function customerPerms(user: PermissionHolder | null): CustomerPerms {
@@ -551,5 +715,6 @@ export function customerPerms(user: PermissionHolder | null): CustomerPerms {
     collect: can('cash_flows:create'),
     viewInvoices: can('invoices:view'),
     viewOrders: can('orders:view'),
+    viewReturns: can('return_orders:view'),
   };
 }

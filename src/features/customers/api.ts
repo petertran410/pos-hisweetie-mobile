@@ -11,12 +11,14 @@ import {
   PAGE_SIZE,
   toCustomerRow,
   toDebtEntry,
+  toReturnRow,
   toUnpaidInvoices,
   type CustomerFilters,
   type CustomerTotals,
   type RawCustomer,
   type RawDebtEntry,
   type RawInvoiceForDebt,
+  type RawReturnOrder,
 } from './model';
 
 // ---------- Danh sách ----------
@@ -88,6 +90,29 @@ export function useCustomerDocs(kind: DocKind, customerId: number, enabled: bool
           : { customerId, page: pageParam, limit: HISTORY_PAGE_SIZE, orderBy: 'orderDate', orderDirection: 'desc' };
       const res = await http.get<RawDocPage>(kind === 'invoice' ? '/invoices' : '/orders', query);
       return { page: pageParam, total: num(res.total), rows: (res.data ?? []).map((r) => toDocRow(kind, r)) };
+    },
+    getNextPageParam: (last) => (last.page * HISTORY_PAGE_SIZE < last.total ? last.page + 1 : undefined),
+    staleTime: 20_000,
+  });
+}
+
+/**
+ * Phiếu trả hàng của khách, mới nhất trước, tải dần (gộp vào lịch sử hóa đơn).
+ * `returns_only`: bỏ phiếu cấn trừ nợ CTN như trang web.
+ */
+export function useCustomerReturns(customerId: number, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: ['customer-docs', 'return', customerId],
+    enabled: enabled && customerId > 0,
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const res = await http.get<{ data?: RawReturnOrder[]; total?: number | string }>('/return-orders', {
+        customerId,
+        refundType: 'returns_only',
+        page: pageParam,
+        limit: HISTORY_PAGE_SIZE,
+      });
+      return { page: pageParam, total: num(res.total), rows: (res.data ?? []).map(toReturnRow) };
     },
     getNextPageParam: (last) => (last.page * HISTORY_PAGE_SIZE < last.total ? last.page + 1 : undefined),
     staleTime: 20_000,

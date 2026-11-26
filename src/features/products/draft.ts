@@ -29,3 +29,12 @@ export function patchDraft(patch: Partial<ProductForm> | ((f: ProductForm) => Pa
 
 export const NEW_PRODUCT_PATH = '/hang-hoa/them';
 export const EDIT_PRODUCT_PATH = '/hang-hoa/sua/[id]';
+
+/**
+ * Xem chi tiết 1 hàng hóa từ chi tiết đơn / hóa đơn: mục
+ * Hàng hóa phủ lên trên, chỉ xem — không sửa / ngừng hoạt động, giống modal
+ * chi tiết sản phẩm của web POS.
+ */
+export function productViewHref(id: number) {
+  return { pathname: '/hang-hoa/[id]', params: { id: String(id), chiXem: '1' } };
+}

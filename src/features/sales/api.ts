@@ -2,7 +2,14 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-qu
 import { http } from '@/core/http';
 import { useSession } from '@/core/session';
 import type { SaleProduct } from './cart';
-import { toSaleCustomer, toSaleProduct, type RawCustomer, type RawProduct } from './mappers';
+import {
+  toPriceHistoryRow,
+  toSaleCustomer,
+  toSaleProduct,
+  type RawCustomer,
+  type RawPriceHistory,
+  type RawProduct,
+} from './mappers';
 
 /** Prisma Decimal về dạng chuỗi → số. */
 const num = (v: unknown): number => {
@@ -143,6 +150,109 @@ export function useCustomerSearch(search: string) {
     placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
+}
+
+/**
+ * Giá khách đã mua món này ở 5 hóa đơn gần nhất tại chi nhánh đang chọn
+ * (giống nút lịch sử giá trên dòng hàng của web POS).
+ */
+export function useProductPriceHistory(customerId: number | null | undefined, productId: number, enabled: boolean) {
+  const branchId = useSession((s) => s.branchId);
+  return useQuery({
+    queryKey: ['sales', 'price-history', customerId ?? 0, productId, branchId],
+    enabled: enabled && !!customerId && productId > 0,
+    queryFn: async () => {
+      const rows = await http.get<RawPriceHistory[]>('/orders/product-price-history', {
+        customerId: customerId ?? undefined,
+        productId,
+        type: 'invoice',
+        branchId: branchId ?? undefined,
+      });
+      return (rows ?? []).map(toPriceHistoryRow);
+    },
+    staleTime: 30_000,
+  });
+}
+
+// ---------- Tồn kho của 1 dòng hàng (màn Sửa hàng, giống dòng tồn trên web POS) ----------
+
+/** Quyền xem từng số tồn (mỗi API cần quyền riêng; thiếu quyền thì không gọi, ẩn ô đó). */
+export interface StockAccess {
+  /** `inventory:view`: tồn + tồn KM mới nhất. Thiếu thì dùng tồn lúc tải danh sách hàng. */
+  inventory: boolean;
+  /** `orders:view`: khách đã đặt (đơn đặt hàng chưa xong). */
+  customerOrdered: boolean;
+  /** `order_suppliers:view`: đã đặt nhà cung cấp. */
+  supplierOrdered: boolean;
+  /** `products:view` hoặc `transfers:view`: hàng đang chuyển tới chi nhánh. */
+  inTransit: boolean;
+}
+
+/** 1 ô số tồn. `value`: `undefined` = đang tải, `null` = không lấy được. */
+export interface StockCell {
+  key: 'onHand' | 'customerOrdered' | 'supplierOrdered' | 'inTransit' | 'promo';
+  label: string;
+  value: number | null | undefined;
+}
+
+const stockValue = (q: { data?: number; isError: boolean }) => (q.isError ? null : q.data);
+
+/** Tổng theo sản phẩm tại chi nhánh (`{ [productId]: số }`), dùng chung cho 3 API tổng hợp. */
+function useStockSummary(path: string, productId: number, branchId: number | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['sales', 'stock', path, productId, branchId],
+    enabled: enabled && productId > 0,
+    queryFn: async () => {
+      const res = await http.get<Record<string, number | string> | null>(path, {
+        productIds: String(productId),
+        branchId: branchId ?? undefined,
+      });
+      return num(res?.[String(productId)]);
+    },
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+/**
+ * Tồn, khách đặt, đặt NCC, đang đi đường, tồn KM của 1 hàng hóa tại chi nhánh
+ * đang chọn. `fallbackOnHand`: tồn lúc tải danh sách hàng (khi không có quyền
+ * xem tồn mới nhất).
+ */
+export function useLineStock(
+  productId: number,
+  fallbackOnHand: number | null | undefined,
+  access: StockAccess,
+  enabled: boolean,
+): StockCell[] {
+  const branchId = useSession((s) => s.branchId);
+  const inventory = useQuery({
+    queryKey: ['sales', 'stock', 'inventory', productId, branchId],
+    enabled: enabled && access.inventory && productId > 0 && !!branchId,
+    queryFn: async () => {
+      const rows = await http.get<{ productId: number; onHand?: number | string; promoQuantity?: number | string }[]>(
+        '/inventories/by-branch',
+        { branchId: branchId ?? undefined, productIds: String(productId) },
+      );
+      const row = (rows ?? []).find((r) => r.productId === productId);
+      return { onHand: num(row?.onHand), promo: num(row?.promoQuantity) };
+    },
+    staleTime: 30_000,
+    retry: false,
+  });
+  const customerOrdered = useStockSummary('/orders/pending-summary', productId, branchId, enabled && access.customerOrdered);
+  const supplierOrdered = useStockSummary('/order-suppliers/confirmed-summary', productId, branchId, enabled && access.supplierOrdered);
+  const inTransit = useStockSummary('/transfers/in-transit-summary', productId, branchId, enabled && access.inTransit);
+
+  const live = access.inventory && !!branchId;
+  // Chưa tải xong (hoặc lỗi) tồn mới nhất thì hiện tồn đã có lúc tải danh sách hàng.
+  const onHand = live && inventory.data ? inventory.data.onHand : inventory.isLoading && live ? (fallbackOnHand ?? undefined) : (fallbackOnHand ?? null);
+  const cells: StockCell[] = [{ key: 'onHand', label: 'Tồn', value: onHand }];
+  if (access.customerOrdered) cells.push({ key: 'customerOrdered', label: 'KH đặt', value: stockValue(customerOrdered) });
+  if (access.supplierOrdered) cells.push({ key: 'supplierOrdered', label: 'Đặt NCC', value: stockValue(supplierOrdered) });
+  if (access.inTransit) cells.push({ key: 'inTransit', label: 'Đang đi đường', value: stockValue(inTransit) });
+  if (live) cells.push({ key: 'promo', label: 'Tồn KM', value: inventory.isError ? null : inventory.data?.promo });
+  return cells;
 }
 
 // ---------- Thanh toán ----------

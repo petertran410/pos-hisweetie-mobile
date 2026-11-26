@@ -21,6 +21,7 @@ import {
   sampleDebtEntries,
   sampleDocRows,
   sampleRawCustomers,
+  sampleReturnRows,
   sampleUnpaid,
   samplePackDetail,
   samplePackRows,
@@ -74,6 +75,7 @@ import {
 import { LineEditorView } from '@/features/sales/LineEditorScreen';
 import { PriceBookView } from '@/features/sales/PriceBookScreen';
 import { SaleScopeProvider } from '@/features/sales/scope';
+import { enterPreviewSandbox } from '@/features/preview/sandbox';
 import { SalesView, setProductQty } from '@/features/sales/SalesScreen';
 import { SuccessView } from '@/features/sales/SuccessScreen';
 import { MoreView } from '@/features/shell/MoreScreen';
@@ -336,6 +338,9 @@ export default function PreviewScreen() {
   const [packForm, setPackForm] = useState<{ key: string; form: PackForm } | null>(null);
   const [khoForm, setKhoForm] = useState<{ key: string; form: KhoForm } | null>(null);
 
+  // Phải chạy trước khi nạp dữ liệu mẫu: rời trang thì giỏ / đơn nháp / đơn đang xử lý trở lại như cũ.
+  useEffect(() => (__DEV__ ? enterPreviewSandbox() : undefined), []);
+
   useEffect(() => {
     // Bản phát hành: link hisweetiepos://xem-truoc không được nạp dữ liệu mẫu vào giỏ / đơn đang sửa.
     if (!__DEV__) return;
@@ -453,6 +458,7 @@ export default function PreviewScreen() {
           promotions={[{ promotionId: 1, name: 'Mua 10 tặng 1 (mẫu)', autoApply: true }]}
           onSubmit={toView('xong')}
           onOpenCustomer={toView('khach')}
+          onViewCustomer={toView('ct-kh')}
           onCreateCustomer={toView('them-kh')}
           onEditCustomer={toView('sua-kh')}
           onOpenLine={toView('sua-hang')}
@@ -481,7 +487,30 @@ export default function PreviewScreen() {
       />
     );
   if (man === 'sua-hang' && lines[0])
-    return <LineEditorView line={lines[0]} perms={sampleSalePerms} onSave={toView('gio-hang')} onRemove={noop} />;
+    return (
+      <LineEditorView
+        line={lines[0]}
+        perms={sampleSalePerms}
+        onOpenProduct={noop}
+        stock={[
+          { key: 'onHand', label: 'Tồn', value: 1565 },
+          { key: 'customerOrdered', label: 'KH đặt', value: 4868 },
+          { key: 'supplierOrdered', label: 'Đặt NCC', value: 19200 },
+          { key: 'inTransit', label: 'Đang đi đường', value: 0 },
+          { key: 'promo', label: 'Tồn KM', value: undefined },
+        ]}
+        history={{
+          rows: [
+            { code: 'HD117894', date: '2026-07-04T03:00:00.000Z', finalPrice: 59_400, discount: 0, quantity: 6000 },
+            { code: 'HD112003', date: '2026-05-12T03:00:00.000Z', finalPrice: 61_000, discount: 1_600, quantity: 2400 },
+          ],
+          loading: false,
+          onRetry: noop,
+        }}
+        onSave={toView('gio-hang')}
+        onRemove={noop}
+      />
+    );
   if (man === 'giao-hang')
     return <DeliveryView customer={cart.customer} initial={cart.delivery} onSave={toView('gio-hang')} />;
   if (man === 'giam-gia')
@@ -579,6 +608,8 @@ export default function PreviewScreen() {
         onPrint={toView('phieu-in')}
         onOpenOrder={noop}
         onOpenInvoice={noop}
+        onViewCustomer={toView('ct-kh')}
+        onOpenProduct={noop}
         onEditCustomer={toView('sua-kh')}
         actions={{
           canProcess: true,
@@ -604,6 +635,7 @@ export default function PreviewScreen() {
           onSave={noop}
           onInvoice={toView('tao-hd')}
           onOpenCustomer={noop}
+          onViewCustomer={toView('ct-kh')}
           onEditCustomer={toView('sua-kh')}
           onOpenLine={noop}
           onOpenDelivery={noop}
@@ -789,6 +821,7 @@ export default function PreviewScreen() {
         tab={customerTab}
         onTab={setCustomerTab}
         invoices={docs('invoice')}
+        returns={{ rows: sampleReturnRows, total: 2, loading: false, hasMore: false, loadingMore: false, onMore: noop, onRetry: noop }}
         orders={docs('order')}
         debt={{ entries: sampleDebtEntries, loading: false, onRetry: noop, withChildren: true, onWithChildren: noop }}
         onEdit={toView('sua-kh')}
