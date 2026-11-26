@@ -20,6 +20,8 @@ export interface SaleScope {
     discount: string;
     priceBook: string;
     scan: string;
+    /** Chi tiết hàng hóa (chỉ xem) mở chồng lên sheet sửa dòng; có tham số `[id]`. */
+    product: string;
   };
 }
 
@@ -34,6 +36,7 @@ export const SALES_SCOPE: SaleScope = {
     discount: '/ban-hang/giam-gia',
     priceBook: '/ban-hang/bang-gia',
     scan: '/ban-hang/quet-ma',
+    product: '/ban-hang/san-pham/[id]',
   },
 };
 

@@ -17,6 +17,8 @@ export function SalesStack() {
       <Stack.Screen name="xong" options={{ gestureEnabled: false, animation: 'fade' }} />
       <Stack.Screen name="khach-hang" options={sheet} />
       <Stack.Screen name="dong/[rowId]" options={sheet} />
+      {/* Chi tiết hàng hóa mở từ sheet sửa dòng: sheet chồng lên sheet. */}
+      <Stack.Screen name="san-pham/[id]" options={sheet} />
       <Stack.Screen name="giao-hang" options={sheet} />
       <Stack.Screen name="giam-gia" options={sheet} />
       <Stack.Screen name="phieu-in" options={sheet} />

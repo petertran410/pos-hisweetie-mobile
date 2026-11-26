@@ -242,6 +242,7 @@ export function useDocList(kind: DocKind, filters: DocFilters, enabled: boolean)
 
 export interface DocLine {
   key: string;
+  productId: number;
   code: string;
   name: string;
   unit: string | null;
@@ -395,6 +396,7 @@ export function toDocDetail(kind: DocKind, r: RawDetail): DocDetail {
     note: r.description || null,
     lines: rawLines.map((l) => ({
       key: String(l.id),
+      productId: l.productId,
       code: l.productCode || l.product?.code || '',
       name: l.productName || l.product?.name || '',
       unit: l.product?.unit ?? null,

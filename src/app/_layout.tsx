@@ -93,6 +93,8 @@ export default function RootLayout() {
                     <Stack.Screen name="hang-hoa" options={{ animation: 'default' }} />
                     {/* Sửa hồ sơ khách từ giỏ hàng / xử lý đơn / chi tiết đơn. */}
                     <Stack.Screen name="sua-khach" options={{ animation: 'default' }} />
+                    {/* Xem chi tiết khách đang chọn ở giỏ hàng. */}
+                    <Stack.Screen name="xem-khach" options={{ animation: 'default' }} />
                     <Stack.Screen
                       name="chi-nhanh"
                       options={{

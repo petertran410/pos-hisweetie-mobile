@@ -1,10 +1,12 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { money, qty } from '@/core/format';
-import { C, gradients, Icon, Pill, PressableScale, QtyStepper, radius, shadow, toneColors, Txt } from '@/ui';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { dateVN, money, qty } from '@/core/format';
+import { C, Card, Divider, gradients, Icon, Pill, PressableScale, QtyStepper, radius, shadow, toneColors, Txt } from '@/ui';
 import type { CartLine, SaleProduct } from './cart';
+import type { StockCell } from './api';
+import type { PriceHistoryRow } from './mappers';
 import { mediaUri } from '@/core/config';
 
 /** Ảnh sản phẩm (chỉ nhận https ở bản phát hành); không có ảnh thì hiện biểu tượng. */
@@ -304,7 +306,112 @@ export function SumRow({
   );
 }
 
+/** Tồn, khách đặt, đặt NCC, đang đi đường, tồn KM tại chi nhánh đang chọn (màn Sửa hàng). */
+export function StockCard({ cells, unit }: { cells: StockCell[]; unit?: string | null }) {
+  return (
+    <View style={{ gap: 8 }}>
+      <Txt variant="label" weight="semibold">
+        Tồn kho tại chi nhánh{unit ? ` (${unit})` : ''}
+      </Txt>
+      <Card style={styles.stockGrid}>
+        {cells.map((c) => (
+          <View
+            key={c.key}
+            accessible
+            accessibilityLabel={`${c.label}: ${c.value === undefined ? 'đang tải' : c.value === null ? 'không có số liệu' : qty(c.value)}`}
+            style={styles.stockCell}>
+            <Txt variant="caption" color={C.muted} numberOfLines={1}>
+              {c.label}
+            </Txt>
+            <Txt
+              variant="body"
+              weight="bold"
+              numeric
+              color={c.key === 'onHand' && typeof c.value === 'number' && c.value <= 0 ? toneColors.danger.fg : c.value == null ? C.faint : C.text}>
+              {c.value === undefined ? '…' : c.value === null ? '—' : qty(c.value)}
+            </Txt>
+          </View>
+        ))}
+      </Card>
+    </View>
+  );
+}
+
+export interface PriceHistoryState {
+  rows: PriceHistoryRow[];
+  loading: boolean;
+  error?: unknown;
+  onRetry: () => void;
+}
+
+/** Giá khách đã mua món này ở 5 hóa đơn gần nhất (màn Sửa hàng). */
+export function PriceHistoryCard({ rows, loading, error, onRetry }: PriceHistoryState) {
+  return (
+    <View style={{ gap: 8 }}>
+      <Txt variant="label" weight="semibold">
+        Lịch sử giá 5 hóa đơn gần nhất
+      </Txt>
+      <Card style={{ paddingVertical: 2 }}>
+        {loading ? (
+          <View style={styles.historyMsg}>
+            <ActivityIndicator size="small" color={C.brand} />
+            <Txt variant="caption" color={C.muted}>
+              Đang tải lịch sử giá…
+            </Txt>
+          </View>
+        ) : error ? (
+          <PressableScale onPress={onRetry} accessibilityRole="button" scaleTo={0.98} style={styles.historyMsg}>
+            <Icon name="refresh-cw" size={16} color={C.brand} />
+            <Txt variant="caption" color={C.brand} weight="semibold">
+              Không tải được lịch sử giá. Bấm để thử lại
+            </Txt>
+          </PressableScale>
+        ) : !rows.length ? (
+          <View style={styles.historyMsg}>
+            <Txt variant="caption" color={C.muted}>
+              Khách chưa mua món này tại chi nhánh đang chọn
+            </Txt>
+          </View>
+        ) : (
+          rows.map((r, i) => (
+            <View key={`${r.code}-${i}`}>
+              {i ? <Divider inset={14} /> : null}
+              <View
+                accessible
+                accessibilityLabel={`${r.code}, ${dateVN(r.date)}, giá ${money(r.finalPrice)} đồng${r.discount > 0 ? `, đã giảm ${money(r.discount)}` : ''}, số lượng ${qty(r.quantity)}`}
+                style={styles.historyRow}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Txt variant="body" weight="semibold" numeric numberOfLines={1}>
+                    {r.code}
+                  </Txt>
+                  <Txt variant="caption" color={C.muted} numeric numberOfLines={1}>
+                    {[dateVN(r.date), `SL ${qty(r.quantity)}`].filter(Boolean).join(' · ')}
+                  </Txt>
+                </View>
+                <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                  <Txt variant="body" weight="bold" numeric>
+                    {money(r.finalPrice)}
+                  </Txt>
+                  {r.discount > 0 ? (
+                    <Txt variant="caption" color={C.muted} numeric>
+                      (-{money(r.discount)})
+                    </Txt>
+                  ) : null}
+                </View>
+              </View>
+            </View>
+          ))
+        )}
+      </Card>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  stockGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 14, paddingVertical: 8 },
+  stockCell: { width: '33.33%', paddingVertical: 6, paddingRight: 8, gap: 2 },
+  historyMsg: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 14 },
+  historyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   thumb: {
     borderRadius: 12,

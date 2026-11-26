@@ -9,6 +9,8 @@ import {
   customerPerms,
   DEFAULT_FILTERS,
   defaultOffsets,
+  describeDebtRule,
+  mergeHistory,
   setInvoiceOffset,
   setInvoicePay,
   sumAmounts,
@@ -16,6 +18,7 @@ import {
   toCustomerDetail,
   toCustomerRow,
   toDebtEntry,
+  toReturnRow,
   toUnpaidInvoices,
 } from '../model';
 
@@ -188,7 +191,77 @@ describe('công nợ', () => {
   });
 });
 
+describe('chính sách công nợ', () => {
+  it('chưa có chính sách, hoặc NONE mà không bắt trả đủ (khách cũ) → chưa thiết lập', () => {
+    expect(describeDebtRule(null)).toEqual({ unset: true, label: 'Chưa thiết lập', detail: '' });
+    expect(describeDebtRule({ debtRuleType: 'NONE', requireFullPaymentForInvoice: false }).unset).toBe(true);
+    expect(describeDebtRule({ debtRuleType: 'NONE', requireFullPaymentForInvoice: true })).toEqual({
+      unset: false,
+      label: 'Không công nợ',
+      detail: '',
+    });
+  });
+
+  it('kèm chi tiết: hạn mức, số ngày, ngày trong tháng, thứ trong tuần (7 = CN)', () => {
+    expect(describeDebtRule({ debtRuleType: 'CREDIT_LIMIT', creditLimit: '5000000' })).toEqual({
+      unset: false,
+      label: 'Hạn mức công nợ',
+      detail: '5,000,000 đ',
+    });
+    expect(describeDebtRule({ debtRuleType: 'TERM_DAYS', termDays: 30 }).detail).toBe('30 ngày');
+    expect(describeDebtRule({ debtRuleType: 'MONTHLY_SCHEDULE', paymentScheduleDays: [5, 20] }).detail).toBe('ngày 5, 20');
+    expect(describeDebtRule({ debtRuleType: 'WEEKLY_SCHEDULE', paymentScheduleDays: [1, 3, 7] }).detail).toBe('T2, T4, CN');
+  });
+
+  it('chi tiết khách có hình thức + quy tắc công nợ', () => {
+    const d = toCustomerDetail({ id: 1, code: 'KH01', name: 'A', debtPolicy: { debtForm: 'TRUST', debtRuleType: 'TERM_DAYS', termDays: 15 } });
+    expect(d.debtForm).toBe('Công Nợ Tín Nhiệm');
+    expect(d.debtRule).toMatchObject({ unset: false, label: 'Công nợ theo số ngày', detail: '15 ngày' });
+    expect(toCustomerDetail({ id: 2, code: 'KH02', name: 'B' })).toMatchObject({ debtForm: null, debtRule: { unset: true } });
+  });
+});
+
+describe('trả hàng trong lịch sử hóa đơn', () => {
+  const day = (d: number) => `2026-11-${String(d).padStart(2, '0')}T10:00:00.000Z`;
+  const row = (id: number, d: number) => ({ id, date: day(d) });
+
+  it('đổi phiếu trả từ API', () => {
+    expect(
+      toReturnRow({ id: 7, code: 'TH07', status: '4', createdAt: day(3), refundAmount: '185000.00', creator: { name: ' Lan ' }, invoice: { code: 'HD01' } }),
+    ).toEqual({ id: 7, code: 'TH07', date: day(3), status: 4, amount: 185000, creatorName: 'Lan', invoiceCode: 'HD01' });
+  });
+
+  it('hết trang cả hai: gộp hết, mới nhất trước', () => {
+    const m = mergeHistory({ rows: [row(1, 20), row(2, 10)], hasMore: false }, { rows: [row(9, 15), row(8, 5)], hasMore: false });
+    expect(m.items.map((it) => `${it.kind}-${it.row.id}`)).toEqual(['invoice-1', 'return-9', 'invoice-2', 'return-8']);
+    expect(m.next).toBeNull();
+  });
+
+  it('hóa đơn còn trang: chưa hiện phiếu trả cũ hơn hóa đơn cuối đã tải, tải tiếp hóa đơn', () => {
+    const m = mergeHistory({ rows: [row(1, 20), row(2, 12)], hasMore: true }, { rows: [row(9, 15), row(8, 5)], hasMore: false });
+    expect(m.items.map((it) => `${it.kind}-${it.row.id}`)).toEqual(['invoice-1', 'return-9', 'invoice-2']);
+    expect(m.next).toBe('invoice');
+  });
+
+  it('cả hai còn trang: tải tiếp luồng có dòng cuối mới hơn', () => {
+    const m = mergeHistory({ rows: [row(1, 20), row(2, 12)], hasMore: true }, { rows: [row(9, 18), row(8, 16)], hasMore: true });
+    expect(m.items.map((it) => `${it.kind}-${it.row.id}`)).toEqual(['invoice-1', 'return-9', 'return-8']);
+    expect(m.next).toBe('return');
+  });
+
+  it('không có phiếu trả: giữ nguyên danh sách hóa đơn', () => {
+    const m = mergeHistory({ rows: [row(1, 20), row(2, 12)], hasMore: true }, { rows: [], hasMore: false });
+    expect(m.items.map((it) => it.row.id)).toEqual([1, 2]);
+    expect(m.next).toBe('invoice');
+  });
+});
+
 describe('customerPerms', () => {
+  it('xem phiếu trả hàng theo quyền return_orders:view', () => {
+    expect(customerPerms({ permissions: ['return_orders:view'] }).viewReturns).toBe(true);
+    expect(customerPerms({ permissions: ['invoices:view'] }).viewReturns).toBe(false);
+  });
+
   it('sửa ghi chú: quyền sửa khách hoặc quyền riêng', () => {
     expect(customerPerms({ permissions: ['customers:update_comments'] }).editNote).toBe(true);
     expect(customerPerms({ permissions: ['customers:view'] })).toMatchObject({ view: true, editNote: false, viewDebt: false });

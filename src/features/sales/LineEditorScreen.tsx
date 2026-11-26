@@ -1,10 +1,14 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { canDo } from '@/core/can';
+import { useSession } from '@/core/session';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { money, parseQty, percentInput, qty } from '@/core/format';
-import { Button, C, Card, ChipGroup, EmptyState, MoneyField, QtyField, SheetHeader, TextField, Txt } from '@/ui';
+import { Button, C, Card, ChipGroup, EmptyState, Icon, MoneyField, QtyField, SheetHeader, TextField, Txt } from '@/ui';
+import { useProductDetail } from '../products/api';
+import { useLineStock, useProductPriceHistory, type StockCell } from './api';
 import type { CartLine } from './cart';
-import { Thumb } from './components';
+import { PriceHistoryCard, StockCard, Thumb, type PriceHistoryState } from './components';
 import { useSalePerms, type SalePerms } from './perms';
 import { useSaleScope, useScopedCart } from './scope';
 import { discountAmount, lineTotal } from './totals';
@@ -15,11 +19,23 @@ type DiscountKind = 'amount' | 'percent';
 export function LineEditorView({
   line,
   perms,
+  history,
+  stock,
+  onOpenProduct,
+  image,
   onSave,
   onRemove,
 }: {
   line: CartLine;
   perms: SalePerms;
+  /** Giá khách đã mua món này (không có = chưa chọn khách / không có quyền: ẩn). */
+  history?: PriceHistoryState;
+  /** Số tồn tại chi nhánh (không có = không có quyền xem tồn: ẩn). */
+  stock?: StockCell[];
+  /** Bấm khung sản phẩm: xem chi tiết hàng hóa (không có = không có quyền xem hàng hóa). */
+  onOpenProduct?: () => void;
+  /** Ảnh thay khi dòng hàng chưa có ảnh (dòng lấy từ đơn / hóa đơn không kèm ảnh). */
+  image?: string | null;
   onSave: (patch: Pick<CartLine, 'quantity' | 'price' | 'discount' | 'note'>) => void;
   onRemove: () => void;
 }) {
@@ -59,8 +75,11 @@ export function LineEditorView({
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         automaticallyAdjustKeyboardInsets>
-        <Card style={styles.head}>
-          <Thumb uri={line.product.image} size={56} />
+        <Card
+          onPress={onOpenProduct}
+          accessibilityLabel={onOpenProduct ? `${line.product.name}. Bấm để xem chi tiết hàng hóa` : undefined}
+          style={styles.head}>
+          <Thumb uri={line.product.image || image} size={56} />
           <View style={{ flex: 1, gap: 2 }}>
             <Txt variant="body" weight="semibold" numberOfLines={2}>
               {line.product.name}
@@ -70,7 +89,10 @@ export function LineEditorView({
               {line.product.conversionValue ? ` · 1 thùng = ${qty(line.product.conversionValue)} ${line.product.unit ?? ''}` : ''}
             </Txt>
           </View>
+          {onOpenProduct ? <Icon name="chevron-right" size={18} color={C.faint} /> : null}
         </Card>
+
+        {stock ? <StockCard cells={stock} unit={line.product.unit} /> : null}
 
         <QtyField label={`Số lượng${line.product.unit ? ` (${line.product.unit})` : ''}`} value={quantity} onChange={setQuantity} />
 
@@ -85,6 +107,8 @@ export function LineEditorView({
             Bạn chưa có quyền sửa giá bán.
           </Txt>
         ) : null}
+
+        {history ? <PriceHistoryCard {...history} /> : null}
 
         {perms.editDiscount ? (
           <View style={{ gap: 8 }}>
@@ -157,8 +181,29 @@ export function LineEditorView({
 export default function LineEditorScreen() {
   const { rowId } = useLocalSearchParams<{ rowId: string }>();
   const perms = useSalePerms();
-  const { store } = useSaleScope();
+  const { store, paths } = useSaleScope();
   const line = useScopedCart((s) => s.lines.find((l) => l.rowId === rowId));
+  // Dòng chưa có ảnh (vd mở từ xử lý đơn / hóa đơn): lấy ảnh từ chi tiết hàng hóa
+  // (dùng chung bộ nhớ đệm với sheet chi tiết hàng hóa mở từ khung này).
+  const productDetail = useProductDetail(line?.product.id ?? 0, perms.products && !!line && !line.product.image);
+  const fallbackImage = productDetail.data?.images?.find((i) => !!i.image)?.image ?? null;
+  const customerId = useScopedCart((s) => s.customer?.id);
+  const user = useSession((s) => s.user);
+  // Giống web: chỉ người được sửa giá mới xem lịch sử giá (API cần quyền xem đơn hàng).
+  const showHistory = perms.editPrice && canDo(user, 'orders:view') && !!customerId;
+  const history = useProductPriceHistory(customerId, line?.product.id ?? 0, showHistory);
+  // Dòng tồn như web POS: cần quyền xem tồn khi bán; từng số còn theo quyền của API đó.
+  const stock = useLineStock(
+    line?.product.id ?? 0,
+    line?.product.onHand,
+    {
+      inventory: canDo(user, 'inventory:view'),
+      customerOrdered: canDo(user, 'orders:view'),
+      supplierOrdered: canDo(user, 'order_suppliers:view'),
+      inTransit: canDo(user, 'products:view') || canDo(user, 'transfers:view'),
+    },
+    perms.viewStock,
+  );
 
   if (!line) {
     return (
@@ -173,6 +218,23 @@ export default function LineEditorScreen() {
     <LineEditorView
       line={line}
       perms={perms}
+      stock={perms.viewStock ? stock : undefined}
+      image={fallbackImage}
+      onOpenProduct={
+        perms.products
+          ? () => router.push({ pathname: paths.product, params: { id: String(line.product.id), chiXem: '1' } } as never)
+          : undefined
+      }
+      history={
+        showHistory
+          ? {
+              rows: history.data ?? [],
+              loading: history.isLoading,
+              error: history.isError ? history.error : undefined,
+              onRetry: () => void history.refetch(),
+            }
+          : undefined
+      }
       onSave={(patch) => {
         store.getState().updateLine(line.rowId, patch);
         router.back();

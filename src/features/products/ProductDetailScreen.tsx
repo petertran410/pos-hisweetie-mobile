@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, usePathname } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { dateTimeVN, dateVN, money, qty } from '@/core/format';
@@ -22,6 +22,7 @@ import {
   Pill,
   PressableScale,
   Section,
+  SheetHeader,
   SubHeader,
   TabPanel,
   toast,
@@ -403,6 +404,8 @@ export interface ProductDetailViewProps {
   busy?: boolean;
   refreshing?: boolean;
   onRefresh?: () => void;
+  /** Mở dạng sheet (chồng lên sheet sửa dòng hàng): đầu sheet có nút Đóng. */
+  sheet?: boolean;
 }
 
 /** Chi tiết hàng hóa: thông tin, tồn kho các chi nhánh, thẻ kho, loại tồn, mô tả. */
@@ -420,10 +423,14 @@ export function ProductDetailView(p: ProductDetailViewProps) {
       refreshing={p.refreshing}
       onRefresh={p.onRefresh}
       header={
-        <SubHeader
-          title={d.code}
-          right={p.onEdit ? <IconButton icon="pencil" label="Sửa hàng hóa" onPress={p.onEdit} tint={C.brand} /> : undefined}
-        />
+        p.sheet ? (
+          <SheetHeader title={d.code} cancelLabel="Đóng" />
+        ) : (
+          <SubHeader
+            title={d.code}
+            right={p.onEdit ? <IconButton icon="pencil" label="Sửa hàng hóa" onPress={p.onEdit} tint={C.brand} /> : undefined}
+          />
+        )
       }
       contentStyle={{ paddingBottom: 40 }}>
       <Section index={0} style={{ marginTop: 8 }}>
@@ -520,8 +527,12 @@ export function ProductDetailView(p: ProductDetailViewProps) {
 }
 
 export default function ProductDetailScreen() {
-  const params = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string; chiXem?: string }>();
   const id = Number(params.id);
+  // Mở từ chi tiết đơn (`productViewHref`) hoặc sheet sửa dòng hàng: chỉ xem như web POS.
+  const readOnly = params.chiXem === '1';
+  // Sheet chồng lên sheet sửa dòng (…/san-pham/[id]): màn khác mở từ đây sẽ nằm dưới sheet → không mở.
+  const inSheet = usePathname().includes('/san-pham/');
   const user = useSession((s) => s.user);
   const branchId = useSession((s) => s.branchId);
   const branches = useSession((s) => s.branches);
@@ -542,7 +553,7 @@ export default function ProductDetailScreen() {
 
   if (detail.isLoading || !detail.data) {
     return (
-      <Page stickyHeader scroll={false} header={<SubHeader title="Hàng hóa" />}>
+      <Page stickyHeader scroll={false} header={inSheet ? <SheetHeader title="Hàng hóa" cancelLabel="Đóng" /> : <SubHeader title="Hàng hóa" />}>
         {detail.isError ? <ErrorState error={detail.error} onRetry={() => void detail.refetch()} /> : <LoadingState />}
       </Page>
     );
@@ -599,20 +610,21 @@ export default function ProductDetailScreen() {
       card={logData(card)}
       condition={{ summary: summary.data, bucket, onBucket: setBucket, logs: logData(condLogs) }}
       onOpenInvoice={
-        perms.viewInvoices
+        perms.viewInvoices && !inSheet
           ? (invoiceId) => router.push({ pathname: '/hang-hoa/chung-tu/[kind]/[id]', params: { kind: 'hoa-don', id: String(invoiceId) } } as never)
           : undefined
       }
       onEdit={
-        perms.update
+        perms.update && !readOnly
           ? () => {
               startDraft(toEditForm(detail.data, branchId), d.id);
               router.push({ pathname: EDIT_PRODUCT_PATH, params: { id: String(d.id) } } as never);
             }
           : undefined
       }
-      onToggleActive={perms.toggleActive ? toggleActive : undefined}
+      onToggleActive={perms.toggleActive && !readOnly ? toggleActive : undefined}
       busy={busy}
+      sheet={inSheet}
       refreshing={refreshing}
       onRefresh={() => {
         setRefreshing(true);

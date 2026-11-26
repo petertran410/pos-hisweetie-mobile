@@ -42,6 +42,9 @@ import {
 } from './api';
 import { toInvoiceEdit, toOrderEdit } from './editOrder';
 import { confirmReplaceEdit, startOrderEdit, useDocRoutes } from './editScope';
+import { customerViewHref } from '../customers/formPaths';
+import { productViewHref } from '../products/draft';
+import { productPerms } from '../products/model';
 import { customerPerms } from '../customers/model';
 import { useCustomerEditor } from '../customers/openEdit';
 import { canPrintDoc } from '../print/perms';
@@ -84,14 +87,20 @@ function Row({ label, value, strong, tone }: { label: string; value: string; str
   );
 }
 
-function LineItem({ line, kind }: { line: DocLine; kind: DocKind }) {
+function LineItem({ line, kind, onPress }: { line: DocLine; kind: DocKind; onPress?: () => void }) {
   const badges = [
     line.gift ? 'Quà tặng' : null,
     line.condition === 'damaged' ? 'Bục rách' : null,
     line.condition === 'near_expiry' ? 'Cận date' : null,
   ].filter(Boolean) as string[];
   return (
-    <View style={styles.line}>
+    <PressableScale
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={onPress ? `${line.name}. Bấm để xem hàng hóa` : undefined}
+      scaleTo={0.985}
+      style={styles.line}>
       <View style={{ flex: 1, gap: 3 }}>
         <Txt variant="body" weight="semibold" numberOfLines={2}>
           {line.name}
@@ -120,10 +129,13 @@ function LineItem({ line, kind }: { line: DocLine; kind: DocKind }) {
           </View>
         ) : null}
       </View>
-      <Txt variant="body" weight="bold" numeric>
-        {money(line.total)}
-      </Txt>
-    </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Txt variant="body" weight="bold" numeric>
+          {money(line.total)}
+        </Txt>
+        {onPress ? <Icon name="chevron-right" size={16} color={C.faint} /> : null}
+      </View>
+    </PressableScale>
   );
 }
 
@@ -135,6 +147,10 @@ export interface OrderDetailViewProps {
   onOpenOrder?: (id: number) => void;
   /** Không có = không có quyền xem hóa đơn: không hiện link. */
   onOpenInvoice?: (id: number) => void;
+  /** Xem chi tiết khách của chứng từ (không có = thẻ khách không mở chi tiết). */
+  onViewCustomer?: () => void;
+  /** Xem hàng hóa của 1 dòng (không có = không có quyền xem hàng hóa). */
+  onOpenProduct?: (productId: number) => void;
   /** Sửa hồ sơ khách của chứng từ (không có = không được sửa). */
   onEditCustomer?: () => void;
   /** Đang tải hồ sơ khách để mở form sửa. */
@@ -161,6 +177,8 @@ export function OrderDetailView({
   onPrint,
   onOpenOrder,
   onOpenInvoice,
+  onViewCustomer,
+  onOpenProduct,
   onEditCustomer,
   editingCustomer,
   actions,
@@ -229,7 +247,13 @@ export function OrderDetailView({
       {doc.customer ? (
         <Section index={1} title="Khách hàng">
           <Card>
-            <View style={styles.customer}>
+            <PressableScale
+              onPress={onViewCustomer}
+              disabled={!onViewCustomer}
+              accessibilityRole={onViewCustomer ? 'button' : undefined}
+              accessibilityLabel={`Khách hàng ${doc.customer.name}${onViewCustomer ? '. Bấm để xem chi tiết' : ''}`}
+              scaleTo={0.98}
+              style={styles.customer}>
               <Avatar name={doc.customer.name} size={44} />
               <View style={{ flex: 1, gap: 2 }}>
                 <Txt variant="body" weight="semibold" numberOfLines={1}>
@@ -239,7 +263,8 @@ export function OrderDetailView({
                   {[doc.customer.code, doc.customer.phone].filter(Boolean).join(' · ')}
                 </Txt>
               </View>
-            </View>
+              {onViewCustomer ? <Icon name="chevron-right" size={18} color={C.faint} /> : null}
+            </PressableScale>
             {onEditCustomer ? (
               <>
                 <Divider />
@@ -275,7 +300,7 @@ export function OrderDetailView({
           {doc.lines.map((l, i) => (
             <View key={l.key}>
               {i > 0 ? <Divider inset={14} /> : null}
-              <LineItem line={l} kind={doc.kind} />
+              <LineItem line={l} kind={doc.kind} onPress={onOpenProduct && l.productId ? () => onOpenProduct(l.productId) : undefined} />
             </View>
           ))}
         </Card>
@@ -662,6 +687,15 @@ export default function OrderDetailScreen() {
       onPrint={() => router.push({ pathname: routes.print, params: { kind, id: String(data.id), code: data.code } } as never)}
       onOpenOrder={canDo(user, 'orders:view') ? (orderId) => open('order', orderId) : undefined}
       onOpenInvoice={canDo(user, 'invoices:view') ? (invoiceId) => open('invoice', invoiceId) : undefined}
+      onOpenProduct={productPerms(user).view ? (productId) => router.push(productViewHref(productId) as never) : undefined}
+      onViewCustomer={
+        canDo(user, 'customers:view') && data.customer?.id
+          ? () => {
+              const customerId = data.customer?.id;
+              if (customerId) router.push(customerViewHref(customerId, 'doc') as never);
+            }
+          : undefined
+      }
       onEditCustomer={
         canEditCustomer && data.customer?.id
           ? () => {

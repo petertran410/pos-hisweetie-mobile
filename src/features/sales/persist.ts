@@ -8,6 +8,25 @@ import { currentBook, openBook, readBook, serializeBook, setDraftsReady, useDraf
 const cartKey = (userId: number, branchId: number) => `${DRAFT_PREFIX}cart_${userId}_${branchId}`;
 const bookKey = (userId: number) => `${DRAFT_PREFIX}pricebook_${userId}`;
 
+/** Đang mở trang xem trước (dữ liệu mẫu): không ghi giỏ / đơn nháp xuống máy. */
+let paused = false;
+/** Đọc lại đơn nháp đã lưu của nhân viên + chi nhánh đang mở (do `useCartPersistence` đăng ký). */
+let reloadSaved: (() => Promise<void>) | null = null;
+
+/** Ngừng lưu giỏ / đơn nháp (trang xem trước nạp dữ liệu mẫu vào các store này). */
+export function pauseCartPersistence() {
+  paused = true;
+}
+
+/**
+ * Lưu lại như thường và đọc lại đơn nháp đã lưu trên máy — trong lúc tạm
+ * ngừng không có gì được ghi, nên máy vẫn giữ đúng đơn nháp thật.
+ */
+export async function resumeCartPersistence() {
+  paused = false;
+  await reloadSaved?.();
+}
+
 function parse<T>(raw: string | null): T | null {
   if (!raw) return null;
   try {
@@ -38,7 +57,7 @@ export function useCartPersistence(defaultMode: SaleMode) {
     const unsubscribe: (() => void)[] = [];
     const key = cartKey(userId, branchId);
 
-    void (async () => {
+    const load = async () => {
       const [rawCart, rawBook] = await Promise.all([
         AsyncStorage.getItem(key).catch(() => null),
         AsyncStorage.getItem(bookKey(userId)).catch(() => null),
@@ -53,18 +72,26 @@ export function useCartPersistence(defaultMode: SaleMode) {
           priceBookName: book?.name ?? null,
         }),
       );
+    };
+
+    void (async () => {
+      await load();
+      if (!alive) return;
       const save = () => {
         clearTimeout(timer);
         timer = setTimeout(() => {
+          if (paused) return;
           void AsyncStorage.setItem(key, serializeBook(currentBook())).catch(() => {});
         }, 400);
       };
       unsubscribe.push(useCart.subscribe(save), useDrafts.subscribe(save));
+      reloadSaved = load;
       setDraftsReady(true);
     })();
 
     return () => {
       alive = false;
+      if (reloadSaved === load) reloadSaved = null;
       setDraftsReady(false);
       clearTimeout(timer);
       unsubscribe.forEach((u) => u());

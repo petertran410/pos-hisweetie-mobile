@@ -1,9 +1,9 @@
 import { StyleSheet, View } from 'react-native';
 import { dateTimeVN, dateVN, money } from '@/core/format';
-import { Avatar, C, Pill, PressableScale, toneColors, Txt } from '@/ui';
+import { Avatar, C, Icon, Pill, PressableScale, toneColors, Txt } from '@/ui';
 import type { DocRow } from '../orders/api';
 import { isCancelled, statusOf, type DocKind } from '../orders/model';
-import type { CustomerRow, DebtEntry } from './model';
+import { RETURN_CANCELLED, returnStatusOf, type CustomerRow, type DebtEntry, type ReturnRow } from './model';
 
 /** Thẻ 1 khách trong danh sách. */
 export function CustomerCard({ row, showDebt, onPress }: { row: CustomerRow; showDebt: boolean; onPress: () => void }) {
@@ -100,6 +100,39 @@ export function HistoryCard({ kind, row, showDebt, onPress }: { kind: DocKind; r
         </Txt>
       ) : null}
     </PressableScale>
+  );
+}
+
+/** 1 phiếu trả hàng trong lịch sử hóa đơn của khách (chưa có màn chi tiết nên không bấm được). */
+export function ReturnCard({ row }: { row: ReturnRow }) {
+  const st = returnStatusOf(row.status);
+  const cancelled = row.status === RETURN_CANCELLED;
+  return (
+    <View
+      accessible
+      accessibilityLabel={`Phiếu trả hàng ${row.code}, ${dateVN(row.date)}, trả ${money(row.amount)} đồng, ${st.label}`}
+      style={[styles.doc, cancelled ? { opacity: 0.6 } : null]}>
+      <View style={styles.docRow}>
+        <Icon name="undo-2" size={16} color={C.muted} />
+        <Txt variant="body" weight="bold" numeric style={{ flex: 1 }}>
+          {row.code}
+        </Txt>
+        <Pill label={st.label} tone={st.tone} />
+      </View>
+      <View style={styles.docRow}>
+        <Txt variant="caption" color={C.muted} numeric numberOfLines={1} style={{ flex: 1 }}>
+          {[dateTimeVN(row.date), row.creatorName].filter(Boolean).join(' · ')}
+        </Txt>
+        <Txt variant="body" weight="bold" numeric style={cancelled ? styles.strike : null}>
+          −{money(row.amount)}
+        </Txt>
+      </View>
+      {row.invoiceCode ? (
+        <Txt variant="caption" color={C.muted} numeric numberOfLines={1}>
+          Trả hàng · từ HĐ {row.invoiceCode}
+        </Txt>
+      ) : null}
+    </View>
   );
 }
 
