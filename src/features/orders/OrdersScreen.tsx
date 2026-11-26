@@ -50,6 +50,7 @@ import {
   type DocPeriod,
   type StatusFilter,
 } from './model';
+import { BranchSwitch, useBranchSwitch, type BranchSwitchProps } from '../shell/BranchSwitch';
 
 function statusOptions(kind: DocKind, counts: StatusCounts | undefined) {
   const all = { value: 'all', label: 'Tất cả', count: counts?.all };
@@ -159,6 +160,8 @@ export interface OrdersViewProps {
   onCreate?: () => void;
   onOpen: (row: DocRow) => void;
   now?: Date;
+  /** Chi nhánh đang chọn ở đầu trang (bấm để đổi); không có = không hiện. */
+  branch?: BranchSwitchProps;
 }
 
 /**
@@ -185,8 +188,13 @@ export function OrdersView(p: OrdersViewProps) {
       <TitleHeader
         title="Đơn hàng"
         right={
-          p.onCreate ? (
-            <IconButton icon="plus" label="Tạo đơn hàng hoặc hóa đơn" onPress={p.onCreate} tint={C.brand} />
+          p.branch || p.onCreate ? (
+            <View style={styles.headerActions}>
+              {p.branch ? <BranchSwitch {...p.branch} /> : null}
+              {p.onCreate ? (
+                <IconButton icon="plus" label="Tạo đơn hàng hoặc hóa đơn" onPress={p.onCreate} tint={C.brand} />
+              ) : null}
+            </View>
           ) : undefined
         }>
         <View style={styles.searchRow}>
@@ -316,6 +324,7 @@ function createFromOrders() {
 
 export default function OrdersScreen() {
   const user = useSession((s) => s.user);
+  const branch = useBranchSwitch();
   const kinds = KIND_ORDER.filter((k) => canDo(user, k === 'invoice' ? 'invoices:view' : 'orders:view'));
   // Lối tắt "Hóa đơn" / "Đặt hàng" ở Tổng quan mở thẳng đúng loại (?kind=hoa-don).
   const params = useLocalSearchParams<{ kind?: string }>();
@@ -381,6 +390,7 @@ export default function OrdersScreen() {
         if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
       }}
       onCreate={canCreate ? createFromOrders : undefined}
+      branch={branch}
       onOpen={(row) =>
         router.push({ pathname: '/don-hang/[kind]/[id]', params: { kind: KIND_SLUG[active], id: String(row.id) } })
       }
@@ -389,6 +399,7 @@ export default function OrdersScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   card: {
     padding: 14,
     gap: 6,

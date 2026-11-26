@@ -29,8 +29,11 @@ import { CartBar, ProductRow } from './components';
 import { closeDraft, draftLabel, draftOptions, DRAFTS_FULL_MESSAGE, isBlankCart, newDraft, switchDraft, useDrafts } from './drafts';
 import { useSalePerms } from './perms';
 import { useSaleScope, useScopedCart } from './scope';
+import { BranchSwitch, useBranchSwitch, type BranchSwitchProps } from '../shell/BranchSwitch';
 
 export interface SalesViewProps {
+  /** Chi nhánh đang chọn ở đầu trang (bấm để đổi); không có = không hiện. */
+  branch?: BranchSwitchProps;
   search: string;
   onSearch: (text: string) => void;
   products: SaleProduct[];
@@ -111,6 +114,7 @@ export function SalesView(p: SalesViewProps) {
         title={p.editing ? 'Thêm hàng vào đơn' : 'Bán hàng'}
         right={
           <View style={styles.actions}>
+            {p.branch ? <BranchSwitch {...p.branch} /> : null}
             {p.drafts ? <IconButton icon="plus" label="Thêm đơn nháp" onPress={p.drafts.onAdd} /> : null}
             {p.onScan ? <IconButton icon="scan-barcode" label="Quét mã vạch" onPress={p.onScan} /> : null}
           </View>
@@ -242,6 +246,7 @@ export default function SalesScreen() {
   const [search, setSearch] = useState('');
   const term = useDebounced(search.trim(), 300);
   const { store, editing, paths } = useSaleScope();
+  const branch = useBranchSwitch();
   const lines = useScopedCart((s) => s.lines);
   const orderDiscount = useScopedCart((s) => s.orderDiscount);
   const shippingFee = useScopedCart((s) => s.shippingFee);
@@ -294,7 +299,9 @@ export default function SalesScreen() {
       showStock={perms.viewStock}
       priceBookName={priceBookName}
       onOpenPriceBook={perms.priceBooks ? () => router.push(paths.priceBook as never) : undefined}
-      onScan={() => router.push(paths.scan as never)}
+      // Tab Bán hàng: có chọn chi nhánh, bỏ quét mã. "Thêm hàng vào đơn" (xử lý đơn) giữ quét mã.
+      branch={editing ? undefined : branch}
+      onScan={editing ? () => router.push(paths.scan as never) : undefined}
       onAdd={(p) => {
         if (book.isLoading && priceBookId) return toast.info('Đang tải bảng giá, thử lại sau giây lát');
         addToCart(p, book.data, 1, store);
@@ -338,7 +345,7 @@ export default function SalesScreen() {
 }
 
 const styles = StyleSheet.create({
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   pills: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pill: {
     flexDirection: 'row',
