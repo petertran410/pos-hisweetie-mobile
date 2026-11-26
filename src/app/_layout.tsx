@@ -100,6 +100,8 @@ export default function RootLayout() {
                       options={{
                         presentation: 'formSheet',
                         sheetAllowedDetents: [0.55, 1],
+                        // Mở thẳng lên đầu màn hình (không dừng nửa chừng); vẫn kéo xuống nửa được.
+                        sheetInitialDetentIndex: 'last',
                         sheetGrabberVisible: true,
                         sheetCornerRadius: 24,
                         contentStyle: { backgroundColor: C.bg },
